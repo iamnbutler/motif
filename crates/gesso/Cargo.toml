@@ -2,6 +2,12 @@
 name = "gesso"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "An immediate-mode UI framework for Rust with GPU rendering"
 
 [dependencies]
 gesso_core = { path = "../gesso_core" }

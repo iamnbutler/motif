@@ -4,6 +4,12 @@ members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Nate Butler <iamnbutler@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/natebutler/gesso"
+homepage = "https://github.com/natebutler/gesso"
+keywords = ["ui", "graphics", "rendering", "metal", "gpu"]
+categories = ["gui", "graphics", "rendering"]
 
 [workspace.dependencies]

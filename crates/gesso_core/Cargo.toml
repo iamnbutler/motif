@@ -2,6 +2,12 @@
 name = "gesso_core"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core types and rendering primitives for the gesso UI framework"
 
 [dependencies]
 glam = "0.32"
