@@ -32,12 +32,11 @@ cargo test --workspace --quiet
 echo "  - Running clippy..."
 cargo clippy --workspace --quiet -- -D warnings 2>/dev/null || true
 
-# Dry run publish
+# Dry run publish (only gesso_core - gesso depends on it being published first)
 echo "  - Checking gesso_core publish..."
 cargo publish --dry-run -p gesso_core --quiet
 
-echo "  - Checking gesso publish..."
-cargo publish --dry-run -p gesso --quiet
+# Note: gesso dry-run skipped - it requires gesso_core to be on crates.io first
 
 echo ""
 echo "All checks passed!"
