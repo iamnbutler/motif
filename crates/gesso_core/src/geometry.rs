@@ -124,6 +124,22 @@ impl<T: Copy> Corners<T> {
     }
 }
 
+/// Axis in 2D space.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Axis {
+    Horizontal,
+    Vertical,
+}
+
+impl Axis {
+    pub fn invert(self) -> Self {
+        match self {
+            Axis::Horizontal => Axis::Vertical,
+            Axis::Vertical => Axis::Horizontal,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
