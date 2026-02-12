@@ -10,7 +10,7 @@ categories.workspace = true
 description = "An immediate-mode UI framework for Rust with GPU rendering"
 
 [dependencies]
-gesso_core = { path = "../gesso_core" }
+gesso_core = { version = "0.1.0", path = "../gesso_core" }
 glamour = "0.18"
 winit = "0.30"
 
