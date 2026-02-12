@@ -1,0 +1,10 @@
+[package]
+name = "gesso_core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+glam = "0.32"
+glamour = "0.18"
+
+[dev-dependencies]
