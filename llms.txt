@@ -2,6 +2,8 @@
 
 > Gesso is an immediate-mode UI framework for Rust, focusing on 2D rendering with type-safe geometry primitives.
 
+Licensed under MIT OR Apache-2.0.
+
 Gesso provides a foundation for building high-performance UI applications with idiomatic Rust patterns. It leverages glamour/glam for linear algebra with custom unit types for coordinate space safety.
 
 ## Core Concepts
