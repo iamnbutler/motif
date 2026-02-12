@@ -1,5 +1,8 @@
 //! Core geometry primitives for gesso.
 
+// Re-export Unit trait for users defining custom coordinate spaces
+pub use glamour::Unit;
+
 /// Logical pixels - DPI-independent coordinate space.
 pub struct LogicalPixels;
 
