@@ -1,6 +1,6 @@
 //! GPU frame timing benchmark - measures actual rendering with window.
 //!
-//! Usage: cargo bench --bench quad_render -- [1k|10k|100k|1m]
+//! Usage: cargo bench --bench quad_render
 
 use gesso_core::{
     metal::{MetalRenderer, MetalSurface},
@@ -251,27 +251,11 @@ impl ApplicationHandler for App {
     }
 }
 
-fn parse_quad_count(arg: &str) -> usize {
-    match arg.to_lowercase().as_str() {
-        "1k" => 1_000,
-        "10k" => 10_000,
-        "100k" => 100_000,
-        "1m" => 1_000_000,
-        _ => arg.parse().unwrap_or_else(|_| {
-            eprintln!("Invalid quad count: {}. Use 1k, 10k, 100k, 1m, or a number.", arg);
-            std::process::exit(1);
-        }),
-    }
-}
+const QUAD_COUNT: usize = 10_000;
 
 fn main() {
-    let quad_count = std::env::args()
-        .nth(1)
-        .map(|s| parse_quad_count(&s))
-        .unwrap_or(10_000);
-
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll); // Run as fast as possible
-    let mut app = App::new(quad_count);
+    let mut app = App::new(QUAD_COUNT);
     event_loop.run_app(&mut app).unwrap();
 }
