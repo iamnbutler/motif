@@ -32,5 +32,5 @@ Gesso provides a foundation for building high-performance UI applications with i
 - [metal/mod.rs](crates/gesso_core/src/metal/mod.rs) - Metal renderer (macOS): MetalRenderer, MetalSurface, QuadInstance
 - [metal/shaders.metal](crates/gesso_core/src/metal/shaders.metal) - MSL shaders for instanced quad rendering
 - [hello_window.rs](crates/gesso/examples/hello_window.rs) - Metal-rendered red quad example
-- [scene_build.rs](crates/gesso/benches/scene_build.rs) - criterion CPU benchmarks (scene building, quad conversion)
-- [quad_render.rs](crates/gesso/benches/quad_render.rs) - GPU frame timing benchmark (1k/10k/100k/1m quads)
+- [scene_build.rs](crates/gesso/benches/scene_build.rs) - criterion CPU benchmarks (DrawContext.paint_quad, scene clear, QuadInstance conversion)
+- [quad_render.rs](crates/gesso/benches/quad_render.rs) - GPU frame timing benchmark (10k quads)
