@@ -40,3 +40,10 @@
 {"v":1,"op":"complete","id":"mliuck9d-phyy","ts":"2026-02-12T02:30:04.972905Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
 {"v":1,"op":"create","id":"mliuckrn-l4tw","ts":"2026-02-12T02:30:05.603122Z","by":"@iamnbutler","branch":"main","d":{"priority":"p1","stream":"mlita3ol-lr5j","title":"Implement Renderer trait"}}
 {"v":1,"op":"complete","id":"mliuckrn-l4tw","ts":"2026-02-12T02:30:05.632173Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
+{"v":1,"op":"create_stream","id":"mliujpgk-lxtt","ts":"2026-02-12T02:35:38.276367Z","by":"@iamnbutler","branch":"main","d":{"description":"Window creation and event loop with winit","name":"windowing"}}
+{"v":1,"op":"create","id":"mliujtcj-73ka","ts":"2026-02-12T02:35:43.315143Z","by":"@iamnbutler","branch":"main","d":{"description":"Standard Rust windowing crate. Provides window creation, event loop, raw-window-handle for GPU surface attachment.","priority":"p3","stream":"mliujpgk-lxtt","title":"Decision: use winit for windowing"}}
+{"v":1,"op":"complete","id":"mliujtcj-73ka","ts":"2026-02-12T02:35:43.340737Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
+{"v":1,"op":"create","id":"mlium1pw-brkw","ts":"2026-02-12T02:37:27.476782Z","by":"@iamnbutler","branch":"main","d":{"priority":"p2","stream":"mliujpgk-lxtt","title":"Add winit dependency"}}
+{"v":1,"op":"complete","id":"mlium1pw-brkw","ts":"2026-02-12T02:37:27.507926Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
+{"v":1,"op":"create","id":"mlium2ab-zmjc","ts":"2026-02-12T02:37:28.211058Z","by":"@iamnbutler","branch":"main","d":{"priority":"p2","stream":"mliujpgk-lxtt","title":"Create hello_window example"}}
+{"v":1,"op":"complete","id":"mlium2ab-zmjc","ts":"2026-02-12T02:37:28.241600Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
