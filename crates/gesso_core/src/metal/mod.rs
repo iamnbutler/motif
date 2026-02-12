@@ -122,6 +122,11 @@ impl MetalSurface {
     pub fn layer(&self) -> &MetalLayer {
         &self.layer
     }
+
+    /// Enable or disable vsync. Disabled is useful for benchmarking.
+    pub fn set_vsync(&self, enabled: bool) {
+        self.layer.set_display_sync_enabled(enabled);
+    }
 }
 
 pub struct MetalRenderer {

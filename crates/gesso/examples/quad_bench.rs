@@ -152,6 +152,7 @@ impl ApplicationHandler for App {
 
             let renderer = MetalRenderer::new();
             let surface = unsafe { MetalSurface::new(&window, renderer.device()) };
+            surface.set_vsync(false); // Disable vsync for accurate benchmarking
 
             window.request_redraw();
             self.window = Some(window);
