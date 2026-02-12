@@ -1,0 +1,24 @@
+# Gesso
+
+> Gesso is an immediate-mode UI framework for Rust, focusing on 2D rendering with type-safe geometry primitives.
+
+Gesso provides a foundation for building high-performance UI applications with idiomatic Rust patterns. It leverages glamour/glam for linear algebra with custom unit types for coordinate space safety.
+
+## Core Concepts
+
+- **Coordinate Spaces**: Type-safe distinction between LogicalPixels (DPI-independent) and DevicePixels (physical)
+- **Layout Primitives**: Edges, Corners for padding/margin/border/radii
+- **Glamour Integration**: Re-exports glamour's Unit trait for custom coordinate spaces
+
+## Crates
+
+- [gesso](crates/gesso/) - Main crate, re-exports gesso_core
+- [gesso_core](crates/gesso_core/) - Core types including geometry module
+
+## Documentation
+
+- [Geometry Design](docs/plans/2026-02-11-geometry-module-design.md) - Architecture decisions for geometry module
+
+## Key Files
+
+- [geometry.rs](crates/gesso_core/src/geometry.rs) - Core geometry primitives (Point, Size, Rect, Vector, Edges, Corners, Axis, ScaleFactor)
