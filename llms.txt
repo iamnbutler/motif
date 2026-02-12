@@ -21,6 +21,7 @@ Gesso provides a foundation for building high-performance UI applications with i
 
 - [Geometry Design](docs/plans/2026-02-11-geometry-module-design.md) - Architecture decisions for geometry module
 - [Draw Abstraction Design](docs/plans/2026-02-11-draw-abstraction-design.md) - Scene, DrawContext, Renderer trait
+- [Metal Renderer Design](docs/plans/2026-02-11-metal-renderer-design.md) - Metal GPU backend architecture
 
 ## Key Files
 
@@ -28,4 +29,6 @@ Gesso provides a foundation for building high-performance UI applications with i
 - [scene.rs](crates/gesso_core/src/scene.rs) - Scene and Quad primitive
 - [context.rs](crates/gesso_core/src/context.rs) - DrawContext painter's stack
 - [renderer.rs](crates/gesso_core/src/renderer.rs) - Renderer trait, DebugRenderer
-- [hello_window.rs](crates/gesso/examples/hello_window.rs) - Basic winit window example
+- [metal/mod.rs](crates/gesso_core/src/metal/mod.rs) - Metal renderer (macOS): MetalRenderer, MetalSurface, QuadInstance
+- [metal/shaders.metal](crates/gesso_core/src/metal/shaders.metal) - MSL shaders for instanced quad rendering
+- [hello_window.rs](crates/gesso/examples/hello_window.rs) - Metal-rendered red quad example
