@@ -41,6 +41,7 @@ impl ApplicationHandler for App {
             let renderer = MetalRenderer::new();
             let surface = unsafe { MetalSurface::new(&window, renderer.device()) };
 
+            window.request_redraw();
             self.window = Some(window);
             self.renderer = Some(renderer);
             self.surface = Some(surface);
