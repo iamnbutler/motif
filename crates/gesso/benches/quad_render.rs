@@ -1,6 +1,6 @@
-//! Benchmark quad rendering performance.
+//! GPU frame timing benchmark - measures actual rendering with window.
 //!
-//! Usage: cargo bench --bench quad_bench -- [1k|10k|100k|1m]
+//! Usage: cargo bench --bench quad_render -- [1k|10k|100k|1m]
 
 use gesso_core::{
     metal::{MetalRenderer, MetalSurface},

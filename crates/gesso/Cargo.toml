@@ -9,8 +9,13 @@ glamour = "0.18"
 winit = "0.30"
 
 [dev-dependencies]
+criterion = "0.5"
 rand = { version = "0.8", features = ["small_rng"] }
 
 [[bench]]
-name = "quad_bench"
+name = "scene_build"
+harness = false
+
+[[bench]]
+name = "quad_render"
 harness = false
