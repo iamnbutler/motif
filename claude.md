@@ -1,0 +1,7 @@
+- use `spool` to track tasks
+  - spool `streams` for epics/projects
+  - spool tasks for individual tasks
+  - spool is _project_ memory, and a paper trail. Not redundant with session tasks.
+- use TDD for all features
+  - do not test things that the compiler can validate (Foo is an f32, bar can be initialized...)
+  - write the tests, make them fail, then write the logic to make them pass.
