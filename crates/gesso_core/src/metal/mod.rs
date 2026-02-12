@@ -3,7 +3,7 @@
 /// Metal shader source, compiled at runtime.
 const SHADER_SOURCE: &str = include_str!("shaders.metal");
 
-use crate::Quad;
+use crate::{Quad, Renderer, Scene};
 use core_graphics_types::geometry::CGSize;
 use foreign_types::ForeignType;
 use metal::{
@@ -191,5 +191,78 @@ impl MetalRenderer {
 impl Default for MetalRenderer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Renderer for MetalRenderer {
+    type Surface = MetalSurface;
+
+    fn render(&mut self, scene: &Scene, surface: &mut MetalSurface) {
+        let quads = scene.quads();
+        if quads.is_empty() {
+            return;
+        }
+
+        // Grow instance buffer if needed
+        if quads.len() > self.instance_capacity {
+            self.instance_capacity = quads.len().next_power_of_two();
+            self.instance_buffer = self.device.new_buffer(
+                (self.instance_capacity * mem::size_of::<QuadInstance>()) as u64,
+                MTLResourceOptions::StorageModeShared,
+            );
+        }
+
+        // Copy quad data to instance buffer
+        let instances: Vec<QuadInstance> = quads.iter().map(QuadInstance::from_quad).collect();
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                instances.as_ptr(),
+                self.instance_buffer.contents() as *mut QuadInstance,
+                instances.len(),
+            );
+        }
+
+        // Get drawable
+        let drawable = match surface.layer().next_drawable() {
+            Some(d) => d,
+            None => return,
+        };
+
+        // Create command buffer and encoder
+        let command_buffer = self.command_queue.new_command_buffer();
+
+        let render_pass_desc = metal::RenderPassDescriptor::new();
+        let color_attachment = render_pass_desc.color_attachments().object_at(0).unwrap();
+        color_attachment.set_texture(Some(drawable.texture()));
+        color_attachment.set_load_action(metal::MTLLoadAction::Clear);
+        color_attachment.set_clear_color(metal::MTLClearColor::new(0.0, 0.0, 0.0, 1.0));
+        color_attachment.set_store_action(metal::MTLStoreAction::Store);
+
+        let encoder = command_buffer.new_render_command_encoder(render_pass_desc);
+
+        encoder.set_render_pipeline_state(&self.pipeline);
+        encoder.set_vertex_buffer(0, Some(&self.unit_quad_buffer), 0);
+        encoder.set_vertex_buffer(1, Some(&self.instance_buffer), 0);
+
+        // Pass viewport size as uniform
+        let viewport_size: [f32; 2] = [surface.drawable_size().0, surface.drawable_size().1];
+        encoder.set_vertex_bytes(
+            2,
+            mem::size_of::<[f32; 2]>() as u64,
+            viewport_size.as_ptr() as *const _,
+        );
+
+        // Draw instanced triangle strip
+        encoder.draw_primitives_instanced(
+            metal::MTLPrimitiveType::TriangleStrip,
+            0,
+            4,
+            quads.len() as u64,
+        );
+
+        encoder.end_encoding();
+
+        command_buffer.present_drawable(drawable);
+        command_buffer.commit();
     }
 }
