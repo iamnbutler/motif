@@ -5,4 +5,5 @@ edition.workspace = true
 
 [dependencies]
 gesso_core = { path = "../gesso_core" }
+glamour = "0.18"
 winit = "0.30"
