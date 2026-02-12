@@ -6,7 +6,11 @@ const SHADER_SOURCE: &str = include_str!("shaders.metal");
 use crate::Quad;
 use core_graphics_types::geometry::CGSize;
 use foreign_types::ForeignType;
-use metal::{Device, MetalLayer};
+use metal::{
+    Buffer, CommandQueue, CompileOptions, Device, MTLResourceOptions,
+    MetalLayer, RenderPipelineDescriptor, RenderPipelineState,
+};
+use std::mem;
 use objc::{msg_send, sel, sel_impl, runtime::{Object, YES}};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
@@ -21,6 +25,16 @@ struct CGPoint {
     x: f64,
     y: f64,
 }
+
+/// Unit quad vertices for triangle strip: [0,0], [1,0], [0,1], [1,1]
+const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [1.0, 1.0],
+];
+
+const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
 /// GPU-side quad instance data.
 /// Tightly packed for Metal buffer: 32 bytes per quad.
@@ -107,5 +121,75 @@ impl MetalSurface {
 
     pub fn layer(&self) -> &MetalLayer {
         &self.layer
+    }
+}
+
+pub struct MetalRenderer {
+    device: Device,
+    command_queue: CommandQueue,
+    pipeline: RenderPipelineState,
+    unit_quad_buffer: Buffer,
+    instance_buffer: Buffer,
+    instance_capacity: usize,
+}
+
+impl MetalRenderer {
+    pub fn new() -> Self {
+        let device = Device::system_default().expect("No Metal device found");
+        let command_queue = device.new_command_queue();
+
+        // Compile shader
+        let library = device
+            .new_library_with_source(SHADER_SOURCE, &CompileOptions::new())
+            .expect("Failed to compile shader");
+
+        let vertex_fn = library.get_function("vertex_main", None).unwrap();
+        let fragment_fn = library.get_function("fragment_main", None).unwrap();
+
+        // Create pipeline
+        let pipeline_desc = RenderPipelineDescriptor::new();
+        pipeline_desc.set_vertex_function(Some(&vertex_fn));
+        pipeline_desc.set_fragment_function(Some(&fragment_fn));
+        pipeline_desc
+            .color_attachments()
+            .object_at(0)
+            .unwrap()
+            .set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
+
+        let pipeline = device
+            .new_render_pipeline_state(&pipeline_desc)
+            .expect("Failed to create pipeline");
+
+        // Create unit quad buffer
+        let unit_quad_buffer = device.new_buffer_with_data(
+            UNIT_QUAD_VERTICES.as_ptr() as *const _,
+            (UNIT_QUAD_VERTICES.len() * mem::size_of::<[f32; 2]>()) as u64,
+            MTLResourceOptions::StorageModeShared,
+        );
+
+        // Create instance buffer
+        let instance_buffer = device.new_buffer(
+            (INITIAL_INSTANCE_CAPACITY * mem::size_of::<QuadInstance>()) as u64,
+            MTLResourceOptions::StorageModeShared,
+        );
+
+        Self {
+            device,
+            command_queue,
+            pipeline,
+            unit_quad_buffer,
+            instance_buffer,
+            instance_capacity: INITIAL_INSTANCE_CAPACITY,
+        }
+    }
+
+    pub fn device(&self) -> &Device {
+        &self.device
+    }
+}
+
+impl Default for MetalRenderer {
+    fn default() -> Self {
+        Self::new()
     }
 }
