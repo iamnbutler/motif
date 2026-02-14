@@ -27,7 +27,7 @@ const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [
 const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
 /// GPU-side quad instance data.
-/// Tightly packed for Metal buffer: 80 bytes per quad.
+/// Tightly packed for Metal buffer: 104 bytes per quad.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadInstance {
@@ -41,6 +41,12 @@ pub struct QuadInstance {
     pub border_widths: [f32; 4],
     /// top_left, top_right, bottom_right, bottom_left
     pub corner_radii: [f32; 4],
+    /// x, y, width, height of clip region
+    pub clip_bounds: [f32; 4],
+    /// 1.0 if clip is active, 0.0 otherwise
+    pub has_clip: f32,
+    /// Padding for alignment (Metal likes 16-byte alignment)
+    pub _padding: [f32; 3],
 }
 
 impl QuadInstance {
@@ -76,6 +82,11 @@ impl QuadInstance {
                 quad.corner_radii.bottom_right,
                 quad.corner_radii.bottom_left,
             ],
+            clip_bounds: quad.clip_bounds.map_or([0.0, 0.0, 0.0, 0.0], |r| {
+                [r.origin.x, r.origin.y, r.size.width, r.size.height]
+            }),
+            has_clip: if quad.clip_bounds.is_some() { 1.0 } else { 0.0 },
+            _padding: [0.0; 3],
         }
     }
 }
@@ -327,5 +338,35 @@ mod tests {
 
         // Corner radii should be captured (top_left, top_right, bottom_right, bottom_left)
         assert_eq!(instance.corner_radii, [8.0, 8.0, 8.0, 8.0]);
+    }
+
+    #[test]
+    fn quad_instance_captures_clip_bounds() {
+        let mut quad = Quad::new(
+            DeviceRect::new(Point2::new(0.0, 0.0), Size2::new(100.0, 100.0)),
+            Srgba::new(1.0, 0.0, 0.0, 1.0),
+        );
+        quad.clip_bounds = Some(DeviceRect::new(
+            Point2::new(10.0, 20.0),
+            Size2::new(50.0, 60.0),
+        ));
+
+        let instance = QuadInstance::from_quad(&quad);
+
+        // Clip bounds: x, y, width, height
+        assert_eq!(instance.clip_bounds, [10.0, 20.0, 50.0, 60.0]);
+        assert_eq!(instance.has_clip, 1.0); // Flag indicating clip is active
+    }
+
+    #[test]
+    fn quad_instance_no_clip() {
+        let quad = Quad::new(
+            DeviceRect::new(Point2::new(0.0, 0.0), Size2::new(100.0, 100.0)),
+            Srgba::new(1.0, 0.0, 0.0, 1.0),
+        );
+
+        let instance = QuadInstance::from_quad(&quad);
+
+        assert_eq!(instance.has_clip, 0.0); // No clip
     }
 }

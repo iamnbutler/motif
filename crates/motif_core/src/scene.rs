@@ -11,6 +11,8 @@ pub struct Quad {
     pub border_color: Srgba,
     pub border_widths: Edges<f32>,
     pub corner_radii: Corners<f32>,
+    /// Optional clip bounds in device pixels. Fragments outside are discarded.
+    pub clip_bounds: Option<DeviceRect>,
 }
 
 impl Quad {
@@ -21,6 +23,7 @@ impl Quad {
             border_color: Srgba::new(0.0, 0.0, 0.0, 0.0),
             border_widths: Edges::default(),
             corner_radii: Corners::default(),
+            clip_bounds: None,
         }
     }
 }

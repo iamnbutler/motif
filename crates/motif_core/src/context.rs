@@ -52,12 +52,22 @@ impl<'a> DrawContext<'a> {
 
     /// Paint a simple filled quad.
     pub fn paint_quad(&mut self, bounds: Rect, fill: impl Into<Srgba>) {
-        self.paint(Quad::new(self.to_device_rect(bounds), fill));
+        let mut quad = Quad::new(self.to_device_rect(bounds), fill);
+        self.apply_clip(&mut quad);
+        self.scene.push_quad(quad);
     }
 
     /// Paint a quad with full control.
-    pub fn paint(&mut self, quad: Quad) {
+    pub fn paint(&mut self, mut quad: Quad) {
+        self.apply_clip(&mut quad);
         self.scene.push_quad(quad);
+    }
+
+    /// Apply current clip stack to quad.
+    fn apply_clip(&self, quad: &mut Quad) {
+        if let Some(clip) = self.clip_stack.last() {
+            quad.clip_bounds = Some(self.scale_factor.scale_rect(*clip));
+        }
     }
 
     /// Convert logical rect to device rect, applying current offset and scale.
@@ -144,5 +154,36 @@ mod tests {
         assert_eq!(quads[0].bounds.origin.y, 40.0);
         assert_eq!(quads[0].bounds.size.width, 200.0);
         assert_eq!(quads[0].bounds.size.height, 100.0);
+    }
+
+    #[test]
+    fn clip_bounds_applied() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        // Paint without clip - should have no clip bounds
+        cx.paint_quad(
+            Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+            Srgba::new(1.0, 0.0, 0.0, 1.0),
+        );
+
+        // Paint with clip
+        cx.with_clip(Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 50.0)), |cx| {
+            cx.paint_quad(
+                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                Srgba::new(0.0, 1.0, 0.0, 1.0),
+            );
+        });
+
+        let quads = scene.quads();
+        // First quad has no clip
+        assert!(quads[0].clip_bounds.is_none());
+        // Second quad should have clip bounds
+        let clip = quads[1].clip_bounds.expect("should have clip bounds");
+        assert_eq!(clip.origin.x, 10.0);
+        assert_eq!(clip.origin.y, 10.0);
+        assert_eq!(clip.size.width, 50.0);
+        assert_eq!(clip.size.height, 50.0);
     }
 }
