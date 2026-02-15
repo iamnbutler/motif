@@ -1,6 +1,6 @@
 //! DrawContext provides a painter's stack for building scenes.
 
-use crate::{DeviceRect, Point, Quad, Rect, ScaleFactor, Scene};
+use crate::{DevicePoint, DeviceRect, Point, Quad, Rect, ScaleFactor, Scene, TextContext, TextRun};
 use palette::Srgba;
 
 /// Painter's stack for hierarchical drawing.
@@ -78,12 +78,48 @@ impl<'a> DrawContext<'a> {
         let scaled_size = self.scale_factor.scale_size(rect.size);
         DeviceRect::new(scaled_origin, scaled_size)
     }
+
+    /// Convert logical point to device point, applying current offset and scale.
+    fn to_device_point(&self, point: Point) -> DevicePoint {
+        let offset = self.current_offset();
+        let origin = Point::new(point.x + offset.x, point.y + offset.y);
+        self.scale_factor.scale_point(origin)
+    }
+
+    /// Paint text at the given position.
+    ///
+    /// The position is the baseline origin (left side of first glyph baseline).
+    pub fn paint_text(
+        &mut self,
+        text: &str,
+        position: Point,
+        font_size: f32,
+        color: impl Into<Srgba>,
+        text_ctx: &mut TextContext,
+    ) {
+        let layout = text_ctx.layout_text(text, font_size * self.scale_factor.0);
+        let device_origin = self.to_device_point(position);
+        let color = color.into();
+
+        for run in layout.glyph_runs_with_font() {
+            if let Some(font) = run.font_data {
+                let mut text_run = TextRun::new(device_origin, color, run.font_size, font);
+                text_run.normalized_coords = run.normalized_coords;
+
+                for glyph in run.glyphs {
+                    text_run.push_glyph(glyph.id, glyph.x, glyph.y);
+                }
+
+                self.scene.push_text_run(text_run);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Size;
+    use crate::{Size, TextContext};
 
     #[test]
     fn offset_stacking() {
@@ -185,5 +221,50 @@ mod tests {
         assert_eq!(clip.origin.y, 10.0);
         assert_eq!(clip.size.width, 50.0);
         assert_eq!(clip.size.height, 50.0);
+    }
+
+    #[test]
+    fn paint_text_creates_text_runs() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.paint_text(
+            "Hello",
+            Point::new(10.0, 50.0),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0, "should create text runs");
+        let text_run = &scene.text_runs()[0];
+        assert!(!text_run.glyphs.is_empty(), "should have glyphs");
+        assert_eq!(text_run.origin.x, 10.0);
+        assert_eq!(text_run.origin.y, 50.0);
+    }
+
+    #[test]
+    fn paint_text_respects_offset() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.with_offset(Point::new(100.0, 200.0), |cx| {
+            cx.paint_text(
+                "Hi",
+                Point::new(10.0, 20.0),
+                16.0,
+                Srgba::new(0.0, 0.0, 0.0, 1.0),
+                &mut text_ctx,
+            );
+        });
+
+        let text_run = &scene.text_runs()[0];
+        // Position should be offset: 100+10=110, 200+20=220
+        assert_eq!(text_run.origin.x, 110.0);
+        assert_eq!(text_run.origin.y, 220.0);
     }
 }
