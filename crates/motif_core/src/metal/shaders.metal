@@ -112,3 +112,59 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
 
     return in.color;
 }
+
+// ============================================================================
+// Text rendering shaders
+// ============================================================================
+
+struct GlyphInstance {
+    float4 bounds;  // x, y, width, height in device pixels
+    float4 uv;      // u_min, v_min, u_max, v_max
+    float4 color;   // r, g, b, a
+};
+
+struct TextVertexOut {
+    float4 position [[position]];
+    float4 color;
+    float2 uv;
+};
+
+vertex TextVertexOut text_vertex_main(
+    uint vertex_id [[vertex_id]],
+    uint instance_id [[instance_id]],
+    constant float2 *vertices [[buffer(0)]],
+    constant GlyphInstance *instances [[buffer(1)]],
+    constant float2 &viewport_size [[buffer(2)]]
+) {
+    float2 unit_pos = vertices[vertex_id];
+    GlyphInstance inst = instances[instance_id];
+
+    // Scale unit quad to glyph bounds
+    float2 pos = inst.bounds.xy + unit_pos * inst.bounds.zw;
+
+    // Device pixels → clip space [-1, 1]
+    float2 clip = (pos / viewport_size) * 2.0 - 1.0;
+    clip.y = -clip.y;
+
+    // Interpolate UV coordinates
+    float2 uv = inst.uv.xy + unit_pos * (inst.uv.zw - inst.uv.xy);
+
+    TextVertexOut out;
+    out.position = float4(clip, 0.0, 1.0);
+    out.color = inst.color;
+    out.uv = uv;
+    return out;
+}
+
+fragment float4 text_fragment_main(
+    TextVertexOut in [[stage_in]],
+    texture2d<float> atlas [[texture(0)]]
+) {
+    constexpr sampler atlas_sampler(filter::linear);
+
+    // Sample alpha from glyph atlas
+    float alpha = atlas.sample(atlas_sampler, in.uv).r;
+
+    // Apply alpha to text color
+    return float4(in.color.rgb, in.color.a * alpha);
+}
