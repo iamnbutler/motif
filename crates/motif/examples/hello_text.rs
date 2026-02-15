@@ -55,11 +55,9 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
+                // Note: size is already in physical pixels
                 if let Some(surface) = &mut self.surface {
-                    if let Some(window) = &self.window {
-                        let scale = window.scale_factor() as f32;
-                        surface.resize(size.width as f32 * scale, size.height as f32 * scale);
-                    }
+                    surface.resize(size.width as f32, size.height as f32);
                 }
             }
             WindowEvent::RedrawRequested => {

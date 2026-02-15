@@ -534,7 +534,7 @@ impl Renderer for MetalRenderer {
 
         let viewport_size: [f32; 2] = [surface.drawable_size().0, surface.drawable_size().1];
 
-        // Render quads
+        // Render quads with instancing
         if !quad_instances.is_empty() {
             encoder.set_render_pipeline_state(&self.quad_pipeline);
             encoder.set_vertex_buffer(0, Some(&self.unit_quad_buffer), 0);
