@@ -10,9 +10,11 @@ categories.workspace = true
 description = "Core types and rendering primitives for the motif UI framework"
 
 [dependencies]
+accesskit = "0.24"
 glam = "0.32"
 glamour = "0.18"
 palette = "0.7"
+parley = { version = "0.7", features = ["accesskit"] }
 winit = "0.30"
 
 [target.'cfg(target_os = "macos")'.dependencies]

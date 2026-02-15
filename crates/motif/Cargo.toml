@@ -10,6 +10,8 @@ categories.workspace = true
 description = "An immediate-mode UI framework for Rust with GPU rendering"
 
 [dependencies]
+accesskit = "0.24"
+accesskit_winit = "0.32"
 motif_core = { version = "0.0.1", path = "../motif_core" }
 glamour = "0.18"
 winit = "0.30"
