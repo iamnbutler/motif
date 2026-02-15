@@ -4,7 +4,7 @@ use parley::{FontContext, LayoutContext};
 use std::collections::HashMap;
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno::Format;
-use swash::FontRef;
+use swash::{FontRef, Metrics as SwashMetrics};
 
 /// Shared resources for text layout.
 pub struct TextContext {
@@ -48,6 +48,60 @@ pub struct TextLayout {
     layout: parley::Layout<()>,
 }
 
+/// Font metrics from the OS/2 and hhea tables.
+#[derive(Clone, Copy, Debug)]
+pub struct FontMetrics {
+    /// Distance from baseline to top of the alignment box.
+    pub ascent: f32,
+    /// Distance from baseline to bottom of the alignment box (typically negative).
+    pub descent: f32,
+    /// Recommended additional spacing between lines.
+    pub leading: f32,
+    /// Distance from baseline to top of capital letters.
+    pub cap_height: f32,
+    /// Distance from baseline to top of lowercase 'x'.
+    pub x_height: f32,
+    /// Recommended underline position (from baseline).
+    pub underline_offset: f32,
+    /// Recommended strikeout position (from baseline).
+    pub strikeout_offset: f32,
+    /// Recommended stroke thickness.
+    pub stroke_size: f32,
+}
+
+impl FontMetrics {
+    /// Create font metrics from swash metrics.
+    pub fn from_swash(m: &SwashMetrics) -> Self {
+        Self {
+            ascent: m.ascent,
+            descent: m.descent,
+            leading: m.leading,
+            cap_height: m.cap_height,
+            x_height: m.x_height,
+            underline_offset: m.underline_offset,
+            strikeout_offset: m.strikeout_offset,
+            stroke_size: m.stroke_size,
+        }
+    }
+}
+
+/// Metrics for a line of text.
+#[derive(Clone, Copy, Debug)]
+pub struct LineLayoutMetrics {
+    /// Typographic ascent for this line.
+    pub ascent: f32,
+    /// Typographic descent for this line.
+    pub descent: f32,
+    /// Typographic leading for this line.
+    pub leading: f32,
+    /// Total line height (ascent + descent + leading).
+    pub line_height: f32,
+    /// Y offset to the baseline from the line's top.
+    pub baseline: f32,
+    /// Total advance width of the line.
+    pub advance: f32,
+}
+
 impl TextLayout {
     pub fn width(&self) -> f32 {
         self.layout.width()
@@ -57,14 +111,50 @@ impl TextLayout {
         self.layout.height()
     }
 
+    /// Get metrics for each line in the layout.
+    pub fn line_metrics(&self) -> Vec<LineLayoutMetrics> {
+        self.layout
+            .lines()
+            .map(|line| {
+                let m = line.metrics();
+                LineLayoutMetrics {
+                    ascent: m.ascent,
+                    descent: m.descent,
+                    leading: m.leading,
+                    line_height: m.line_height,
+                    baseline: m.baseline,
+                    advance: m.advance,
+                }
+            })
+            .collect()
+    }
+
+    /// Get font metrics for the first run in the layout.
+    /// Returns None if there are no runs.
+    pub fn font_metrics(&self) -> Option<FontMetrics> {
+        for line in self.layout.lines() {
+            for item in line.items() {
+                if let parley::layout::PositionedLayoutItem::GlyphRun(run) = item {
+                    let font_data = run.run().font();
+                    let font_ref = FontRef::from_index(font_data.data.as_ref(), font_data.index as usize)?;
+                    let normalized_coords: Vec<i16> = run.run().normalized_coords().to_vec();
+                    let swash_metrics = font_ref.metrics(&normalized_coords).scale(run.run().font_size());
+                    return Some(FontMetrics::from_swash(&swash_metrics));
+                }
+            }
+        }
+        None
+    }
+
     /// Iterate over glyph runs for rendering.
     pub fn glyph_runs(&self) -> impl Iterator<Item = GlyphRun> + '_ {
         self.layout.lines().flat_map(|line| {
             line.items().filter_map(|item| {
                 match item {
                     parley::layout::PositionedLayoutItem::GlyphRun(run) => {
+                        // Use positioned_glyphs() which handles advance accumulation
                         let glyphs: Vec<PositionedGlyph> = run
-                            .glyphs()
+                            .positioned_glyphs()
                             .map(|g| PositionedGlyph {
                                 id: g.id as u32,
                                 x: g.x,
@@ -242,8 +332,9 @@ impl TextLayout {
             line.items().filter_map(|item| {
                 match item {
                     parley::layout::PositionedLayoutItem::GlyphRun(run) => {
+                        // Use positioned_glyphs() which handles advance accumulation
                         let glyphs: Vec<PositionedGlyph> = run
-                            .glyphs()
+                            .positioned_glyphs()
                             .map(|g| PositionedGlyph {
                                 id: g.id as u32,
                                 x: g.x,

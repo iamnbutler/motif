@@ -1,24 +1,56 @@
 //! DrawContext provides a painter's stack for building scenes.
 
-use crate::{DevicePoint, DeviceRect, Point, Quad, Rect, ScaleFactor, Scene, TextContext, TextRun};
+use crate::{
+    AccessId, AccessNode, AccessRole, AccessTree, DevicePoint, DeviceRect, Point, Quad, Rect,
+    ScaleFactor, Scene, Size, TextContext, TextRun,
+};
 use palette::Srgba;
 
 /// Painter's stack for hierarchical drawing.
 pub struct DrawContext<'a> {
     scene: &'a mut Scene,
+    access_tree: Option<&'a mut AccessTree>,
     scale_factor: ScaleFactor,
     offset_stack: Vec<Point>,
     clip_stack: Vec<Rect>,
+    next_access_id: u64,
 }
 
 impl<'a> DrawContext<'a> {
     pub fn new(scene: &'a mut Scene, scale_factor: ScaleFactor) -> Self {
         Self {
             scene,
+            access_tree: None,
             scale_factor,
             offset_stack: vec![Point::new(0.0, 0.0)],
             clip_stack: Vec::new(),
+            next_access_id: 1,
         }
+    }
+
+    /// Create a DrawContext with accessibility support.
+    ///
+    /// When enabled, `paint_text()` will also create AccessNodes in the AccessTree.
+    pub fn with_accessibility(
+        scene: &'a mut Scene,
+        access_tree: &'a mut AccessTree,
+        scale_factor: ScaleFactor,
+    ) -> Self {
+        Self {
+            scene,
+            access_tree: Some(access_tree),
+            scale_factor,
+            offset_stack: vec![Point::new(0.0, 0.0)],
+            clip_stack: Vec::new(),
+            next_access_id: 1,
+        }
+    }
+
+    /// Generate a unique AccessId for accessibility nodes.
+    fn next_access_id(&mut self) -> AccessId {
+        let id = AccessId(self.next_access_id);
+        self.next_access_id += 1;
+        id
     }
 
     /// Current offset (sum of all pushed offsets).
@@ -89,6 +121,7 @@ impl<'a> DrawContext<'a> {
     /// Paint text at the given position.
     ///
     /// The position is the baseline origin (left side of first glyph baseline).
+    /// If accessibility is enabled, also creates an AccessNode for screen readers.
     pub fn paint_text(
         &mut self,
         text: &str,
@@ -98,8 +131,52 @@ impl<'a> DrawContext<'a> {
         text_ctx: &mut TextContext,
     ) {
         let layout = text_ctx.layout_text(text, font_size * self.scale_factor.0);
-        let device_origin = self.to_device_point(position);
+        let device_position = self.to_device_point(position);
         let color = color.into();
+
+        // Get the baseline offset from the first line so we can position correctly.
+        // positioned_glyphs() returns y values relative to layout top, with baseline added.
+        // We need to subtract baseline so the text baseline lands at the specified position.
+        let line_metrics = layout.line_metrics();
+        let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
+
+        let device_origin = DevicePoint::new(
+            device_position.x,
+            device_position.y - baseline_offset,
+        );
+
+        // Create accessibility node if enabled
+        if self.access_tree.is_some() {
+            let offset = self.current_offset();
+
+            // Calculate text bounds in logical coordinates
+            // Position is baseline, so we need to compute the bounding box
+            let ascent = line_metrics.first().map(|m| m.ascent).unwrap_or(0.0);
+            let descent = line_metrics.first().map(|m| m.descent).unwrap_or(0.0);
+
+            // Scale metrics back to logical coordinates
+            let scale = self.scale_factor.0;
+            let logical_ascent = ascent / scale;
+            let logical_descent = descent / scale;
+
+            let bounds = Rect::new(
+                Point::new(
+                    position.x + offset.x,
+                    position.y + offset.y - logical_ascent,
+                ),
+                Size::new(layout.width() / scale, logical_ascent + logical_descent),
+            );
+
+            let access_id = self.next_access_id();
+            let node = AccessNode::new(access_id, AccessRole::Label, text.to_string())
+                .with_bounds(bounds);
+
+            // We need to use the access_tree, but it's behind Option<&mut>
+            // Take it temporarily to satisfy borrow checker
+            if let Some(tree) = self.access_tree.as_mut() {
+                tree.push(node);
+            }
+        }
 
         for run in layout.glyph_runs_with_font() {
             if let Some(font) = run.font_data {
@@ -241,8 +318,11 @@ mod tests {
         assert!(scene.text_run_count() > 0, "should create text runs");
         let text_run = &scene.text_runs()[0];
         assert!(!text_run.glyphs.is_empty(), "should have glyphs");
+        // X position should be exact
         assert_eq!(text_run.origin.x, 10.0);
-        assert_eq!(text_run.origin.y, 50.0);
+        // Y position is adjusted for baseline - origin is above baseline
+        // so the text baseline lands at the specified position
+        assert!(text_run.origin.y < 50.0, "origin should be above baseline position");
     }
 
     #[test]
@@ -263,8 +343,58 @@ mod tests {
         });
 
         let text_run = &scene.text_runs()[0];
-        // Position should be offset: 100+10=110, 200+20=220
+        // X position should be offset: 100+10=110
         assert_eq!(text_run.origin.x, 110.0);
-        assert_eq!(text_run.origin.y, 220.0);
+        // Y position is offset (200+20=220) minus baseline offset
+        // so origin is above 220 but offset is correctly applied
+        assert!(text_run.origin.y < 220.0, "origin should be above baseline position");
+        assert!(text_run.origin.y > 200.0, "origin should be below the offset y");
+    }
+
+    #[test]
+    fn paint_text_creates_access_node_when_enabled() {
+        use crate::{AccessId, AccessRole, AccessTree};
+
+        let mut scene = Scene::new();
+        let mut access_tree = AccessTree::new(AccessId(0));
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::with_accessibility(&mut scene, &mut access_tree, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.paint_text(
+            "Hello World",
+            Point::new(50.0, 100.0),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        // Should have created an accessibility node
+        assert!(access_tree.node_count() > 0, "should create access node");
+
+        // Find the text node (it will have a generated ID starting from 1)
+        let node = access_tree.get(AccessId(1)).expect("should have node with ID 1");
+        assert_eq!(node.role, AccessRole::Label);
+        assert_eq!(node.name, "Hello World");
+        assert!(node.bounds.is_some(), "should have bounds");
+    }
+
+    #[test]
+    fn paint_text_without_accessibility_works() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        // Should work fine without accessibility
+        cx.paint_text(
+            "Hello",
+            Point::new(10.0, 50.0),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0);
     }
 }

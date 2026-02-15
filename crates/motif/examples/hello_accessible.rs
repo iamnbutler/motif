@@ -1,14 +1,14 @@
-//! Example demonstrating AccessKit integration with motif.
+//! Example demonstrating AccessKit integration with motif text.
 //!
-//! This shows how to wire AccessKit's accessibility adapter into a motif application.
+//! Run with: cargo run --example hello_accessible
+//! Then enable VoiceOver (Cmd+F5) and navigate to hear the text.
 
 use accesskit_winit::Adapter;
 use motif_core::{
     metal::{MetalRenderer, MetalSurface},
-    AccessId, AccessNode, AccessRole, AccessTree, Corners, DeviceRect, Edges, FocusManager, Quad,
-    Renderer, Scene, Srgba,
+    AccessId, AccessNode, AccessRole, AccessTree, DrawContext, FocusManager, Point, Rect,
+    Renderer, ScaleFactor, Scene, Size, Srgba, TextContext,
 };
-use glamour::{Point2, Size2};
 use std::sync::{Arc, Mutex};
 use winit::{
     application::ApplicationHandler,
@@ -17,8 +17,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
-/// Shared state for accessibility handlers.
-/// Handlers may be called from different threads, so we use Arc<Mutex<>>.
+/// Shared state for accessibility - rebuilt each frame.
 struct AccessState {
     tree: AccessTree,
     focus: FocusManager,
@@ -26,27 +25,9 @@ struct AccessState {
 
 impl AccessState {
     fn new() -> Self {
-        // Root window node
-        let root_id = AccessId(1);
-        let mut tree = AccessTree::new(root_id);
-
-        // Add root window node
-        tree.push(
-            AccessNode::new(root_id, AccessRole::Window, "Motif App".to_string())
-                .with_child(AccessId(2)),
-        );
-
-        // Add a button
-        tree.push(AccessNode::new(
-            AccessId(2),
-            AccessRole::Button,
-            "Hello Button".to_string(),
-        ));
-
-        let mut focus = FocusManager::new();
-        focus.set_focus_order(vec![AccessId(2)]);
-        focus.set_focus(AccessId(2));
-
+        let root_id = AccessId(0);
+        let tree = AccessTree::new(root_id);
+        let focus = FocusManager::new();
         Self { tree, focus }
     }
 
@@ -77,12 +58,10 @@ impl accesskit::ActionHandler for ActionHandler {
         let mut state = self.state.lock().unwrap();
         match request.action {
             accesskit::Action::Focus => {
-                // Set focus to the requested node
                 state.focus.set_focus(AccessId(request.target_node.0));
                 println!("Focus requested on node {:?}", request.target_node);
             }
             accesskit::Action::Click => {
-                // Handle click/activate
                 println!("Click action on node {:?}", request.target_node);
             }
             _ => {
@@ -106,6 +85,7 @@ struct App {
     renderer: Option<MetalRenderer>,
     surface: Option<MetalSurface>,
     scene: Scene,
+    text_ctx: TextContext,
     adapter: Option<Adapter>,
     access_state: Arc<Mutex<AccessState>>,
 }
@@ -117,6 +97,7 @@ impl Default for App {
             renderer: None,
             surface: None,
             scene: Scene::new(),
+            text_ctx: TextContext::new(),
             adapter: None,
             access_state: Arc::new(Mutex::new(AccessState::new())),
         }
@@ -128,9 +109,9 @@ impl ApplicationHandler for App {
         if self.window.is_none() {
             // IMPORTANT: Window must start invisible for AccessKit
             let attrs = Window::default_attributes()
-                .with_title("Motif - Accessible Window")
+                .with_title("Motif - Accessible Text")
                 .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
-                .with_visible(false); // Start invisible!
+                .with_visible(false);
 
             let window = event_loop.create_window(attrs).unwrap();
 
@@ -180,24 +161,74 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let (Some(renderer), Some(surface)) = (&mut self.renderer, &mut self.surface) {
+                if let (Some(renderer), Some(surface), Some(window)) =
+                    (&mut self.renderer, &mut self.surface, &self.window)
+                {
                     self.scene.clear();
 
-                    let (width, height) = surface.drawable_size();
-                    let quad_size = 200.0;
+                    // Rebuild accessibility tree each frame
+                    let mut state = self.access_state.lock().unwrap();
+                    state.tree.clear();
 
-                    // Red quad representing the "button"
-                    let mut quad = Quad::new(
-                        DeviceRect::new(
-                            Point2::new((width - quad_size) / 2.0, (height - quad_size) / 2.0),
-                            Size2::new(quad_size, quad_size),
-                        ),
-                        Srgba::new(1.0, 0.0, 0.0, 1.0),
+                    // Add root window node
+                    let root_id = AccessId(0);
+                    let window_bounds = Rect::new(Point::new(0.0, 0.0), Size::new(800.0, 600.0));
+                    state.tree.push(
+                        AccessNode::new(root_id, AccessRole::Window, "Motif Accessible App".to_string())
+                            .with_bounds(window_bounds)
+                            .with_child(AccessId(1))
+                            .with_child(AccessId(2))
+                            .with_child(AccessId(3)),
                     );
-                    quad.border_color = Srgba::new(0.0, 0.0, 1.0, 1.0);
-                    quad.border_widths = Edges::all(4.0);
-                    quad.corner_radii = Corners::all(20.0);
-                    self.scene.push_quad(quad);
+
+                    let scale = ScaleFactor(window.scale_factor() as f32);
+                    let mut cx = DrawContext::with_accessibility(
+                        &mut self.scene,
+                        &mut state.tree,
+                        scale,
+                    );
+
+                    // Background
+                    cx.paint_quad(
+                        Rect::new(Point::new(50.0, 50.0), Size::new(700.0, 200.0)),
+                        Srgba::new(0.15, 0.15, 0.2, 1.0),
+                    );
+
+                    // Paint text - automatically creates accessibility nodes!
+                    cx.paint_text(
+                        "Hello, Accessibility!",
+                        Point::new(70.0, 120.0),
+                        48.0,
+                        Srgba::new(1.0, 1.0, 1.0, 1.0),
+                        &mut self.text_ctx,
+                    );
+
+                    cx.paint_text(
+                        "VoiceOver can read this text.",
+                        Point::new(70.0, 180.0),
+                        24.0,
+                        Srgba::new(0.8, 0.8, 0.8, 1.0),
+                        &mut self.text_ctx,
+                    );
+
+                    cx.paint_text(
+                        "Press Cmd+F5 to enable VoiceOver, then Ctrl+Option+arrows to navigate.",
+                        Point::new(70.0, 220.0),
+                        16.0,
+                        Srgba::new(0.6, 0.6, 0.6, 1.0),
+                        &mut self.text_ctx,
+                    );
+
+                    // Update focus order with the text element IDs (1, 2, 3)
+                    state.focus.set_focus_order(vec![AccessId(1), AccessId(2), AccessId(3)]);
+
+                    // Update the adapter with the new tree
+                    drop(state); // Release lock before updating adapter
+
+                    if let Some(adapter) = &mut self.adapter {
+                        let state = self.access_state.lock().unwrap();
+                        adapter.update_if_active(|| state.build_tree_update());
+                    }
 
                     renderer.render(&self.scene, surface);
                 }
@@ -211,6 +242,13 @@ impl ApplicationHandler for App {
 }
 
 fn main() {
+    println!("Accessible Text Example");
+    println!("========================");
+    println!("1. Enable VoiceOver: Cmd+F5");
+    println!("2. Navigate with: Ctrl+Option+Arrow keys");
+    println!("3. VoiceOver should announce the text content");
+    println!();
+
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
     let mut app = App::default();
