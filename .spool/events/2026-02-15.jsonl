@@ -39,3 +39,5 @@
 {"v":1,"op":"assign","id":"mllpwri9-2134","ts":"2026-02-15T03:34:46.774921Z","by":"@iamnbutler","branch":"main","d":{"to":"@iamnbutler"}}
 {"v":1,"op":"complete","id":"mllpwri9-2134","ts":"2026-02-15T03:37:14.386244Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
 {"v":1,"op":"update","id":"mllpwri9-2134","ts":"2026-02-15T03:37:14.411458Z","by":"@iamnbutler","branch":"main","d":{"description":"Text primitives now expose their content to screen readers when accessibility is enabled. Implementation:\n- DrawContext::with_accessibility() creates context with AccessTree\n- paint_text() automatically creates AccessNode with role Label, text content, and bounds\n- Updated hello_accessible example to demonstrate text accessibility with VoiceOver"}}
+{"v":1,"op":"assign","id":"mln635v3-7dyl","ts":"2026-02-15T03:47:08.317501Z","by":"@iamnbutler","branch":"main","d":{"to":"@iamnbutler"}}
+{"v":1,"op":"complete","id":"mln635v3-7dyl","ts":"2026-02-15T18:04:10.130160Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
