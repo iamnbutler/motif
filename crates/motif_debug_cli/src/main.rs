@@ -92,16 +92,30 @@ fn print_usage() {
 /// command into the method and constructing the appropriate params object.
 fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
     let trimmed = input.trim();
-    if let Some(path) = trimmed.strip_prefix("screenshot ") {
+    if trimmed == "screenshot" {
+        let path = default_screenshot_path();
+        ("screenshot", Some(serde_json::json!({ "path": path })))
+    } else if let Some(path) = trimmed.strip_prefix("screenshot ") {
         let path = path.trim();
         if path.is_empty() {
-            ("screenshot", None)
+            let path = default_screenshot_path();
+            ("screenshot", Some(serde_json::json!({ "path": path })))
         } else {
             ("screenshot", Some(serde_json::json!({ "path": path })))
         }
     } else {
         (trimmed, None)
     }
+}
+
+fn default_screenshot_path() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let millis = now.subsec_millis();
+    format!("/tmp/motif-screenshot-{secs}-{millis:03}.png")
 }
 
 fn format_screenshot(value: &serde_json::Value) -> String {
