@@ -37,7 +37,8 @@ pub fn render_scene_to_buffer(
     width: u32,
     height: u32,
 ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    let mut img = ImageBuffer::from_pixel(width, height, Rgba([255, 255, 255, 255]));
+    // Black background to match the Metal renderer's clear color
+    let mut img = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 255]));
 
     // Draw quads as filled rectangles.
     for quad in &snapshot.quads {
@@ -179,16 +180,16 @@ mod tests {
     }
 
     #[test]
-    fn empty_scene_produces_white_image() {
+    fn empty_scene_produces_black_image() {
         let snap = empty_snapshot(100.0, 80.0);
         let img = render_scene_to_buffer(&snap, 100, 80);
 
         assert_eq!(img.width(), 100);
         assert_eq!(img.height(), 80);
 
-        // Every pixel should be white (the background fill).
+        // Every pixel should be black (matching Metal clear color).
         for pixel in img.pixels() {
-            assert_eq!(*pixel, Rgba([255, 255, 255, 255]));
+            assert_eq!(*pixel, Rgba([0, 0, 0, 255]));
         }
     }
 
@@ -203,9 +204,9 @@ mod tests {
         // Pixel inside the quad should be red.
         assert_eq!(*img.get_pixel(15, 30), Rgba([255, 0, 0, 255]));
 
-        // Pixel outside the quad should be white (background).
-        assert_eq!(*img.get_pixel(0, 0), Rgba([255, 255, 255, 255]));
-        assert_eq!(*img.get_pixel(50, 50), Rgba([255, 255, 255, 255]));
+        // Pixel outside the quad should be black (background).
+        assert_eq!(*img.get_pixel(0, 0), Rgba([0, 0, 0, 255]));
+        assert_eq!(*img.get_pixel(50, 50), Rgba([0, 0, 0, 255]));
     }
 
     #[test]
@@ -244,8 +245,8 @@ mod tests {
         // Inside both quad bounds AND clip bounds: red.
         assert_eq!(*img.get_pixel(40, 40), Rgba([255, 0, 0, 255]));
 
-        // Inside quad bounds but OUTSIDE clip bounds: white (not drawn).
-        assert_eq!(*img.get_pixel(15, 15), Rgba([255, 255, 255, 255]));
+        // Inside quad bounds but OUTSIDE clip bounds: black (background).
+        assert_eq!(*img.get_pixel(15, 15), Rgba([0, 0, 0, 255]));
     }
 
     #[test]
@@ -259,12 +260,11 @@ mod tests {
         let img = render_scene_to_buffer(&snap, 10, 10);
 
         let pixel = *img.get_pixel(5, 5);
-        // Red blended over white at ~50% alpha.
-        // Due to u8 quantization of the alpha channel, results may be off
-        // by 1 from the ideal float calculation. Use a tolerance of 1.
-        assert_eq!(pixel[0], 255); // red channel stays 255
-        assert!((pixel[1] as i16 - 128).unsigned_abs() <= 1); // green ~128
-        assert!((pixel[2] as i16 - 128).unsigned_abs() <= 1); // blue ~128
+        // Red at 50% alpha blended over black background.
+        // Result: ~(128, 0, 0) with tolerance for u8 quantization.
+        assert!((pixel[0] as i16 - 128).unsigned_abs() <= 1); // red ~128
+        assert_eq!(pixel[1], 0); // green stays 0
+        assert_eq!(pixel[2], 0); // blue stays 0
     }
 
     #[test]
@@ -303,9 +303,9 @@ mod tests {
             font_size: 16.0,
             glyph_count: 5,
             color: ColorInfo {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
                 a: 1.0,
             },
         });
@@ -314,12 +314,12 @@ mod tests {
         let img = render_scene_to_buffer(&snap, 200, 200);
 
         // The indicator rectangle starts at (origin_x, origin_y - font_size)
-        // = (10, 14). It should be black.
+        // = (10, 14). It should be white (the text color).
         let pixel = *img.get_pixel(12, 20);
-        assert_eq!(pixel, Rgba([0, 0, 0, 255]));
+        assert_eq!(pixel, Rgba([255, 255, 255, 255]));
 
-        // Outside the indicator: white.
-        assert_eq!(*img.get_pixel(0, 0), Rgba([255, 255, 255, 255]));
+        // Outside the indicator: black (background).
+        assert_eq!(*img.get_pixel(0, 0), Rgba([0, 0, 0, 255]));
     }
 
     #[test]
