@@ -12,6 +12,7 @@ use motif_core::{
     text, ArcStr, DrawContext, IntoElement, ParentElement, Point, Rect, Render,
     RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
 };
+use motif_debug::{DebugServer, SceneSnapshot};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -244,10 +245,12 @@ struct App {
     scene: Scene,
     text_ctx: TextContext,
     element_demo: ElementDemo,
+    debug_server: Option<DebugServer>,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let debug_server = DebugServer::new().ok();
         Self {
             window: None,
             renderer: None,
@@ -255,6 +258,7 @@ impl Default for App {
             scene: Scene::new(),
             text_ctx: TextContext::new(),
             element_demo: ElementDemo { frame: 0 },
+            debug_server,
         }
     }
 }
@@ -351,6 +355,18 @@ impl ApplicationHandler for App {
                     }
 
                     renderer.render(&self.scene, surface);
+
+                    // Update the debug server with the current scene state.
+                    if let Some(ref debug_server) = self.debug_server {
+                        let phys = window.inner_size();
+                        let viewport = (phys.width as f32, phys.height as f32);
+                        let snapshot = SceneSnapshot::from_scene(
+                            &self.scene,
+                            viewport,
+                            scale.0,
+                        );
+                        debug_server.update_scene(snapshot);
+                    }
                 }
                 if let Some(window) = &self.window {
                     window.request_redraw();

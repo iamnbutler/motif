@@ -1,0 +1,17 @@
+[package]
+name = "motif_debug"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Debug server and devtools protocol for motif"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+motif_core = { version = "0.0.1", path = "../motif_core" }
+
+[dev-dependencies]

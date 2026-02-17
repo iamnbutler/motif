@@ -1343,6 +1343,7 @@ dependencies = [
  "criterion",
  "glamour",
  "motif_core",
+ "motif_debug",
  "rand",
  "winit",
 ]
@@ -1365,6 +1366,15 @@ dependencies = [
  "smallvec",
  "swash",
  "winit",
+]
+
+[[package]]
+name = "motif_debug"
+version = "0.0.1"
+dependencies = [
+ "motif_core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
