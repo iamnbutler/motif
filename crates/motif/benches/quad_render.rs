@@ -2,13 +2,13 @@
 //!
 //! Usage: cargo bench --bench quad_render
 
+use glamour::{Point2, Size2};
 use motif_core::{
     metal::{MetalRenderer, MetalSurface},
     DeviceRect, Quad, Renderer, Scene, Srgba,
 };
-use glamour::{Point2, Size2};
-use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
@@ -43,9 +43,7 @@ impl BenchStats {
     }
 
     fn report(&self, quad_count: usize) {
-        let avg = |times: &[Duration]| {
-            times.iter().sum::<Duration>() / times.len() as u32
-        };
+        let avg = |times: &[Duration]| times.iter().sum::<Duration>() / times.len() as u32;
         let min = |times: &[Duration]| *times.iter().min().unwrap();
         let max = |times: &[Duration]| *times.iter().max().unwrap();
         let p50 = |times: &[Duration]| {
@@ -63,22 +61,44 @@ impl BenchStats {
         let fps = 1.0 / frame_avg.as_secs_f64();
 
         println!("\n=== Benchmark Results: {} quads ===", quad_count);
-        println!("Samples: {} frames (after {} warmup)", SAMPLE_FRAMES, WARMUP_FRAMES);
+        println!(
+            "Samples: {} frames (after {} warmup)",
+            SAMPLE_FRAMES, WARMUP_FRAMES
+        );
         println!();
         println!("Frame time:");
         println!("  avg: {:>8.2?}  ({:.1} FPS)", frame_avg, fps);
-        println!("  min: {:>8.2?}  max: {:>8.2?}", min(&self.frame_times), max(&self.frame_times));
-        println!("  p50: {:>8.2?}  p99: {:>8.2?}", p50(&self.frame_times), p99(&self.frame_times));
+        println!(
+            "  min: {:>8.2?}  max: {:>8.2?}",
+            min(&self.frame_times),
+            max(&self.frame_times)
+        );
+        println!(
+            "  p50: {:>8.2?}  p99: {:>8.2?}",
+            p50(&self.frame_times),
+            p99(&self.frame_times)
+        );
         println!();
         println!("Scene build (CPU):");
         println!("  avg: {:>8.2?}", avg(&self.scene_build_times));
-        println!("  min: {:>8.2?}  max: {:>8.2?}", min(&self.scene_build_times), max(&self.scene_build_times));
+        println!(
+            "  min: {:>8.2?}  max: {:>8.2?}",
+            min(&self.scene_build_times),
+            max(&self.scene_build_times)
+        );
         println!();
         println!("Render submit:");
         println!("  avg: {:>8.2?}", avg(&self.render_times));
-        println!("  min: {:>8.2?}  max: {:>8.2?}", min(&self.render_times), max(&self.render_times));
+        println!(
+            "  min: {:>8.2?}  max: {:>8.2?}",
+            min(&self.render_times),
+            max(&self.render_times)
+        );
         println!();
-        println!("Throughput: {:.2}M quads/sec", (quad_count as f64 * fps) / 1_000_000.0);
+        println!(
+            "Throughput: {:.2}M quads/sec",
+            (quad_count as f64 * fps) / 1_000_000.0
+        );
     }
 }
 
@@ -132,10 +152,7 @@ impl App {
             let a = rng.gen_range(0.5..1.0); // Semi-transparent to fully opaque
 
             let quad = Quad::new(
-                DeviceRect::new(
-                    Point2::new(x, y),
-                    Size2::new(w, h),
-                ),
+                DeviceRect::new(Point2::new(x, y), Size2::new(w, h)),
                 Srgba::new(r, g, b, a),
             );
             self.scene.push_quad(quad);
@@ -208,7 +225,8 @@ impl ApplicationHandler for App {
                     let scene_build_time = scene_start.elapsed();
 
                     // Measure render time
-                    if let (Some(renderer), Some(surface)) = (&mut self.renderer, &mut self.surface) {
+                    if let (Some(renderer), Some(surface)) = (&mut self.renderer, &mut self.surface)
+                    {
                         let render_start = Instant::now();
                         renderer.render(&self.scene, surface);
                         let render_time = render_start.elapsed();
@@ -249,7 +267,7 @@ impl ApplicationHandler for App {
     }
 }
 
-const QUAD_COUNT: usize = 10_000;
+const QUAD_COUNT: usize = 1_000_000;
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();
