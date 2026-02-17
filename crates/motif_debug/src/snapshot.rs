@@ -3,6 +3,22 @@
 use motif_core::Scene;
 use serde::Serialize;
 
+/// A debug overlay quad injected via the debug CLI.
+///
+/// These persist across frames until explicitly cleared.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct OverlayQuad {
+    pub id: u64,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub color: ColorInfo,
+    pub border_color: ColorInfo,
+    pub border_width: f32,
+    pub corner_radius: f32,
+}
+
 /// Serializable info about a single quad.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct QuadInfo {

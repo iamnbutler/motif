@@ -361,6 +361,43 @@ impl ApplicationHandler for App {
                         }
                     }
 
+                    // --- Debug overlays ---
+                    // Paint any debug overlay quads on top of the scene.
+                    if let Some(ref debug_server) = self.debug_server {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        for overlay in debug_server.overlays() {
+                            let mut quad = motif_core::Quad::new(
+                                motif_core::DeviceRect::new(
+                                    motif_core::DevicePoint::new(
+                                        overlay.x * scale.0,
+                                        overlay.y * scale.0,
+                                    ),
+                                    motif_core::DeviceSize::new(
+                                        overlay.w * scale.0,
+                                        overlay.h * scale.0,
+                                    ),
+                                ),
+                                Srgba::new(
+                                    overlay.color.r,
+                                    overlay.color.g,
+                                    overlay.color.b,
+                                    overlay.color.a,
+                                ),
+                            );
+                            quad.border_color = Srgba::new(
+                                overlay.border_color.r,
+                                overlay.border_color.g,
+                                overlay.border_color.b,
+                                overlay.border_color.a,
+                            );
+                            quad.border_widths =
+                                motif_core::Edges::all(overlay.border_width * scale.0);
+                            quad.corner_radii =
+                                motif_core::Corners::all(overlay.corner_radius * scale.0);
+                            cx.paint(quad);
+                        }
+                    }
+
                     renderer.render(&self.scene, surface);
 
                     // Update the debug server with the current scene state.

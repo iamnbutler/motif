@@ -83,6 +83,12 @@ fn print_usage() {
     eprintln!("  scene.text_runs          List all text runs in the scene");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
+    eprintln!("DEBUG OVERLAY COMMANDS:");
+    eprintln!("  draw.quad x y w h r g b a      Draw a debug overlay quad");
+    eprintln!("  debug.remove <id>              Remove a specific debug overlay");
+    eprintln!("  debug.clear                    Clear all debug overlays");
+    eprintln!("  debug.list                     List all debug overlays");
+    eprintln!();
     eprintln!("If no command is given, starts an interactive REPL.");
 }
 
@@ -103,8 +109,45 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
         } else {
             ("screenshot", Some(serde_json::json!({ "path": path })))
         }
+    } else if let Some(args) = trimmed.strip_prefix("draw.quad ") {
+        parse_draw_quad(args)
+    } else if let Some(args) = trimmed.strip_prefix("debug.remove ") {
+        parse_debug_remove(args)
     } else {
         (trimmed, None)
+    }
+}
+
+/// Parse `draw.quad x y w h r g b a` into a debug.draw_quad request.
+fn parse_draw_quad(args: &str) -> (&'static str, Option<serde_json::Value>) {
+    let parts: Vec<f64> = args
+        .split_whitespace()
+        .filter_map(|s| s.parse::<f64>().ok())
+        .collect();
+
+    if parts.len() < 8 {
+        eprintln!("usage: draw.quad x y w h r g b a");
+        return ("debug.draw_quad", None);
+    }
+
+    let params = serde_json::json!({
+        "x": parts[0],
+        "y": parts[1],
+        "w": parts[2],
+        "h": parts[3],
+        "color": [parts[4], parts[5], parts[6], parts[7]],
+    });
+    ("debug.draw_quad", Some(params))
+}
+
+/// Parse `debug.remove <id>` into a debug.remove request.
+fn parse_debug_remove(args: &str) -> (&'static str, Option<serde_json::Value>) {
+    match args.trim().parse::<u64>() {
+        Ok(id) => ("debug.remove", Some(serde_json::json!({ "id": id }))),
+        Err(_) => {
+            eprintln!("usage: debug.remove <id>");
+            ("debug.remove", None)
+        }
     }
 }
 
@@ -124,6 +167,68 @@ fn format_screenshot(value: &serde_json::Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
     format!("Screenshot saved to {path}\n")
+}
+
+fn format_draw_quad(value: &serde_json::Value) -> String {
+    let id = value.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+    format!("Created overlay quad #{id}\n")
+}
+
+fn format_debug_clear(value: &serde_json::Value) -> String {
+    let count = value.get("cleared").and_then(|v| v.as_u64()).unwrap_or(0);
+    format!("Cleared {count} overlays\n")
+}
+
+fn format_debug_remove(value: &serde_json::Value) -> String {
+    let removed = value
+        .get("removed")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if removed {
+        "Overlay removed.\n".to_string()
+    } else {
+        "Overlay not found.\n".to_string()
+    }
+}
+
+fn format_debug_list(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No overlay data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No debug overlays.\n".to_string();
+    }
+
+    out.push_str("Debug Overlays\n");
+    out.push_str("───────────────────────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "  {:<5}  {:<20}  {:<14}  {:}\n",
+        "ID", "POSITION", "SIZE", "COLOR"
+    ));
+    out.push_str("  ─────  ────────────────────  ──────────────  ───────────────\n");
+
+    for q in arr.iter() {
+        let id = q["id"].as_u64().unwrap_or(0);
+        let x = q["x"].as_f64().unwrap_or(0.0);
+        let y = q["y"].as_f64().unwrap_or(0.0);
+        let w = q["w"].as_f64().unwrap_or(0.0);
+        let h = q["h"].as_f64().unwrap_or(0.0);
+        let r = q["color"]["r"].as_f64().unwrap_or(0.0);
+        let g = q["color"]["g"].as_f64().unwrap_or(0.0);
+        let b = q["color"]["b"].as_f64().unwrap_or(0.0);
+        let a = q["color"]["a"].as_f64().unwrap_or(0.0);
+
+        out.push_str(&format!(
+            "  {:<5}  ({:>7.1}, {:>7.1})    {:>5.0} x {:<5.0}  rgba({:.2},{:.2},{:.2},{:.2})\n",
+            id, x, y, w, h, r, g, b, a
+        ));
+    }
+
+    out.push_str(&format!("\n  Total: {} overlays\n", arr.len()));
+    out
 }
 
 fn connect(socket: Option<&str>) -> DebugClient {
@@ -271,6 +376,10 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
+        "debug.draw_quad" => print!("{}", format_draw_quad(result)),
+        "debug.clear" => print!("{}", format_debug_clear(result)),
+        "debug.remove" => print!("{}", format_debug_remove(result)),
+        "debug.list" => print!("{}", format_debug_list(result)),
         _ => {
             let pretty = serde_json::to_string_pretty(result).unwrap_or_default();
             println!("{pretty}");
