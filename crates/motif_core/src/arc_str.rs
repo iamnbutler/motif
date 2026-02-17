@@ -10,14 +10,14 @@ use std::sync::Arc;
 /// Either a `&'static str` (zero-cost) or an `Arc<str>` (reference-counted).
 /// Use this for text content in elements to avoid unnecessary allocations.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum SharedString {
+pub enum ArcStr {
     /// A static string literal - zero allocation cost.
     Static(&'static str),
     /// A reference-counted string - cheap to clone.
     Owned(Arc<str>),
 }
 
-impl SharedString {
+impl ArcStr {
     /// Create from a static string literal.
     pub const fn new_static(s: &'static str) -> Self {
         Self::Static(s)
@@ -37,7 +37,7 @@ impl SharedString {
     }
 }
 
-impl Deref for SharedString {
+impl Deref for ArcStr {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -45,67 +45,67 @@ impl Deref for SharedString {
     }
 }
 
-impl AsRef<str> for SharedString {
+impl AsRef<str> for ArcStr {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl Borrow<str> for SharedString {
+impl Borrow<str> for ArcStr {
     fn borrow(&self) -> &str {
         self.as_str()
     }
 }
 
-impl fmt::Debug for SharedString {
+impl fmt::Debug for ArcStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_str(), f)
     }
 }
 
-impl fmt::Display for SharedString {
+impl fmt::Display for ArcStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self.as_str(), f)
     }
 }
 
-impl Default for SharedString {
+impl Default for ArcStr {
     fn default() -> Self {
         Self::Static("")
     }
 }
 
-impl From<&'static str> for SharedString {
+impl From<&'static str> for ArcStr {
     fn from(s: &'static str) -> Self {
         Self::Static(s)
     }
 }
 
-impl From<String> for SharedString {
+impl From<String> for ArcStr {
     fn from(s: String) -> Self {
         Self::Owned(Arc::from(s))
     }
 }
 
-impl From<Arc<str>> for SharedString {
+impl From<Arc<str>> for ArcStr {
     fn from(s: Arc<str>) -> Self {
         Self::Owned(s)
     }
 }
 
-impl PartialEq<str> for SharedString {
+impl PartialEq<str> for ArcStr {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<&str> for SharedString {
+impl PartialEq<&str> for ArcStr {
     fn eq(&self, other: &&str) -> bool {
         self.as_str() == *other
     }
 }
 
-impl PartialEq<String> for SharedString {
+impl PartialEq<String> for ArcStr {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
@@ -117,32 +117,32 @@ mod tests {
 
     #[test]
     fn static_string_is_zero_cost() {
-        let s = SharedString::new_static("hello");
+        let s = ArcStr::new_static("hello");
         assert_eq!(s.as_str(), "hello");
     }
 
     #[test]
     fn owned_string_from_string() {
-        let s = SharedString::from(String::from("world"));
+        let s = ArcStr::from(String::from("world"));
         assert_eq!(s.as_str(), "world");
     }
 
     #[test]
     fn cheap_clone() {
-        let s1 = SharedString::from(String::from("test"));
+        let s1 = ArcStr::from(String::from("test"));
         let s2 = s1.clone();
         assert_eq!(s1, s2);
     }
 
     #[test]
     fn equality_with_str() {
-        let s = SharedString::new_static("hello");
+        let s = ArcStr::new_static("hello");
         assert_eq!(s, "hello");
     }
 
     #[test]
     fn default_is_empty() {
-        let s = SharedString::default();
+        let s = ArcStr::default();
         assert_eq!(s.as_str(), "");
     }
 }

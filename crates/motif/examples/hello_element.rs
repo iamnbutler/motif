@@ -5,7 +5,7 @@
 use motif_core::{
     div, element, metal::{MetalRenderer, MetalSurface},
     text, IntoElement, PaintContext, ParentElement, Point, Rect, Render, RenderOnce,
-    Renderer, ScaleFactor, Scene, SharedString, Size, Srgba, TextContext,
+    Renderer, ScaleFactor, Scene, ArcStr, Size, Srgba, TextContext,
     ViewContext, WindowContext, Element,
 };
 use winit::{
@@ -19,11 +19,11 @@ use winit::{
 
 struct Counter {
     count: i32,
-    label: SharedString,
+    label: ArcStr,
 }
 
 impl Counter {
-    fn new(label: impl Into<SharedString>) -> Self {
+    fn new(label: impl Into<ArcStr>) -> Self {
         Self {
             count: 0,
             label: label.into(),
@@ -51,8 +51,8 @@ impl Render for Counter {
 // --- Stateless Element: InfoCard ---
 
 struct InfoCard {
-    title: SharedString,
-    body: SharedString,
+    title: ArcStr,
+    body: ArcStr,
     position: Point,
     accent: Srgba,
 }
@@ -81,8 +81,8 @@ impl RenderOnce for InfoCard {
 }
 
 fn info_card(
-    title: impl Into<SharedString>,
-    body: impl Into<SharedString>,
+    title: impl Into<ArcStr>,
+    body: impl Into<ArcStr>,
     position: Point,
     accent: Srgba,
 ) -> InfoCard {

@@ -1,7 +1,7 @@
 //! Text element for rendering text content.
 
 use crate::element::{Element, IntoElement, PaintContext};
-use crate::{Point, SharedString, TextRun};
+use crate::{Point, ArcStr, TextRun};
 use palette::Srgba;
 
 /// A text element that renders a string at a given position.
@@ -13,14 +13,14 @@ use palette::Srgba;
 ///     .color(Srgba::new(1.0, 1.0, 1.0, 1.0))
 /// ```
 pub struct Text {
-    content: SharedString,
+    content: ArcStr,
     position: Point,
     font_size: f32,
     color: Srgba,
 }
 
 impl Text {
-    pub fn new(content: impl Into<SharedString>) -> Self {
+    pub fn new(content: impl Into<ArcStr>) -> Self {
         Self {
             content: content.into(),
             position: Point::new(0.0, 0.0),
@@ -90,7 +90,7 @@ impl IntoElement for Text {
 }
 
 /// Create a new Text element.
-pub fn text(content: impl Into<SharedString>) -> Text {
+pub fn text(content: impl Into<ArcStr>) -> Text {
     Text::new(content)
 }
 
@@ -98,18 +98,18 @@ pub fn text(content: impl Into<SharedString>) -> Text {
 impl IntoElement for &'static str {
     type Element = Text;
     fn into_element(self) -> Text {
-        Text::new(SharedString::from(self))
+        Text::new(ArcStr::from(self))
     }
 }
 
 impl IntoElement for String {
     type Element = Text;
     fn into_element(self) -> Text {
-        Text::new(SharedString::from(self))
+        Text::new(ArcStr::from(self))
     }
 }
 
-impl IntoElement for SharedString {
+impl IntoElement for ArcStr {
     type Element = Text;
     fn into_element(self) -> Text {
         Text::new(self)
