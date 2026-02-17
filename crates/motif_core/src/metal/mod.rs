@@ -283,6 +283,21 @@ impl GlyphAtlas {
     }
 }
 
+/// Get the macOS CGWindowID for a winit window.
+///
+/// Useful for native screenshot capture via `CGWindowListCreateImage`.
+pub fn window_id(window: &impl HasWindowHandle) -> Option<u32> {
+    let handle = window.window_handle().ok()?;
+    let RawWindowHandle::AppKit(handle) = handle.as_raw() else {
+        return None;
+    };
+    let ns_view: &NSView = unsafe {
+        (handle.ns_view.as_ptr() as *const NSView).as_ref()?
+    };
+    let ns_window = ns_view.window()?;
+    Some(unsafe { ns_window.windowNumber() } as u32)
+}
+
 /// Wraps CAMetalLayer attached to a window.
 pub struct MetalSurface {
     layer: MetalLayer,

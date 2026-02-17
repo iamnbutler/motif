@@ -274,6 +274,13 @@ impl ApplicationHandler for App {
             let renderer = MetalRenderer::new();
             let surface = unsafe { MetalSurface::new(&window, renderer.device()) };
 
+            // Pass the window ID to the debug server for native screenshots
+            if let Some(ref debug_server) = self.debug_server {
+                if let Some(id) = motif_core::metal::window_id(&window) {
+                    debug_server.set_window_id(id);
+                }
+            }
+
             window.request_redraw();
             self.window = Some(window);
             self.renderer = Some(renderer);

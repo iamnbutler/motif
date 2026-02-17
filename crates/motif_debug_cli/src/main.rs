@@ -109,17 +109,7 @@ fn format_screenshot(value: &serde_json::Value) -> String {
         .get("path")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
-    let w = value
-        .get("size")
-        .and_then(|v| v.get(0))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let h = value
-        .get("size")
-        .and_then(|v| v.get(1))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    format!("Screenshot saved to {path} ({w}x{h})\n")
+    format!("Screenshot saved to {path}\n")
 }
 
 fn connect(socket: Option<&str>) -> DebugClient {

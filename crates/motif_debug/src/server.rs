@@ -19,6 +19,7 @@ use crate::snapshot::SceneSnapshot;
 pub struct DebugServer {
     socket_path: PathBuf,
     snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+    window_id: Arc<Mutex<Option<u32>>>,
     _shutdown: Arc<Mutex<bool>>,
 }
 
@@ -45,13 +46,15 @@ impl DebugServer {
         listener.set_nonblocking(true)?;
 
         let snapshot: Arc<Mutex<Option<SceneSnapshot>>> = Arc::new(Mutex::new(None));
+        let window_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
         let shutdown = Arc::new(Mutex::new(false));
 
         let server_snapshot = Arc::clone(&snapshot);
+        let server_window_id = Arc::clone(&window_id);
         let server_shutdown = Arc::clone(&shutdown);
 
         thread::spawn(move || {
-            Self::accept_loop(listener, server_snapshot, server_shutdown);
+            Self::accept_loop(listener, server_snapshot, server_window_id, server_shutdown);
         });
 
         eprintln!("[motif-debug] listening on {}", socket_path.display());
@@ -59,6 +62,7 @@ impl DebugServer {
         Ok(Self {
             socket_path,
             snapshot,
+            window_id,
             _shutdown: shutdown,
         })
     }
@@ -70,6 +74,14 @@ impl DebugServer {
         }
     }
 
+    /// Set the window ID for native screenshot capture.
+    /// Call this once after creating the window.
+    pub fn set_window_id(&self, id: u32) {
+        if let Ok(mut guard) = self.window_id.lock() {
+            *guard = Some(id);
+        }
+    }
+
     /// Return the socket path for this server.
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
@@ -78,6 +90,7 @@ impl DebugServer {
     fn accept_loop(
         listener: UnixListener,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        window_id: Arc<Mutex<Option<u32>>>,
         shutdown: Arc<Mutex<bool>>,
     ) {
         loop {
@@ -93,8 +106,9 @@ impl DebugServer {
                     let _ = stream.set_nonblocking(false);
 
                     let snap = Arc::clone(&snapshot);
+                    let wid = Arc::clone(&window_id);
                     thread::spawn(move || {
-                        Self::handle_connection(stream, snap);
+                        Self::handle_connection(stream, snap, wid);
                     });
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -112,6 +126,7 @@ impl DebugServer {
     fn handle_connection(
         stream: std::os::unix::net::UnixStream,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        window_id: Arc<Mutex<Option<u32>>>,
     ) {
         let reader = BufReader::new(match stream.try_clone() {
             Ok(s) => s,
@@ -141,7 +156,7 @@ impl DebugServer {
                 }
             };
 
-            let response = Self::dispatch(&request, &snapshot);
+            let response = Self::dispatch(&request, &snapshot, &window_id);
             let _ = writeln!(writer, "{}", serde_json::to_string(&response).unwrap());
         }
     }
@@ -149,6 +164,7 @@ impl DebugServer {
     fn dispatch(
         request: &DebugRequest,
         snapshot: &Arc<Mutex<Option<SceneSnapshot>>>,
+        window_id: &Arc<Mutex<Option<u32>>>,
     ) -> DebugResponse {
         match request.method.as_str() {
             "scene.stats" => {
@@ -184,17 +200,7 @@ impl DebugServer {
                     ),
                 }
             }
-            "screenshot" => {
-                let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
-                match guard.as_ref() {
-                    Some(snap) => Self::handle_screenshot(request, snap),
-                    None => DebugResponse::err(
-                        request.id,
-                        -32000,
-                        "No scene snapshot available yet",
-                    ),
-                }
-            }
+            "screenshot" => Self::handle_screenshot(request, window_id),
             _ => DebugResponse::err(
                 request.id,
                 -32601,
@@ -203,7 +209,10 @@ impl DebugServer {
         }
     }
 
-    fn handle_screenshot(request: &DebugRequest, snap: &SceneSnapshot) -> DebugResponse {
+    fn handle_screenshot(
+        request: &DebugRequest,
+        window_id: &Arc<Mutex<Option<u32>>>,
+    ) -> DebugResponse {
         let params = match &request.params {
             Some(p) => p,
             None => {
@@ -226,23 +235,22 @@ impl DebugServer {
             }
         };
 
-        // Width and height default to the snapshot's viewport size.
-        let width = params
-            .get("width")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(snap.viewport_size.0 as u64) as u32;
-        let height = params
-            .get("height")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(snap.viewport_size.1 as u64) as u32;
+        let wid = window_id.lock().unwrap_or_else(|e| e.into_inner());
+        let wid = match *wid {
+            Some(id) => id,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32000,
+                    "No window ID set — call set_window_id() on the debug server",
+                )
+            }
+        };
 
-        match screenshot::capture_scene_to_png(snap, path, width, height) {
+        match screenshot::capture_window_to_png(wid, path) {
             Ok(()) => DebugResponse::ok(
                 request.id,
-                serde_json::json!({
-                    "path": path,
-                    "size": [width, height],
-                }),
+                serde_json::json!({ "path": path }),
             ),
             Err(e) => DebugResponse::err(
                 request.id,
@@ -477,18 +485,15 @@ mod tests {
     }
 
     #[test]
-    fn server_responds_to_screenshot() {
+    fn server_screenshot_without_window_id_returns_error() {
         let path = test_socket_path();
         let server = DebugServer::with_path(path.clone()).expect("server should start");
 
-        use motif_core::{DevicePoint, DeviceRect, DeviceSize, Quad, Scene, Srgba};
-        let mut scene = Scene::new();
-        scene.push_quad(Quad::new(
-            DeviceRect::new(DevicePoint::new(10.0, 10.0), DeviceSize::new(50.0, 50.0)),
-            Srgba::new(1.0, 0.0, 0.0, 1.0),
-        ));
+        use motif_core::Scene;
+        let scene = Scene::new();
         let snap = SceneSnapshot::from_scene(&scene, (100.0, 100.0), 1.0);
         server.update_scene(snap);
+        // Note: NOT calling set_window_id()
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -497,11 +502,7 @@ mod tests {
             .set_read_timeout(Some(std::time::Duration::from_secs(2)))
             .unwrap();
 
-        let screenshot_path = format!("/tmp/motif-debug-test-screenshot-{}.png", std::process::id());
-        let request = format!(
-            r#"{{"method":"screenshot","params":{{"path":"{}","width":100,"height":100}},"id":20}}"#,
-            screenshot_path
-        );
+        let request = r#"{"method":"screenshot","params":{"path":"/tmp/test.png"},"id":20}"#;
         writeln!(stream, "{request}").unwrap();
 
         let mut reader = BufReader::new(stream);
@@ -510,18 +511,8 @@ mod tests {
 
         let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
         assert_eq!(resp.id, 20);
-        assert!(resp.error.is_none(), "expected ok, got: {:?}", resp.error);
-        let result = resp.result.unwrap();
-        assert_eq!(result["path"], screenshot_path);
-        assert_eq!(result["size"][0], 100);
-        assert_eq!(result["size"][1], 100);
-
-        // Verify the file was actually created.
-        assert!(
-            std::path::Path::new(&screenshot_path).exists(),
-            "screenshot file should exist"
-        );
-        let _ = std::fs::remove_file(&screenshot_path);
+        assert!(resp.error.is_some(), "should error without window_id");
+        assert_eq!(resp.error.unwrap().code, -32000);
     }
 
     #[test]
@@ -556,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn server_screenshot_defaults_to_viewport_size() {
+    fn server_screenshot_with_invalid_window_id_returns_error() {
         let path = test_socket_path();
         let server = DebugServer::with_path(path.clone()).expect("server should start");
 
@@ -564,6 +555,7 @@ mod tests {
         let scene = Scene::new();
         let snap = SceneSnapshot::from_scene(&scene, (320.0, 240.0), 1.0);
         server.update_scene(snap);
+        server.set_window_id(999999); // Invalid window ID
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -572,11 +564,7 @@ mod tests {
             .set_read_timeout(Some(std::time::Duration::from_secs(2)))
             .unwrap();
 
-        let screenshot_path = format!("/tmp/motif-debug-test-screenshot-vp-{}.png", std::process::id());
-        let request = format!(
-            r#"{{"method":"screenshot","params":{{"path":"{}"}},"id":22}}"#,
-            screenshot_path
-        );
+        let request = r#"{"method":"screenshot","params":{"path":"/tmp/test-invalid.png"},"id":22}"#;
         writeln!(stream, "{request}").unwrap();
 
         let mut reader = BufReader::new(stream);
@@ -585,11 +573,6 @@ mod tests {
 
         let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
         assert_eq!(resp.id, 22);
-        assert!(resp.error.is_none(), "expected ok, got: {:?}", resp.error);
-        let result = resp.result.unwrap();
-        assert_eq!(result["size"][0], 320);
-        assert_eq!(result["size"][1], 240);
-
-        let _ = std::fs::remove_file(&screenshot_path);
+        assert!(resp.error.is_some(), "invalid window ID should error");
     }
 }

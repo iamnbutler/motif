@@ -24,6 +24,6 @@ pub mod server;
 pub mod snapshot;
 
 pub use protocol::{DebugError, DebugRequest, DebugResponse};
-pub use screenshot::capture_scene_to_png;
+pub use screenshot::capture_window_to_png;
 pub use server::DebugServer;
 pub use snapshot::SceneSnapshot;
