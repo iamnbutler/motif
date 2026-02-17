@@ -86,6 +86,11 @@ impl DebugServer {
 
             match listener.accept() {
                 Ok((stream, _addr)) => {
+                    // On macOS, accepted connections inherit the listener's
+                    // non-blocking mode. Set them back to blocking so the
+                    // handler can read lines synchronously.
+                    let _ = stream.set_nonblocking(false);
+
                     let snap = Arc::clone(&snapshot);
                     thread::spawn(move || {
                         Self::handle_connection(stream, snap);

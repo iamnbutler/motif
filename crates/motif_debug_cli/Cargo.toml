@@ -1,0 +1,18 @@
+[package]
+name = "motif-debug"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "CLI tool for inspecting a running motif process"
+
+[[bin]]
+name = "motif-debug"
+path = "src/main.rs"
+
+[dependencies]
+motif_debug = { version = "0.0.1", path = "../motif_debug" }
+serde_json = "1"
