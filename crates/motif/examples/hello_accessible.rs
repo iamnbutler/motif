@@ -169,8 +169,13 @@ impl ApplicationHandler for App {
                     state.tree.clear();
 
                     // Add root window node
+                    // Bounds should be in physical pixels for AccessKit
                     let root_id = AccessId(0);
-                    let window_bounds = Rect::new(Point::new(0.0, 0.0), Size::new(800.0, 600.0));
+                    let physical_size = window.inner_size();
+                    let window_bounds = Rect::new(
+                        Point::new(0.0, 0.0),
+                        Size::new(physical_size.width as f32, physical_size.height as f32),
+                    );
                     state.tree.push(
                         AccessNode::new(root_id, AccessRole::Window, "Motif Accessible App".to_string())
                             .with_bounds(window_bounds)
