@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::protocol::{DebugRequest, DebugResponse};
+use crate::screenshot;
 use crate::snapshot::SceneSnapshot;
 
 /// A debug server that embeds in a running motif app.
@@ -183,10 +184,70 @@ impl DebugServer {
                     ),
                 }
             }
+            "screenshot" => {
+                let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(snap) => Self::handle_screenshot(request, snap),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No scene snapshot available yet",
+                    ),
+                }
+            }
             _ => DebugResponse::err(
                 request.id,
                 -32601,
                 format!("Method not found: {}", request.method),
+            ),
+        }
+    }
+
+    fn handle_screenshot(request: &DebugRequest, snap: &SceneSnapshot) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "screenshot requires params: { \"path\": \"/path/to/output.png\" }",
+                )
+            }
+        };
+
+        let path = match params.get("path").and_then(|v| v.as_str()) {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "screenshot requires a \"path\" parameter",
+                )
+            }
+        };
+
+        // Width and height default to the snapshot's viewport size.
+        let width = params
+            .get("width")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(snap.viewport_size.0 as u64) as u32;
+        let height = params
+            .get("height")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(snap.viewport_size.1 as u64) as u32;
+
+        match screenshot::capture_scene_to_png(snap, path, width, height) {
+            Ok(()) => DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "path": path,
+                    "size": [width, height],
+                }),
+            ),
+            Err(e) => DebugResponse::err(
+                request.id,
+                -32000,
+                format!("Failed to capture screenshot: {e}"),
             ),
         }
     }
@@ -413,5 +474,122 @@ mod tests {
         let result = resp.result.unwrap();
         let arr = result.as_array().expect("should be an array");
         assert!(arr.is_empty());
+    }
+
+    #[test]
+    fn server_responds_to_screenshot() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        use motif_core::{DevicePoint, DeviceRect, DeviceSize, Quad, Scene, Srgba};
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(
+            DeviceRect::new(DevicePoint::new(10.0, 10.0), DeviceSize::new(50.0, 50.0)),
+            Srgba::new(1.0, 0.0, 0.0, 1.0),
+        ));
+        let snap = SceneSnapshot::from_scene(&scene, (100.0, 100.0), 1.0);
+        server.update_scene(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let screenshot_path = format!("/tmp/motif-debug-test-screenshot-{}.png", std::process::id());
+        let request = format!(
+            r#"{{"method":"screenshot","params":{{"path":"{}","width":100,"height":100}},"id":20}}"#,
+            screenshot_path
+        );
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 20);
+        assert!(resp.error.is_none(), "expected ok, got: {:?}", resp.error);
+        let result = resp.result.unwrap();
+        assert_eq!(result["path"], screenshot_path);
+        assert_eq!(result["size"][0], 100);
+        assert_eq!(result["size"][1], 100);
+
+        // Verify the file was actually created.
+        assert!(
+            std::path::Path::new(&screenshot_path).exists(),
+            "screenshot file should exist"
+        );
+        let _ = std::fs::remove_file(&screenshot_path);
+    }
+
+    #[test]
+    fn server_screenshot_missing_params_returns_error() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        use motif_core::Scene;
+        let scene = Scene::new();
+        let snap = SceneSnapshot::from_scene(&scene, (800.0, 600.0), 1.0);
+        server.update_scene(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        // Send without params.
+        let request = r#"{"method":"screenshot","params":null,"id":21}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 21);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
+    }
+
+    #[test]
+    fn server_screenshot_defaults_to_viewport_size() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        use motif_core::Scene;
+        let scene = Scene::new();
+        let snap = SceneSnapshot::from_scene(&scene, (320.0, 240.0), 1.0);
+        server.update_scene(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let screenshot_path = format!("/tmp/motif-debug-test-screenshot-vp-{}.png", std::process::id());
+        let request = format!(
+            r#"{{"method":"screenshot","params":{{"path":"{}"}},"id":22}}"#,
+            screenshot_path
+        );
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 22);
+        assert!(resp.error.is_none(), "expected ok, got: {:?}", resp.error);
+        let result = resp.result.unwrap();
+        assert_eq!(result["size"][0], 320);
+        assert_eq!(result["size"][1], 240);
+
+        let _ = std::fs::remove_file(&screenshot_path);
     }
 }

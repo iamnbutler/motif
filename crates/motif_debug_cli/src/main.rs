@@ -20,7 +20,7 @@ fn parse_args() -> Args {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut json = false;
     let mut socket = None;
-    let mut command = None;
+    let mut positional = Vec::new();
     let mut i = 0;
 
     while i < args.len() {
@@ -44,11 +44,20 @@ fn parse_args() -> Args {
                 std::process::exit(1);
             }
             _ => {
-                command = Some(args[i].clone());
+                positional.push(args[i].clone());
             }
         }
         i += 1;
     }
+
+    // Join all positional args into a single command string so that
+    // `motif-debug screenshot /tmp/test.png` works the same as
+    // `motif-debug 'screenshot /tmp/test.png'`.
+    let command = if positional.is_empty() {
+        None
+    } else {
+        Some(positional.join(" "))
+    };
 
     Args {
         json,
@@ -69,11 +78,48 @@ fn print_usage() {
     eprintln!("  -h, --help         Show this help message");
     eprintln!();
     eprintln!("COMMANDS:");
-    eprintln!("  scene.stats        Show scene statistics");
-    eprintln!("  scene.quads        List all quads in the scene");
-    eprintln!("  scene.text_runs    List all text runs in the scene");
+    eprintln!("  scene.stats              Show scene statistics");
+    eprintln!("  scene.quads              List all quads in the scene");
+    eprintln!("  scene.text_runs          List all text runs in the scene");
+    eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("If no command is given, starts an interactive REPL.");
+}
+
+/// Parse a command string into a method name and optional JSON params.
+///
+/// Handles commands like `screenshot /path/to/file.png` by splitting the
+/// command into the method and constructing the appropriate params object.
+fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
+    let trimmed = input.trim();
+    if let Some(path) = trimmed.strip_prefix("screenshot ") {
+        let path = path.trim();
+        if path.is_empty() {
+            ("screenshot", None)
+        } else {
+            ("screenshot", Some(serde_json::json!({ "path": path })))
+        }
+    } else {
+        (trimmed, None)
+    }
+}
+
+fn format_screenshot(value: &serde_json::Value) -> String {
+    let path = value
+        .get("path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let w = value
+        .get("size")
+        .and_then(|v| v.get(0))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let h = value
+        .get("size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    format!("Screenshot saved to {path} ({w}x{h})\n")
 }
 
 fn connect(socket: Option<&str>) -> DebugClient {
@@ -220,6 +266,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.stats" => print!("{}", format_scene_stats(result)),
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
+        "screenshot" => print!("{}", format_screenshot(result)),
         _ => {
             let pretty = serde_json::to_string_pretty(result).unwrap_or_default();
             println!("{pretty}");
@@ -257,8 +304,9 @@ fn run_repl(mut client: DebugClient, json_mode: bool) {
             break;
         }
 
-        match client.send(cmd, None) {
-            Ok(response) => print_response(cmd, &response, json_mode),
+        let (method, params) = parse_command(cmd);
+        match client.send(method, params) {
+            Ok(response) => print_response(method, &response, json_mode),
             Err(e) => {
                 eprintln!("error: {e}");
                 break;
@@ -274,10 +322,11 @@ fn main() {
     match args.command {
         Some(cmd) => {
             // Single command mode.
-            match client.send(&cmd, None) {
+            let (method, params) = parse_command(&cmd);
+            match client.send(method, params) {
                 Ok(response) => {
                     let has_error = response.error.is_some();
-                    print_response(&cmd, &response, args.json);
+                    print_response(method, &response, args.json);
                     if has_error {
                         std::process::exit(1);
                     }
