@@ -29,7 +29,7 @@ const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [
 const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
 /// GPU-side quad instance data.
-/// Tightly packed for Metal buffer: 104 bytes per quad.
+/// Tightly packed for Metal buffer: 112 bytes per quad.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadInstance {
