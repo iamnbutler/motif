@@ -161,6 +161,28 @@ impl DebugServer {
                     ),
                 }
             }
+            "scene.quads" => {
+                let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(snap) => DebugResponse::ok(request.id, snap.quads_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No scene snapshot available yet",
+                    ),
+                }
+            }
+            "scene.text_runs" => {
+                let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(snap) => DebugResponse::ok(request.id, snap.text_runs_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No scene snapshot available yet",
+                    ),
+                }
+            }
             _ => DebugResponse::err(
                 request.id,
                 -32601,
@@ -321,5 +343,75 @@ mod tests {
         assert_eq!(resp.id, 0);
         assert!(resp.error.is_some());
         assert_eq!(resp.error.unwrap().code, -32700);
+    }
+
+    #[test]
+    fn server_responds_to_scene_quads() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        use motif_core::{DevicePoint, DeviceRect, DeviceSize, Quad, Scene, Srgba};
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(
+            DeviceRect::new(DevicePoint::new(10.0, 20.0), DeviceSize::new(100.0, 50.0)),
+            Srgba::new(1.0, 0.0, 0.0, 1.0),
+        ));
+        let snap = SceneSnapshot::from_scene(&scene, (800.0, 600.0), 1.0);
+        server.update_scene(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"scene.quads","params":null,"id":10}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 10);
+        assert!(resp.error.is_none());
+        let result = resp.result.unwrap();
+        let arr = result.as_array().expect("should be an array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["bounds"]["x"], 10.0);
+    }
+
+    #[test]
+    fn server_responds_to_scene_text_runs() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        // Empty scene -- no text runs.
+        use motif_core::Scene;
+        let scene = Scene::new();
+        let snap = SceneSnapshot::from_scene(&scene, (800.0, 600.0), 1.0);
+        server.update_scene(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"scene.text_runs","params":null,"id":11}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 11);
+        assert!(resp.error.is_none());
+        let result = resp.result.unwrap();
+        let arr = result.as_array().expect("should be an array");
+        assert!(arr.is_empty());
     }
 }

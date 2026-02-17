@@ -1380,6 +1380,7 @@ dependencies = [
 name = "motif_debug"
 version = "0.0.1"
 dependencies = [
+ "linebender_resource_handle",
  "motif_core",
  "serde",
  "serde_json",

@@ -70,6 +70,8 @@ fn print_usage() {
     eprintln!();
     eprintln!("COMMANDS:");
     eprintln!("  scene.stats        Show scene statistics");
+    eprintln!("  scene.quads        List all quads in the scene");
+    eprintln!("  scene.text_runs    List all text runs in the scene");
     eprintln!();
     eprintln!("If no command is given, starts an interactive REPL.");
 }
@@ -112,6 +114,80 @@ fn format_scene_stats(value: &serde_json::Value) -> String {
     out
 }
 
+fn format_scene_quads(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No quad data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No quads in scene.\n".to_string();
+    }
+
+    out.push_str("Scene Quads\n");
+    out.push_str("───────────────────────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "  {:<5}  {:<20}  {:<14}  {:}\n",
+        "IDX", "POSITION", "SIZE", "COLOR"
+    ));
+    out.push_str("  ─────  ────────────────────  ──────────────  ───────────────\n");
+
+    for (i, q) in arr.iter().enumerate() {
+        let x = q["bounds"]["x"].as_f64().unwrap_or(0.0);
+        let y = q["bounds"]["y"].as_f64().unwrap_or(0.0);
+        let w = q["bounds"]["w"].as_f64().unwrap_or(0.0);
+        let h = q["bounds"]["h"].as_f64().unwrap_or(0.0);
+        let r = q["color"]["r"].as_f64().unwrap_or(0.0);
+        let g = q["color"]["g"].as_f64().unwrap_or(0.0);
+        let b = q["color"]["b"].as_f64().unwrap_or(0.0);
+        let a = q["color"]["a"].as_f64().unwrap_or(0.0);
+
+        out.push_str(&format!(
+            "  {:<5}  ({:>7.1}, {:>7.1})    {:>5.0} x {:<5.0}  rgba({:.2},{:.2},{:.2},{:.2})\n",
+            i, x, y, w, h, r, g, b, a
+        ));
+    }
+
+    out.push_str(&format!("\n  Total: {} quads\n", arr.len()));
+    out
+}
+
+fn format_scene_text_runs(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No text run data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No text runs in scene.\n".to_string();
+    }
+
+    out.push_str("Scene Text Runs\n");
+    out.push_str("───────────────────────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "  {:<5}  {:<20}  {:<10}  {:}\n",
+        "IDX", "ORIGIN", "FONT SIZE", "GLYPHS"
+    ));
+    out.push_str("  ─────  ────────────────────  ──────────  ──────\n");
+
+    for (i, tr) in arr.iter().enumerate() {
+        let x = tr["origin"]["x"].as_f64().unwrap_or(0.0);
+        let y = tr["origin"]["y"].as_f64().unwrap_or(0.0);
+        let fs = tr["font_size"].as_f64().unwrap_or(0.0);
+        let gc = tr["glyph_count"].as_u64().unwrap_or(0);
+
+        out.push_str(&format!(
+            "  {:<5}  ({:>7.1}, {:>7.1})    {:>7.1}px  {:>6}\n",
+            i, x, y, fs, gc
+        ));
+    }
+
+    out.push_str(&format!("\n  Total: {} text runs\n", arr.len()));
+    out
+}
+
 fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode: bool) {
     if let Some(err) = &response.error {
         if json_mode {
@@ -142,6 +218,8 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
     // Pretty-print known result types.
     match method {
         "scene.stats" => print!("{}", format_scene_stats(result)),
+        "scene.quads" => print!("{}", format_scene_quads(result)),
+        "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
         _ => {
             let pretty = serde_json::to_string_pretty(result).unwrap_or_default();
             println!("{pretty}");
