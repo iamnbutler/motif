@@ -8,6 +8,7 @@
 use motif_core::{
     div,
     element::{self, Element, PaintContext},
+    input::{InputState, MouseButton, ScrollDelta},
     metal::{MetalRenderer, MetalSurface},
     text, ArcStr, DrawContext, IntoElement, ParentElement, Point, Rect, Render,
     RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
@@ -246,6 +247,7 @@ struct App {
     text_ctx: TextContext,
     element_demo: ElementDemo,
     debug_server: Option<DebugServer>,
+    input_state: InputState,
 }
 
 impl Default for App {
@@ -259,6 +261,7 @@ impl Default for App {
             text_ctx: TextContext::new(),
             element_demo: ElementDemo { frame: 0 },
             debug_server,
+            input_state: InputState::new(),
         }
     }
 }
@@ -415,6 +418,39 @@ impl ApplicationHandler for App {
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
+            }
+            // --- Input events ---
+            WindowEvent::CursorMoved { position, .. } => {
+                let scale = self.window.as_ref()
+                    .map(|w| w.scale_factor() as f32)
+                    .unwrap_or(1.0);
+                self.input_state.handle_cursor_moved(position.x, position.y, scale);
+            }
+            WindowEvent::CursorEntered { .. } => {
+                self.input_state.handle_cursor_entered();
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.input_state.handle_cursor_left();
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let pressed = state == winit::event::ElementState::Pressed;
+                self.input_state.handle_mouse_button(MouseButton::from_winit(button), pressed);
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scale = self.window.as_ref()
+                    .map(|w| w.scale_factor() as f32)
+                    .unwrap_or(1.0);
+                self.input_state.handle_scroll(ScrollDelta::from_winit(delta, scale));
+            }
+            WindowEvent::ModifiersChanged(mods) => {
+                self.input_state.handle_modifiers_changed(mods.state());
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.input_state.handle_key(
+                    event.logical_key,
+                    event.physical_key,
+                    event.state,
+                );
             }
             _ => {}
         }
