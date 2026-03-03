@@ -149,22 +149,20 @@ impl<'a> DrawContext<'a> {
         if self.access_tree.is_some() {
             let offset = self.current_offset();
 
-            // Calculate text bounds in logical coordinates
-            // Position is baseline, so we need to compute the bounding box
+            // Calculate text bounds in physical pixel coordinates for AccessKit
+            // AccessKit (via winit) expects window-relative physical pixels
             let ascent = line_metrics.first().map(|m| m.ascent).unwrap_or(0.0);
             let descent = line_metrics.first().map(|m| m.descent).unwrap_or(0.0);
 
-            // Scale metrics back to logical coordinates
             let scale = self.scale_factor.0;
-            let logical_ascent = ascent / scale;
-            let logical_descent = descent / scale;
 
+            // Physical pixel position and size
             let bounds = Rect::new(
                 Point::new(
-                    position.x + offset.x,
-                    position.y + offset.y - logical_ascent,
+                    (position.x + offset.x) * scale,
+                    (position.y + offset.y) * scale - ascent,
                 ),
-                Size::new(layout.width() / scale, logical_ascent + logical_descent),
+                Size::new(layout.width(), ascent + descent),
             );
 
             let access_id = self.next_access_id();

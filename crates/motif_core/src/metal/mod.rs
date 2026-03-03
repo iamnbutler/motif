@@ -29,7 +29,7 @@ const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [
 const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
 /// GPU-side quad instance data.
-/// Tightly packed for Metal buffer: 104 bytes per quad.
+/// Tightly packed for Metal buffer: 112 bytes per quad.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadInstance {
@@ -281,6 +281,21 @@ impl GlyphAtlas {
         self.row_height = 0;
         self.cache.clear();
     }
+}
+
+/// Get the macOS CGWindowID for a winit window.
+///
+/// Useful for native screenshot capture via `CGWindowListCreateImage`.
+pub fn window_id(window: &impl HasWindowHandle) -> Option<u32> {
+    let handle = window.window_handle().ok()?;
+    let RawWindowHandle::AppKit(handle) = handle.as_raw() else {
+        return None;
+    };
+    let ns_view: &NSView = unsafe {
+        (handle.ns_view.as_ptr() as *const NSView).as_ref()?
+    };
+    let ns_window = ns_view.window()?;
+    Some(unsafe { ns_window.windowNumber() } as u32)
 }
 
 /// Wraps CAMetalLayer attached to a window.

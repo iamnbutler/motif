@@ -15,6 +15,7 @@ glam = "0.32"
 glamour = "0.18"
 palette = "0.7"
 parley = { version = "0.7", features = ["accesskit"] }
+smallvec = "1.11"
 swash = "0.2"
 winit = "0.30"
 

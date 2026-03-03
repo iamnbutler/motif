@@ -9,7 +9,11 @@ struct QuadInstance {
     float4 corner_radii;  // top_left, top_right, bottom_right, bottom_left
     float4 clip_bounds;   // x, y, width, height of clip region
     float has_clip;       // 1.0 if clip active
-    float3 _padding;
+    // NOTE: Using 3 separate floats instead of float3 because float3 has 16-byte
+    // alignment in Metal, which would cause struct size mismatch with Rust's [f32; 3]
+    float _pad1;
+    float _pad2;
+    float _pad3;
 };
 
 struct VertexOut {
