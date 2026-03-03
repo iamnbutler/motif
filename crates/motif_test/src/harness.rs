@@ -126,6 +126,37 @@ impl TestHarness {
     pub fn size(&self) -> Size {
         self.size
     }
+
+    /// Assert the number of registered hit regions.
+    #[track_caller]
+    pub fn assert_element_count(&self, expected: usize) {
+        let actual = self.hit_tree.len();
+        assert_eq!(
+            actual, expected,
+            "Expected {} registered elements, got {}",
+            expected, actual
+        );
+    }
+
+    /// Assert the number of quads in the scene.
+    #[track_caller]
+    pub fn assert_quad_count(&self, expected: usize) {
+        let actual = self.scene.quad_count();
+        assert_eq!(
+            actual, expected,
+            "Expected {} quads in scene, got {}",
+            expected, actual
+        );
+    }
+
+    /// Get the bounds of a registered element by ID.
+    pub fn get_element_bounds(&self, id: ElementId) -> Option<Rect> {
+        self.hit_tree
+            .entries()
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.bounds.clone())
+    }
 }
 
 /// Context for rendering in tests.
@@ -344,5 +375,51 @@ mod tests {
 
         assert_eq!(harness.scene.quad_count(), 1);
         harness.assert_no_hit(pt(150.0, 150.0));
+    }
+
+    // --- Additional assertion tests ---
+
+    #[test]
+    fn harness_assert_element_count() {
+        let mut harness = TestHarness::new(800, 600);
+        let id1 = harness.element_id();
+        let id2 = harness.element_id();
+
+        harness.render(|cx| {
+            cx.register_hit(id1, rect(0.0, 0.0, 50.0, 50.0));
+            cx.register_hit(id2, rect(60.0, 0.0, 50.0, 50.0));
+        });
+
+        harness.assert_element_count(2);
+    }
+
+    #[test]
+    fn harness_assert_quad_count() {
+        let mut harness = TestHarness::new(800, 600);
+
+        harness.render(|cx| {
+            cx.paint_quad(rect(0.0, 0.0, 50.0, 50.0), Srgba::new(1.0, 0.0, 0.0, 1.0));
+            cx.paint_quad(rect(60.0, 0.0, 50.0, 50.0), Srgba::new(0.0, 1.0, 0.0, 1.0));
+        });
+
+        harness.assert_quad_count(2);
+    }
+
+    #[test]
+    fn harness_get_element_bounds() {
+        let mut harness = TestHarness::new(800, 600);
+        let id = harness.element_id();
+
+        harness.render(|cx| {
+            cx.register_hit(id, rect(100.0, 100.0, 200.0, 50.0));
+        });
+
+        let bounds = harness.get_element_bounds(id);
+        assert!(bounds.is_some());
+        let b = bounds.unwrap();
+        assert_eq!(b.origin.x, 100.0);
+        assert_eq!(b.origin.y, 100.0);
+        assert_eq!(b.size.width, 200.0);
+        assert_eq!(b.size.height, 50.0);
     }
 }
