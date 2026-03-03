@@ -10,7 +10,7 @@ use motif_core::{
     element::{self, Element, PaintContext},
     input::{InputState, MouseButton, ScrollDelta},
     metal::{MetalRenderer, MetalSurface},
-    text, ArcStr, DrawContext, IntoElement, ParentElement, Point, Rect, Render,
+    text, ArcStr, DrawContext, HitTree, IntoElement, ParentElement, Point, Rect, Render,
     RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
@@ -245,6 +245,7 @@ struct App {
     surface: Option<MetalSurface>,
     scene: Scene,
     text_ctx: TextContext,
+    hit_tree: HitTree,
     element_demo: ElementDemo,
     debug_server: Option<DebugServer>,
     input_state: InputState,
@@ -259,6 +260,7 @@ impl Default for App {
             surface: None,
             scene: Scene::new(),
             text_ctx: TextContext::new(),
+            hit_tree: HitTree::new(),
             element_demo: ElementDemo { frame: 0 },
             debug_server,
             input_state: InputState::new(),
@@ -328,7 +330,7 @@ impl ApplicationHandler for App {
                             &mut self.text_ctx,
                             scale,
                         );
-                        element::render_view(&mut self.element_demo, &mut wcx);
+                        element::render_view(&mut self.element_demo, &mut wcx, &mut self.hit_tree);
                     }
 
                     // Render stateless cards
@@ -358,6 +360,7 @@ impl ApplicationHandler for App {
                             let mut pcx = PaintContext::new(
                                 &mut self.scene,
                                 &mut self.text_ctx,
+                                &mut self.hit_tree,
                                 scale,
                             );
                             el.paint(&mut pcx);

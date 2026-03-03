@@ -137,7 +137,7 @@ pub fn div() -> Div {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ScaleFactor, Scene, TextContext};
+    use crate::{HitTree, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn div_builder_sets_background() {
@@ -160,7 +160,8 @@ mod tests {
 
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, ScaleFactor(1.0));
+        let mut hit_tree = HitTree::new();
+        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
         d.paint(&mut cx);
 
         assert_eq!(scene.quad_count(), 1);
@@ -172,7 +173,8 @@ mod tests {
 
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, ScaleFactor(1.0));
+        let mut hit_tree = HitTree::new();
+        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
         d.paint(&mut cx);
 
         assert_eq!(scene.quad_count(), 0);

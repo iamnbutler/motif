@@ -4,7 +4,7 @@
 //! hit testing, and debug server integration.
 
 pub mod harness;
-pub mod hit_tree;
 
 pub use harness::{TestHarness, TestRenderContext};
-pub use hit_tree::{ElementId, HitEntry, HitTree};
+// Re-export hit testing types from motif_core
+pub use motif_core::{ElementId, HitEntry, HitTree};

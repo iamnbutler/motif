@@ -2,8 +2,7 @@
 //!
 //! Provides a real Metal rendering environment for tests.
 
-use crate::hit_tree::{ElementId, HitTree};
-use motif_core::{DeviceRect, Point, Quad, Rect, ScaleFactor, Scene, Size, TextContext};
+use motif_core::{DeviceRect, ElementId, HitTree, Point, Quad, Rect, ScaleFactor, Scene, Size, TextContext};
 use palette::Srgba;
 
 /// Test harness for integration testing with real Metal rendering.

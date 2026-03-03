@@ -1486,6 +1486,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "motif_test"
+version = "0.0.1"
+dependencies = [
+ "motif_core",
+ "motif_debug",
+ "palette",
+ "winit",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

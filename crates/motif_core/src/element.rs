@@ -4,7 +4,7 @@
 //! - **Views** (`Render`): Stateful components that own data and persist across frames.
 //! - **Elements** (`RenderOnce`): Stateless components consumed on render.
 
-use crate::{Scene, ScaleFactor, TextContext};
+use crate::{ElementId, HitTree, Rect, Scene, ScaleFactor, TextContext};
 
 /// Views are stateful components that persist across frames.
 ///
@@ -168,6 +168,7 @@ impl<'a> WindowContext<'a> {
 pub struct PaintContext<'a> {
     pub(crate) scene: &'a mut Scene,
     pub(crate) text_ctx: &'a mut TextContext,
+    pub(crate) hit_tree: &'a mut HitTree,
     pub(crate) scale_factor: ScaleFactor,
 }
 
@@ -175,11 +176,13 @@ impl<'a> PaintContext<'a> {
     pub fn new(
         scene: &'a mut Scene,
         text_ctx: &'a mut TextContext,
+        hit_tree: &'a mut HitTree,
         scale_factor: ScaleFactor,
     ) -> Self {
         Self {
             scene,
             text_ctx,
+            hit_tree,
             scale_factor,
         }
     }
@@ -192,8 +195,17 @@ impl<'a> PaintContext<'a> {
         self.text_ctx
     }
 
+    pub fn hit_tree(&mut self) -> &mut HitTree {
+        self.hit_tree
+    }
+
     pub fn scale_factor(&self) -> ScaleFactor {
         self.scale_factor
+    }
+
+    /// Register an element for hit testing.
+    pub fn register_hit(&mut self, id: ElementId, bounds: Rect) {
+        self.hit_tree.push(id, bounds);
     }
 
     /// Paint a child element.
@@ -203,7 +215,7 @@ impl<'a> PaintContext<'a> {
 }
 
 /// Render a view and paint its element tree to the scene.
-pub fn render_view<V: Render>(view: &mut V, cx: &mut WindowContext) {
+pub fn render_view<V: Render>(view: &mut V, cx: &mut WindowContext, hit_tree: &mut HitTree) {
     let mut view_cx = ViewContext::<V>::new(WindowContext {
         scene: cx.scene,
         text_ctx: cx.text_ctx,
@@ -215,6 +227,7 @@ pub fn render_view<V: Render>(view: &mut V, cx: &mut WindowContext) {
     let mut paint_cx = PaintContext {
         scene: cx.scene,
         text_ctx: cx.text_ctx,
+        hit_tree,
         scale_factor: cx.scale_factor,
     };
     element.paint(&mut paint_cx);
@@ -237,12 +250,14 @@ impl IntoElement for Empty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ElementId, HitTree, Point, Rect, Size};
 
     #[test]
     fn empty_element_paints_nothing() {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, ScaleFactor(1.0));
+        let mut hit_tree = HitTree::new();
+        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
         let mut empty = Empty;
         empty.paint(&mut cx);
         assert_eq!(scene.quad_count(), 0);
@@ -253,8 +268,68 @@ mod tests {
         let mut any = AnyElement::new(Empty);
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, ScaleFactor(1.0));
+        let mut hit_tree = HitTree::new();
+        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
         any.paint(&mut cx);
         assert_eq!(scene.quad_count(), 0);
+    }
+
+    #[test]
+    fn paint_context_registers_hit() {
+        let mut scene = Scene::new();
+        let mut text_ctx = TextContext::new();
+        let mut hit_tree = HitTree::new();
+
+        {
+            let mut cx =
+                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+            let id = ElementId(42);
+            let bounds = Rect::new(Point::new(100.0, 100.0), Size::new(200.0, 50.0));
+            cx.register_hit(id, bounds);
+        }
+
+        // Hit tree should have the element
+        assert_eq!(hit_tree.len(), 1);
+        assert_eq!(
+            hit_tree.hit_test(Point::new(150.0, 125.0)),
+            Some(ElementId(42))
+        );
+        assert_eq!(hit_tree.hit_test(Point::new(50.0, 50.0)), None);
+    }
+
+    #[test]
+    fn paint_context_multiple_hits() {
+        let mut scene = Scene::new();
+        let mut text_ctx = TextContext::new();
+        let mut hit_tree = HitTree::new();
+
+        {
+            let mut cx =
+                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+
+            // Back element
+            cx.register_hit(
+                ElementId(1),
+                Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 200.0)),
+            );
+
+            // Front element (overlapping)
+            cx.register_hit(
+                ElementId(2),
+                Rect::new(Point::new(50.0, 50.0), Size::new(100.0, 100.0)),
+            );
+        }
+
+        // In overlap: front wins
+        assert_eq!(
+            hit_tree.hit_test(Point::new(75.0, 75.0)),
+            Some(ElementId(2))
+        );
+
+        // In back only: back wins
+        assert_eq!(
+            hit_tree.hit_test(Point::new(25.0, 25.0)),
+            Some(ElementId(1))
+        );
     }
 }

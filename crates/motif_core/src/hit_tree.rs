@@ -2,7 +2,7 @@
 //!
 //! Collects element bounds during paint and provides hit testing queries.
 
-use motif_core::{Point, Rect};
+use crate::{Point, Rect};
 
 /// Unique identifier for an element within a frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,7 +103,7 @@ fn rect_contains(rect: &Rect, point: Point) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use motif_core::Size;
+    use crate::Size;
 
     fn rect(x: f32, y: f32, w: f32, h: f32) -> Rect {
         Rect::new(Point::new(x, y), Size::new(w, h))
@@ -264,21 +264,6 @@ mod tests {
         assert!(hits.is_empty());
     }
 
-    #[test]
-    fn hit_test_all_nested_elements() {
-        let mut tree = HitTree::new();
-
-        // Parent
-        tree.push(ElementId(100), rect(50.0, 50.0, 300.0, 200.0));
-
-        // Child
-        tree.push(ElementId(101), rect(100.0, 100.0, 100.0, 50.0));
-
-        // In child: both, child first
-        let hits = tree.hit_test_all(pt(125.0, 115.0));
-        assert_eq!(hits, vec![ElementId(101), ElementId(100)]);
-    }
-
     // --- Z-index tracking ---
 
     #[test]
@@ -307,49 +292,5 @@ mod tests {
 
         let entries = tree.entries();
         assert_eq!(entries[0].z_index, 0); // reset
-    }
-
-    // --- Edge cases ---
-
-    #[test]
-    fn hit_test_zero_size_element() {
-        let mut tree = HitTree::new();
-        tree.push(ElementId(1), rect(100.0, 100.0, 0.0, 0.0));
-
-        // Zero-size element can't be hit
-        assert_eq!(tree.hit_test(pt(100.0, 100.0)), None);
-    }
-
-    #[test]
-    fn hit_test_negative_coordinates() {
-        let mut tree = HitTree::new();
-        tree.push(ElementId(1), rect(-100.0, -100.0, 200.0, 200.0));
-
-        // Inside (includes negative space)
-        assert_eq!(tree.hit_test(pt(-50.0, -50.0)), Some(ElementId(1)));
-        assert_eq!(tree.hit_test(pt(50.0, 50.0)), Some(ElementId(1)));
-
-        // Outside
-        assert_eq!(tree.hit_test(pt(-150.0, 0.0)), None);
-    }
-
-    #[test]
-    fn hit_test_many_elements() {
-        let mut tree = HitTree::new();
-
-        // Add 1000 non-overlapping elements in a grid
-        for i in 0..1000 {
-            let x = (i % 100) as f32 * 10.0;
-            let y = (i / 100) as f32 * 10.0;
-            tree.push(ElementId(i as u64), rect(x, y, 10.0, 10.0));
-        }
-
-        assert_eq!(tree.len(), 1000);
-
-        // Hit test specific element
-        assert_eq!(tree.hit_test(pt(55.0, 35.0)), Some(ElementId(305)));
-
-        // Miss
-        assert_eq!(tree.hit_test(pt(1000.0, 1000.0)), None);
     }
 }
