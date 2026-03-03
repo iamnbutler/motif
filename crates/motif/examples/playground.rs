@@ -467,10 +467,12 @@ impl ApplicationHandler for App {
                         debug_server.update_scene(snapshot);
 
                         // Update window position for input simulation
-                        if let Ok(outer_pos) = window.outer_position() {
+                        // Use inner_position (content area) not outer_position (includes title bar)
+                        // Convert from physical pixels to logical for CGEvent
+                        if let Ok(inner_pos) = window.inner_position() {
                             debug_server.set_window_position(
-                                outer_pos.x as f32,
-                                outer_pos.y as f32,
+                                inner_pos.x as f32 / scale.0,
+                                inner_pos.y as f32 / scale.0,
                                 scale.0,
                             );
                         }
