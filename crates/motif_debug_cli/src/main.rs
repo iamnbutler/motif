@@ -81,6 +81,7 @@ fn print_usage() {
     eprintln!("  scene.stats              Show scene statistics");
     eprintln!("  scene.quads              List all quads in the scene");
     eprintln!("  scene.text_runs          List all text runs in the scene");
+    eprintln!("  input.state              Show current input state (cursor, buttons, modifiers)");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
@@ -308,6 +309,60 @@ fn format_scene_quads(value: &serde_json::Value) -> String {
     out
 }
 
+fn format_input_state(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    out.push_str("Input State\n");
+    out.push_str("───────────────────────\n");
+
+    // Cursor position
+    if let Some(pos) = value.get("cursor_position") {
+        if pos.is_null() {
+            out.push_str("  Cursor:        (outside window)\n");
+        } else {
+            let x = pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let y = pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            out.push_str(&format!("  Cursor:        ({:.1}, {:.1})\n", x, y));
+        }
+    }
+
+    // Mouse buttons
+    if let Some(buttons) = value.get("mouse_buttons").and_then(|v| v.as_array()) {
+        if buttons.is_empty() {
+            out.push_str("  Buttons:       (none)\n");
+        } else {
+            let btn_str: Vec<&str> = buttons
+                .iter()
+                .filter_map(|b| b.as_str())
+                .collect();
+            out.push_str(&format!("  Buttons:       {}\n", btn_str.join(", ")));
+        }
+    }
+
+    // Modifiers
+    if let Some(mods) = value.get("modifiers") {
+        let mut active = Vec::new();
+        if mods.get("shift").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("shift");
+        }
+        if mods.get("control").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("control");
+        }
+        if mods.get("alt").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("alt");
+        }
+        if mods.get("super").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("super");
+        }
+        if active.is_empty() {
+            out.push_str("  Modifiers:     (none)\n");
+        } else {
+            out.push_str(&format!("  Modifiers:     {}\n", active.join(" + ")));
+        }
+    }
+
+    out
+}
+
 fn format_scene_text_runs(value: &serde_json::Value) -> String {
     let mut out = String::new();
     let arr = match value.as_array() {
@@ -375,6 +430,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.stats" => print!("{}", format_scene_stats(result)),
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
+        "input.state" => print!("{}", format_input_state(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),

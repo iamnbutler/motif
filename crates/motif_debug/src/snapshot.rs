@@ -1,5 +1,6 @@
 //! Scene snapshot: a serializable capture of the current scene state.
 
+use motif_core::input::{InputState, MouseButton};
 use motif_core::Scene;
 use serde::Serialize;
 
@@ -75,6 +76,82 @@ pub struct TextRunInfo {
     pub font_size: f32,
     pub glyph_count: usize,
     pub color: ColorInfo,
+}
+
+/// A serializable snapshot of the current input state.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct InputStateSnapshot {
+    /// Cursor position in logical pixels, or null if outside window.
+    pub cursor_position: Option<PointInfo>,
+    /// List of currently pressed mouse buttons.
+    pub mouse_buttons: Vec<String>,
+    /// Current modifier key state.
+    pub modifiers: ModifiersInfo,
+}
+
+/// Serializable point (x, y).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct PointInfo {
+    pub x: f32,
+    pub y: f32,
+}
+
+/// Serializable modifier key state.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct ModifiersInfo {
+    pub shift: bool,
+    pub control: bool,
+    pub alt: bool,
+    pub super_key: bool,
+}
+
+impl InputStateSnapshot {
+    /// Create a snapshot from InputState.
+    pub fn from_input_state(state: &InputState) -> Self {
+        let cursor_position = state.cursor_position.map(|p| PointInfo { x: p.x, y: p.y });
+
+        let mouse_buttons: Vec<String> = state
+            .mouse_buttons
+            .iter()
+            .map(|b| match b {
+                MouseButton::Left => "left".to_string(),
+                MouseButton::Right => "right".to_string(),
+                MouseButton::Middle => "middle".to_string(),
+                MouseButton::Back => "back".to_string(),
+                MouseButton::Forward => "forward".to_string(),
+                MouseButton::Other(n) => format!("other({})", n),
+            })
+            .collect();
+
+        let modifiers = ModifiersInfo {
+            shift: state.modifiers.shift_key(),
+            control: state.modifiers.control_key(),
+            alt: state.modifiers.alt_key(),
+            super_key: state.modifiers.super_key(),
+        };
+
+        Self {
+            cursor_position,
+            mouse_buttons,
+            modifiers,
+        }
+    }
+
+    /// Return input state as a JSON value (for the `input.state` command).
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "cursor_position": self.cursor_position.as_ref().map(|p| {
+                serde_json::json!({ "x": p.x, "y": p.y })
+            }),
+            "mouse_buttons": self.mouse_buttons,
+            "modifiers": {
+                "shift": self.modifiers.shift,
+                "control": self.modifiers.control,
+                "alt": self.modifiers.alt,
+                "super": self.modifiers.super_key,
+            },
+        })
+    }
 }
 
 /// A serializable snapshot of the current scene state.
@@ -263,11 +340,81 @@ impl SceneSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use motif_core::input::ModifiersState;
+    use motif_core::Point;
     use motif_core::{
         Corners, DevicePoint, DeviceRect, DeviceSize, Edges, FontData, Quad, Scene, Srgba,
         TextRun,
     };
     use linebender_resource_handle::Blob;
+
+    #[test]
+    fn input_snapshot_from_empty_state() {
+        let state = InputState::new();
+        let snap = InputStateSnapshot::from_input_state(&state);
+
+        assert!(snap.cursor_position.is_none());
+        assert!(snap.mouse_buttons.is_empty());
+        assert!(!snap.modifiers.shift);
+        assert!(!snap.modifiers.control);
+        assert!(!snap.modifiers.alt);
+        assert!(!snap.modifiers.super_key);
+    }
+
+    #[test]
+    fn input_snapshot_captures_cursor_position() {
+        let mut state = InputState::new();
+        state.cursor_position = Some(Point::new(123.5, 456.0));
+
+        let snap = InputStateSnapshot::from_input_state(&state);
+
+        let pos = snap.cursor_position.expect("should have position");
+        assert_eq!(pos.x, 123.5);
+        assert_eq!(pos.y, 456.0);
+    }
+
+    #[test]
+    fn input_snapshot_captures_mouse_buttons() {
+        let mut state = InputState::new();
+        state.mouse_buttons.insert(MouseButton::Left);
+        state.mouse_buttons.insert(MouseButton::Right);
+
+        let snap = InputStateSnapshot::from_input_state(&state);
+
+        assert_eq!(snap.mouse_buttons.len(), 2);
+        assert!(snap.mouse_buttons.contains(&"left".to_string()));
+        assert!(snap.mouse_buttons.contains(&"right".to_string()));
+    }
+
+    #[test]
+    fn input_snapshot_captures_modifiers() {
+        let mut state = InputState::new();
+        state.modifiers = ModifiersState::SHIFT | ModifiersState::CONTROL;
+
+        let snap = InputStateSnapshot::from_input_state(&state);
+
+        assert!(snap.modifiers.shift);
+        assert!(snap.modifiers.control);
+        assert!(!snap.modifiers.alt);
+        assert!(!snap.modifiers.super_key);
+    }
+
+    #[test]
+    fn input_snapshot_to_json() {
+        let mut state = InputState::new();
+        state.cursor_position = Some(Point::new(100.0, 200.0));
+        state.mouse_buttons.insert(MouseButton::Left);
+        state.modifiers = ModifiersState::ALT;
+
+        let snap = InputStateSnapshot::from_input_state(&state);
+        let json = snap.to_json();
+
+        assert_eq!(json["cursor_position"]["x"], 100.0);
+        assert_eq!(json["cursor_position"]["y"], 200.0);
+        assert!(json["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
+        assert_eq!(json["modifiers"]["alt"], true);
+        assert_eq!(json["modifiers"]["shift"], false);
+    }
 
     #[test]
     fn snapshot_from_empty_scene() {

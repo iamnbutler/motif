@@ -13,7 +13,7 @@ use motif_core::{
     text, ArcStr, DrawContext, IntoElement, ParentElement, Point, Rect, Render,
     RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
 };
-use motif_debug::{DebugServer, SceneSnapshot};
+use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -453,6 +453,12 @@ impl ApplicationHandler for App {
                 );
             }
             _ => {}
+        }
+
+        // Update debug server with current input state after any event.
+        if let Some(ref debug_server) = self.debug_server {
+            let snapshot = InputStateSnapshot::from_input_state(&self.input_state);
+            debug_server.update_input(snapshot);
         }
     }
 }

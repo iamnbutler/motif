@@ -11,7 +11,7 @@ use std::thread;
 
 use crate::protocol::{DebugRequest, DebugResponse};
 use crate::screenshot;
-use crate::snapshot::{ColorInfo, OverlayQuad, SceneSnapshot};
+use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
 
 /// Shared state for debug overlays injected via the debug CLI.
 ///
@@ -72,6 +72,7 @@ impl DebugOverlays {
 pub struct DebugServer {
     socket_path: PathBuf,
     snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+    input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
     window_id: Arc<Mutex<Option<u32>>>,
     overlays: Arc<Mutex<DebugOverlays>>,
     _shutdown: Arc<Mutex<bool>>,
@@ -100,11 +101,13 @@ impl DebugServer {
         listener.set_nonblocking(true)?;
 
         let snapshot: Arc<Mutex<Option<SceneSnapshot>>> = Arc::new(Mutex::new(None));
+        let input_state: Arc<Mutex<Option<InputStateSnapshot>>> = Arc::new(Mutex::new(None));
         let window_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
         let overlays: Arc<Mutex<DebugOverlays>> = Arc::new(Mutex::new(DebugOverlays::default()));
         let shutdown = Arc::new(Mutex::new(false));
 
         let server_snapshot = Arc::clone(&snapshot);
+        let server_input_state = Arc::clone(&input_state);
         let server_window_id = Arc::clone(&window_id);
         let server_overlays = Arc::clone(&overlays);
         let server_shutdown = Arc::clone(&shutdown);
@@ -113,6 +116,7 @@ impl DebugServer {
             Self::accept_loop(
                 listener,
                 server_snapshot,
+                server_input_state,
                 server_window_id,
                 server_overlays,
                 server_shutdown,
@@ -124,6 +128,7 @@ impl DebugServer {
         Ok(Self {
             socket_path,
             snapshot,
+            input_state,
             window_id,
             overlays,
             _shutdown: shutdown,
@@ -133,6 +138,13 @@ impl DebugServer {
     /// Update the shared scene snapshot. Called from the render loop each frame.
     pub fn update_scene(&self, snapshot: SceneSnapshot) {
         if let Ok(mut guard) = self.snapshot.lock() {
+            *guard = Some(snapshot);
+        }
+    }
+
+    /// Update the shared input state snapshot. Called from the event loop.
+    pub fn update_input(&self, snapshot: InputStateSnapshot) {
+        if let Ok(mut guard) = self.input_state.lock() {
             *guard = Some(snapshot);
         }
     }
@@ -164,6 +176,7 @@ impl DebugServer {
     fn accept_loop(
         listener: UnixListener,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
         overlays: Arc<Mutex<DebugOverlays>>,
         shutdown: Arc<Mutex<bool>>,
@@ -181,10 +194,11 @@ impl DebugServer {
                     let _ = stream.set_nonblocking(false);
 
                     let snap = Arc::clone(&snapshot);
+                    let inp = Arc::clone(&input_state);
                     let wid = Arc::clone(&window_id);
                     let ovl = Arc::clone(&overlays);
                     thread::spawn(move || {
-                        Self::handle_connection(stream, snap, wid, ovl);
+                        Self::handle_connection(stream, snap, inp, wid, ovl);
                     });
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -202,6 +216,7 @@ impl DebugServer {
     fn handle_connection(
         stream: std::os::unix::net::UnixStream,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
         overlays: Arc<Mutex<DebugOverlays>>,
     ) {
@@ -233,7 +248,7 @@ impl DebugServer {
                 }
             };
 
-            let response = Self::dispatch(&request, &snapshot, &window_id, &overlays);
+            let response = Self::dispatch(&request, &snapshot, &input_state, &window_id, &overlays);
             let _ = writeln!(writer, "{}", serde_json::to_string(&response).unwrap());
         }
     }
@@ -241,6 +256,7 @@ impl DebugServer {
     fn dispatch(
         request: &DebugRequest,
         snapshot: &Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: &Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: &Arc<Mutex<Option<u32>>>,
         overlays: &Arc<Mutex<DebugOverlays>>,
     ) -> DebugResponse {
@@ -275,6 +291,17 @@ impl DebugServer {
                         request.id,
                         -32000,
                         "No scene snapshot available yet",
+                    ),
+                }
+            }
+            "input.state" => {
+                let guard = input_state.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(snap) => DebugResponse::ok(request.id, snap.to_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No input state available yet",
                     ),
                 }
             }
@@ -948,5 +975,67 @@ mod tests {
         assert_eq!(overlays[0].y, 10.0);
         assert_eq!(overlays[0].w, 50.0);
         assert_eq!(overlays[0].h, 25.0);
+    }
+
+    #[test]
+    fn server_responds_to_input_state_without_snapshot() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.state","params":null,"id":1}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 1);
+        assert!(resp.error.is_some(), "should error when no input state available");
+        assert_eq!(resp.error.unwrap().code, -32000);
+    }
+
+    #[test]
+    fn server_responds_to_input_state_with_snapshot() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        // Provide an input state snapshot.
+        use motif_core::input::InputState;
+        use motif_core::Point;
+        let mut input = InputState::new();
+        input.cursor_position = Some(Point::new(150.0, 250.0));
+        input.mouse_buttons.insert(motif_core::input::MouseButton::Left);
+        let snap = InputStateSnapshot::from_input_state(&input);
+        server.update_input(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.state","params":null,"id":42}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 42);
+        assert!(resp.error.is_none());
+        let result = resp.result.unwrap();
+        assert_eq!(result["cursor_position"]["x"], 150.0);
+        assert_eq!(result["cursor_position"]["y"], 250.0);
+        assert!(result["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
     }
 }
