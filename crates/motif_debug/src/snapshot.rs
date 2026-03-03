@@ -87,6 +87,10 @@ pub struct InputStateSnapshot {
     pub mouse_buttons: Vec<String>,
     /// Current modifier key state.
     pub modifiers: ModifiersInfo,
+    /// Element currently under the cursor (from hit testing).
+    pub hovered_element: Option<u64>,
+    /// Element where mouse button was pressed (for click detection).
+    pub pressed_element: Option<u64>,
 }
 
 /// Serializable point (x, y).
@@ -130,10 +134,15 @@ impl InputStateSnapshot {
             super_key: state.modifiers.super_key(),
         };
 
+        let hovered_element = state.hovered().map(|e| e.0);
+        let pressed_element = state.pressed().map(|e| e.0);
+
         Self {
             cursor_position,
             mouse_buttons,
             modifiers,
+            hovered_element,
+            pressed_element,
         }
     }
 
@@ -150,6 +159,8 @@ impl InputStateSnapshot {
                 "alt": self.modifiers.alt,
                 "super": self.modifiers.super_key,
             },
+            "hovered_element": self.hovered_element,
+            "pressed_element": self.pressed_element,
         })
     }
 }
@@ -359,6 +370,8 @@ mod tests {
         assert!(!snap.modifiers.control);
         assert!(!snap.modifiers.alt);
         assert!(!snap.modifiers.super_key);
+        assert!(snap.hovered_element.is_none());
+        assert!(snap.pressed_element.is_none());
     }
 
     #[test]
@@ -400,11 +413,28 @@ mod tests {
     }
 
     #[test]
+    fn input_snapshot_captures_interaction_state() {
+        use motif_core::ElementId;
+
+        let mut state = InputState::new();
+        state.set_hovered(Some(ElementId(42)));
+        state.begin_press();
+
+        let snap = InputStateSnapshot::from_input_state(&state);
+
+        assert_eq!(snap.hovered_element, Some(42));
+        assert_eq!(snap.pressed_element, Some(42));
+    }
+
+    #[test]
     fn input_snapshot_to_json() {
+        use motif_core::ElementId;
+
         let mut state = InputState::new();
         state.cursor_position = Some(Point::new(100.0, 200.0));
         state.mouse_buttons.insert(MouseButton::Left);
         state.modifiers = ModifiersState::ALT;
+        state.set_hovered(Some(ElementId(123)));
 
         let snap = InputStateSnapshot::from_input_state(&state);
         let json = snap.to_json();
@@ -414,6 +444,8 @@ mod tests {
         assert!(json["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
         assert_eq!(json["modifiers"]["alt"], true);
         assert_eq!(json["modifiers"]["shift"], false);
+        assert_eq!(json["hovered_element"], 123);
+        assert!(json["pressed_element"].is_null());
     }
 
     #[test]

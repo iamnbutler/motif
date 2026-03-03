@@ -360,6 +360,26 @@ fn format_input_state(value: &serde_json::Value) -> String {
         }
     }
 
+    // Interaction state
+    out.push_str("───────────────────────\n");
+    out.push_str("Interaction State\n");
+
+    if let Some(hovered) = value.get("hovered_element") {
+        if hovered.is_null() {
+            out.push_str("  Hovered:       (none)\n");
+        } else if let Some(id) = hovered.as_u64() {
+            out.push_str(&format!("  Hovered:       ElementId({})\n", id));
+        }
+    }
+
+    if let Some(pressed) = value.get("pressed_element") {
+        if pressed.is_null() {
+            out.push_str("  Pressed:       (none)\n");
+        } else if let Some(id) = pressed.as_u64() {
+            out.push_str(&format!("  Pressed:       ElementId({})\n", id));
+        }
+    }
+
     out
 }
 

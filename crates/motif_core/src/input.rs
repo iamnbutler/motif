@@ -3,7 +3,7 @@
 //! Provides motif-native input types with logical coordinates,
 //! translating from winit's physical-pixel events.
 
-use crate::Point;
+use crate::{ElementId, Point};
 use std::collections::HashSet;
 
 // Re-export winit keyboard types (well-designed, handles international layouts)
@@ -93,6 +93,10 @@ pub struct InputState {
     pub modifiers: ModifiersState,
     /// Events queued this frame.
     events: Vec<InputEvent>,
+    /// Element currently under the cursor.
+    hovered: Option<ElementId>,
+    /// Element where mouse button was pressed (for click detection).
+    pressed: Option<ElementId>,
 }
 
 impl InputState {
@@ -193,6 +197,49 @@ impl InputState {
             state,
             modifiers: self.modifiers,
         }));
+    }
+
+    // --- Interaction tracking ---
+    //
+    // These methods track element-level interactions (hover, press, click)
+    // based on hit testing results. They work alongside the raw input methods.
+    //
+    // Typical usage:
+    //   1. CursorMoved: call handle_cursor_moved(), then hit_test(), then set_hovered()
+    //   2. MouseDown: call handle_mouse_button(btn, true), then begin_press()
+    //   3. MouseUp: call end_press() to get clicked element, then handle_mouse_button(btn, false)
+
+    /// Get the element currently under the cursor.
+    pub fn hovered(&self) -> Option<ElementId> {
+        self.hovered
+    }
+
+    /// Get the element where the mouse button was pressed (for drag/click detection).
+    pub fn pressed(&self) -> Option<ElementId> {
+        self.pressed
+    }
+
+    /// Set the currently hovered element. Call after hit testing when cursor moves.
+    pub fn set_hovered(&mut self, element: Option<ElementId>) {
+        self.hovered = element;
+    }
+
+    /// Begin a press gesture. Records the currently hovered element as the press target.
+    /// Call this on mouse button down (after handle_mouse_button).
+    pub fn begin_press(&mut self) {
+        self.pressed = self.hovered;
+    }
+
+    /// End a press gesture. Returns the clicked element if the press started and
+    /// ended on the same element. Call this on mouse button up (before handle_mouse_button).
+    pub fn end_press(&mut self) -> Option<ElementId> {
+        let pressed = self.pressed.take();
+        // Click detected if we're still hovering the same element we pressed
+        if pressed.is_some() && pressed == self.hovered {
+            pressed
+        } else {
+            None
+        }
     }
 }
 
@@ -471,5 +518,103 @@ mod tests {
             }
             _ => panic!("expected key event"),
         }
+    }
+
+    // --- Interaction tracking tests ---
+
+    #[test]
+    fn interaction_state_starts_empty() {
+        let state = InputState::new();
+        assert!(state.hovered().is_none());
+        assert!(state.pressed().is_none());
+    }
+
+    #[test]
+    fn set_hovered_updates_element() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(42);
+
+        state.set_hovered(Some(elem));
+        assert_eq!(state.hovered(), Some(elem));
+
+        state.set_hovered(None);
+        assert!(state.hovered().is_none());
+    }
+
+    #[test]
+    fn begin_press_records_hovered_as_pressed() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+
+        state.set_hovered(Some(elem));
+        state.begin_press();
+
+        assert_eq!(state.pressed(), Some(elem));
+    }
+
+    #[test]
+    fn end_press_clears_pressed() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        state.end_press();
+
+        assert!(state.pressed().is_none());
+    }
+
+    #[test]
+    fn end_press_returns_clicked_when_same_element() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+
+        // Hover, press, still hovering same element, release = click
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        let click = state.end_press();
+
+        assert_eq!(click, Some(elem));
+    }
+
+    #[test]
+    fn end_press_returns_none_when_different_element() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem1 = ElementId(1);
+        let elem2 = ElementId(2);
+
+        // Press on elem1, move to elem2, release = no click
+        state.set_hovered(Some(elem1));
+        state.begin_press();
+        state.set_hovered(Some(elem2));
+        let click = state.end_press();
+
+        assert!(click.is_none());
+    }
+
+    #[test]
+    fn end_press_returns_none_when_moved_off() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+
+        // Press on elem, move off, release = no click
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        state.set_hovered(None);
+        let click = state.end_press();
+
+        assert!(click.is_none());
     }
 }
