@@ -18,11 +18,13 @@
 //! server.update_scene(snapshot);
 //! ```
 
+pub mod input_sim;
 pub mod protocol;
 pub mod screenshot;
 pub mod server;
 pub mod snapshot;
 
+pub use input_sim::{SimResult, WindowPosition};
 pub use protocol::{DebugError, DebugRequest, DebugResponse};
 pub use screenshot::capture_window_to_png;
 pub use server::DebugServer;

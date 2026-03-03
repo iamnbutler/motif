@@ -465,6 +465,15 @@ impl ApplicationHandler for App {
                             scale.0,
                         );
                         debug_server.update_scene(snapshot);
+
+                        // Update window position for input simulation
+                        if let Ok(outer_pos) = window.outer_position() {
+                            debug_server.set_window_position(
+                                outer_pos.x as f32,
+                                outer_pos.y as f32,
+                                scale.0,
+                            );
+                        }
                     }
                 }
                 if let Some(window) = &self.window {
