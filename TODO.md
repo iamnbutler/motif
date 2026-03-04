@@ -45,25 +45,19 @@ _Auto-generated from spool. Do not edit manually._
 
 ## text-input-rewrite
 
-- [ ] Implement index_for_position for click-to-cursor (p3)
 - [ ] Implement on_mouse_down with click counting (p3)
 - [ ] Implement double-click word selection (p3)
 - [ ] Implement triple-click line selection (p3)
 - [ ] Implement drag-to-select (p3)
 - [ ] Implement cursor blinking (p3)
 - [ ] Implement horizontal scrolling for single-line input (p3)
-- [ ] Implement selection highlighting in paint (p3)
-- [ ] Implement cursor position calculation for rendering (p3)
 - [ ] Implement UTF-8/UTF-16 offset conversion (p3)
 - [ ] Implement InputHandler trait (p3)
 - [ ] Implement marked text (IME composition) visual (p3)
-- [ ] Design key bindings system (p3)
 - [ ] Implement focus handling (p3)
 - [ ] Implement event emission (p3)
 - [ ] Implement vertical cursor movement (up/down) (p3)
 - [ ] Implement vertical scrolling for multiline (p3)
 - [ ] Implement line layout system for multiline (p3)
-- [ ] Refactor TextInput element to use InputState (p3)
-- [ ] Update playground TextInput demo (p3)
 - [ ] Write comprehensive tests for InputState (p3)
 
