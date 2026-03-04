@@ -1,6 +1,8 @@
 //! Container element with background, border, and children.
 
-use crate::element::{AnyElement, Element, IntoElement, LayoutContext, PaintContext, ParentElement};
+use crate::element::{
+    AnyElement, Element, IntoElement, LayoutContext, PaintContext, ParentElement,
+};
 use crate::layout::{self, NodeId};
 use crate::{Corners, DeviceRect, Edges, Quad, Rect, Size};
 use palette::Srgba;
@@ -239,8 +241,8 @@ pub fn div() -> Div {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HitTree, LayoutEngine, ScaleFactor, Scene, TextContext};
     use crate::element::LayoutContext;
+    use crate::{HitTree, LayoutEngine, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn div_builder_sets_background() {

@@ -219,10 +219,7 @@ impl Element for TextInput {
         let mut quad = crate::Quad::new(
             crate::DeviceRect::new(
                 crate::DevicePoint::new(bounds.origin.x * scale, bounds.origin.y * scale),
-                crate::DeviceSize::new(
-                    bounds.size.width * scale,
-                    bounds.size.height * scale,
-                ),
+                crate::DeviceSize::new(bounds.size.width * scale, bounds.size.height * scale),
             ),
             self.background,
         );
@@ -322,8 +319,7 @@ impl Element for TextInput {
             };
 
             let cursor_x = bounds.origin.x + self.padding + cursor_x_logical;
-            let cursor_top =
-                bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
+            let cursor_top = bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
 
             let cursor_quad = crate::Quad::new(
                 crate::DeviceRect::new(

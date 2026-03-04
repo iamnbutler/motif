@@ -213,10 +213,7 @@ mod tests {
         cb.paint(bounds, &mut cx);
 
         // Center of the 18x18 box at (0,0) is (9,9).
-        assert_eq!(
-            hit_tree.hit_test(Point::new(9.0, 9.0)),
-            Some(ElementId(1))
-        );
+        assert_eq!(hit_tree.hit_test(Point::new(9.0, 9.0)), Some(ElementId(1)));
     }
 
     #[test]
@@ -344,9 +341,7 @@ mod tests {
         let mut hit_tree = HitTree::new();
         let mut layout_engine = LayoutEngine::new();
 
-        let mut cb = checkbox(ElementId(1))
-            .size(20.0)
-            .checked(false);
+        let mut cb = checkbox(ElementId(1)).size(20.0).checked(false);
 
         // Request layout
         let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));

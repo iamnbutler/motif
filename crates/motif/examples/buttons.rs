@@ -165,14 +165,15 @@ impl ApplicationHandler for App {
                         }
 
                         // Layout phase
-                        let mut layout_cx = LayoutContext::new(
-                            &mut self.layout_engine,
-                            &mut self.text_ctx,
-                            scale,
-                        );
+                        let mut layout_cx =
+                            LayoutContext::new(&mut self.layout_engine, &mut self.text_ctx, scale);
                         let node_id = btn.request_layout(&mut layout_cx);
-                        self.layout_engine
-                            .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+                        self.layout_engine.compute_layout(
+                            node_id,
+                            800.0,
+                            600.0,
+                            &mut self.text_ctx,
+                        );
 
                         // Paint at desired position (use computed size but manual position)
                         let computed = self.layout_engine.layout_bounds(node_id);

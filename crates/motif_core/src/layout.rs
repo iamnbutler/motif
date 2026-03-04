@@ -153,7 +153,7 @@ fn measure_text(
     // Determine max width for text wrapping
     let max_width = known_dimensions.width.or(match available_space.width {
         AvailableSpace::Definite(w) => Some(w),
-        AvailableSpace::MaxContent => None, // No wrapping
+        AvailableSpace::MaxContent => None,      // No wrapping
         AvailableSpace::MinContent => Some(0.0), // Force minimum width
     });
 

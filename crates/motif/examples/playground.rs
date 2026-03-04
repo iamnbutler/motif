@@ -358,17 +358,21 @@ impl ApplicationHandler for App {
                     // Render stateful view (manually positioned at 500, 30)
                     {
                         let wcx = WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
-                        let mut el = self.element_demo.render(&mut ViewContext::new(wcx)).into_element();
+                        let mut el = self
+                            .element_demo
+                            .render(&mut ViewContext::new(wcx))
+                            .into_element();
 
                         // Layout phase
-                        let mut layout_cx = LayoutContext::new(
-                            &mut self.layout_engine,
-                            &mut self.text_ctx,
-                            scale,
-                        );
+                        let mut layout_cx =
+                            LayoutContext::new(&mut self.layout_engine, &mut self.text_ctx, scale);
                         let node_id = el.request_layout(&mut layout_cx);
-                        self.layout_engine
-                            .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+                        self.layout_engine.compute_layout(
+                            node_id,
+                            800.0,
+                            600.0,
+                            &mut self.text_ctx,
+                        );
 
                         // Paint at desired position with offset for children
                         let layout_bounds = self.layout_engine.layout_bounds(node_id);
@@ -426,8 +430,12 @@ impl ApplicationHandler for App {
                                 scale,
                             );
                             let node_id = el.request_layout(&mut layout_cx);
-                            self.layout_engine
-                                .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+                            self.layout_engine.compute_layout(
+                                node_id,
+                                800.0,
+                                600.0,
+                                &mut self.text_ctx,
+                            );
 
                             // Paint at desired position with offset for children
                             let layout_bounds = self.layout_engine.layout_bounds(node_id);
@@ -611,8 +619,12 @@ impl ApplicationHandler for App {
                                 scale,
                             );
                             let node_id = cb.request_layout(&mut layout_cx);
-                            self.layout_engine
-                                .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+                            self.layout_engine.compute_layout(
+                                node_id,
+                                800.0,
+                                600.0,
+                                &mut self.text_ctx,
+                            );
 
                             // Paint at desired position (offset bounds)
                             let mut bounds = self.layout_engine.layout_bounds(node_id);
@@ -659,14 +671,15 @@ impl ApplicationHandler for App {
                         }
 
                         // Layout phase
-                        let mut layout_cx = LayoutContext::new(
-                            &mut self.layout_engine,
-                            &mut self.text_ctx,
-                            scale,
-                        );
+                        let mut layout_cx =
+                            LayoutContext::new(&mut self.layout_engine, &mut self.text_ctx, scale);
                         let node_id = input.request_layout(&mut layout_cx);
-                        self.layout_engine
-                            .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+                        self.layout_engine.compute_layout(
+                            node_id,
+                            800.0,
+                            600.0,
+                            &mut self.text_ctx,
+                        );
 
                         // Paint at desired position
                         let mut pcx = PaintContext::new(

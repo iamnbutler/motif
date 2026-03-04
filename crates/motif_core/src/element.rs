@@ -9,7 +9,9 @@
 //! 2. Layout engine computes bounds
 //! 3. `paint()` - draw at computed bounds
 
-use crate::{ElementId, HitTree, LayoutEngine, NodeId, Point, Rect, ScaleFactor, Scene, TextContext};
+use crate::{
+    ElementId, HitTree, LayoutEngine, NodeId, Point, Rect, ScaleFactor, Scene, TextContext,
+};
 
 /// Views are stateful components that persist across frames.
 ///
