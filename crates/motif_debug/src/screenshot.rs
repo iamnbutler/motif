@@ -4,7 +4,6 @@
 //! pixels — exactly what's on screen, including Metal rendering, text, etc.
 
 use std::io;
-use std::path::Path;
 
 /// Capture a window to a PNG file using macOS screen capture.
 ///
@@ -19,6 +18,7 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
     use core_graphics::display::*;
     use core_graphics::geometry::{CGPoint, CGRect, CGSize};
     use image::RgbaImage;
+    use std::path::Path;
 
     // Capture the specific window
     let cg_image = CGDisplay::screenshot(
