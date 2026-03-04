@@ -1,0 +1,49 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  bench:
+    name: Run benchmarks
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run benchmark
+        run: |
+          cargo bench --bench quad_render 2>&1 | tee /tmp/bench_output.txt
+        env:
+          MOTIF_BENCH_JSON: "1"
+
+      - name: Append to benches.jsonl
+        run: |
+          mkdir -p docs
+
+          # Extract JSON line from benchmark output (benchmark outputs JSON when MOTIF_BENCH_JSON=1)
+          if grep -q '^{' /tmp/bench_output.txt; then
+            grep '^{' /tmp/bench_output.txt >> docs/benches.jsonl
+          else
+            echo "Warning: No JSON output found from benchmark"
+            exit 0
+          fi
+
+      - name: Commit benchmark results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/benches.jsonl
+          if git diff --staged --quiet; then
+            echo "No changes to benchmark results"
+          else
+            git commit -m "bench: update benchmark results [skip ci]"
+            git push
+          fi
