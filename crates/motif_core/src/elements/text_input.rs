@@ -291,15 +291,22 @@ impl Element for TextInput {
 
         // 4. Cursor — only drawn when focused
         if self.is_focused {
-            // Determine cursor x by laying out the text before the cursor position
+            // Determine cursor x by laying out the text before the cursor position.
+            // We append a visible character to ensure trailing whitespace is measured,
+            // then subtract that character's width.
             let cursor_x_logical = if self.cursor_pos == 0 || self.value.is_empty() {
                 0.0_f32
             } else {
                 let text_before = &self.value[..self.cursor_pos];
-                let layout = cx
+                // Append a pipe character to measure trailing whitespace properly
+                let text_with_marker = format!("{}|", text_before);
+                let layout_with_marker = cx
                     .text_ctx()
-                    .layout_text(text_before, self.font_size * scale);
-                layout.width() / scale
+                    .layout_text(&text_with_marker, self.font_size * scale);
+                // Layout just the marker to get its width
+                let marker_layout = cx.text_ctx().layout_text("|", self.font_size * scale);
+                // Cursor position = total width - marker width
+                (layout_with_marker.width() - marker_layout.width()) / scale
             };
 
             let cursor_x = self.bounds.origin.x + self.padding + cursor_x_logical;
