@@ -1,16 +1,14 @@
 name: Benchmark
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'  # daily at 6am UTC
   workflow_dispatch:
 
 jobs:
   bench:
     name: Run benchmarks
     runs-on: macos-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -26,34 +24,61 @@ jobs:
         env:
           MOTIF_BENCH_JSON: "1"
 
-      - name: Collect benchmark results
+      - name: Clone wiki
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p docs
-          TIMESTAMP=$(date +%s)
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git /tmp/wiki
 
-          # Criterion results from scene_build
+      - name: Collect and prepend benchmark results
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+
+          # Collect results
+          SCENE_BUILD_NS=""
           for est in target/criterion/*/new/estimates.json; do
             if [ -f "$est" ]; then
-              BENCH_NAME=$(echo "$est" | sed 's|target/criterion/\(.*\)/new/estimates.json|\1|')
-              # Extract mean estimate (in nanoseconds)
-              MEAN_NS=$(jq '.mean.point_estimate' "$est")
-              echo "{\"timestamp\":\"$TIMESTAMP\",\"benchmark\":\"scene_build/$BENCH_NAME\",\"mean_ns\":$MEAN_NS}" >> docs/benches.jsonl
+              SCENE_BUILD_NS=$(jq '.mean.point_estimate | floor' "$est")
             fi
           done
 
-          # quad_render results (already JSON)
+          QUAD_RENDER_FPS=""
           if grep -q '^{' /tmp/quad_render_output.txt; then
-            grep '^{' /tmp/quad_render_output.txt >> docs/benches.jsonl
+            QUAD_RENDER_FPS=$(grep '^{' /tmp/quad_render_output.txt | jq -r '.fps | . * 100 | floor | . / 100')
           fi
 
-      - name: Commit benchmark results
+          # Build new row
+          NEW_ROW="| $DATE | $SHORT_SHA | ${SCENE_BUILD_NS:-N/A} | ${QUAD_RENDER_FPS:-N/A} |"
+
+          # Create or update wiki page
+          WIKI_FILE="/tmp/wiki/Benchmarks.md"
+
+          # Extract existing data rows (lines starting with "| 20")
+          EXISTING_ROWS=$(grep "^| 20" "$WIKI_FILE" 2>/dev/null || true)
+
+          # Write header + new row + existing rows
+          {
+            echo "# Benchmark Results"
+            echo ""
+            echo "| Date | Commit | scene_build (ns) | quad_render (fps) |"
+            echo "|------|--------|------------------|-------------------|"
+            echo "$NEW_ROW"
+            if [ -n "$EXISTING_ROWS" ]; then
+              echo "$EXISTING_ROWS"
+            fi
+          } > "$WIKI_FILE"
+
+      - name: Push to wiki
+        working-directory: /tmp/wiki
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f docs/benches.jsonl
+          git add Benchmarks.md
           if git diff --staged --quiet; then
             echo "No changes to benchmark results"
           else
-            git commit -m "bench: update benchmark results [skip ci]"
+            git commit -m "Update benchmark results"
             git push
           fi
