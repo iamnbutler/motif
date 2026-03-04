@@ -1,6 +1,8 @@
 //! GPU frame timing benchmark - measures actual rendering with window.
 //!
 //! Usage: cargo bench --bench quad_render
+//!
+//! Set MOTIF_BENCH_JSON=1 for JSON output (used by CI).
 
 use glamour::{Point2, Size2};
 use motif_core::{
@@ -59,6 +61,38 @@ impl BenchStats {
 
         let frame_avg = avg(&self.frame_times);
         let fps = 1.0 / frame_avg.as_secs_f64();
+        let throughput = (quad_count as f64 * fps) / 1_000_000.0;
+
+        // JSON output for CI
+        if std::env::var("MOTIF_BENCH_JSON").is_ok() {
+            let json = serde_json::json!({
+                "timestamp": chrono_lite_timestamp(),
+                "benchmark": "quad_render",
+                "quad_count": quad_count,
+                "samples": SAMPLE_FRAMES,
+                "frame_time_us": {
+                    "avg": frame_avg.as_micros(),
+                    "min": min(&self.frame_times).as_micros(),
+                    "max": max(&self.frame_times).as_micros(),
+                    "p50": p50(&self.frame_times).as_micros(),
+                    "p99": p99(&self.frame_times).as_micros(),
+                },
+                "scene_build_us": {
+                    "avg": avg(&self.scene_build_times).as_micros(),
+                    "min": min(&self.scene_build_times).as_micros(),
+                    "max": max(&self.scene_build_times).as_micros(),
+                },
+                "render_us": {
+                    "avg": avg(&self.render_times).as_micros(),
+                    "min": min(&self.render_times).as_micros(),
+                    "max": max(&self.render_times).as_micros(),
+                },
+                "fps": fps,
+                "throughput_mquads_sec": throughput,
+            });
+            println!("{}", json);
+            return;
+        }
 
         println!("\n=== Benchmark Results: {} quads ===", quad_count);
         println!(
@@ -95,11 +129,19 @@ impl BenchStats {
             max(&self.render_times)
         );
         println!();
-        println!(
-            "Throughput: {:.2}M quads/sec",
-            (quad_count as f64 * fps) / 1_000_000.0
-        );
+        println!("Throughput: {:.2}M quads/sec", throughput);
     }
+}
+
+/// Simple ISO 8601 timestamp without external crate
+fn chrono_lite_timestamp() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    // Just return unix timestamp - good enough for sorting
+    format!("{}", now)
 }
 
 struct App {
