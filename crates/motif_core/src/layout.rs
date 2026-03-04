@@ -7,10 +7,7 @@ use taffy::prelude::*;
 #[derive(Clone)]
 pub enum MeasureContext {
     /// Text that needs to be measured for layout.
-    Text {
-        content: String,
-        font_size: f32,
-    },
+    Text { content: String, font_size: f32 },
 }
 
 /// Layout engine wrapping Taffy.
@@ -67,7 +64,12 @@ impl LayoutEngine {
                 root,
                 available_space,
                 |known_dimensions, available_space, _node_id, node_context, _style| {
-                    measure_node(known_dimensions, available_space, node_context, text_context)
+                    measure_node(
+                        known_dimensions,
+                        available_space,
+                        node_context,
+                        text_context,
+                    )
                 },
             )
             .expect("taffy compute_layout failed");
@@ -130,9 +132,13 @@ fn measure_node(
     };
 
     match context {
-        MeasureContext::Text { content, font_size } => {
-            measure_text(known_dimensions, available_space, content, *font_size, text_context)
-        }
+        MeasureContext::Text { content, font_size } => measure_text(
+            known_dimensions,
+            available_space,
+            content,
+            *font_size,
+            text_context,
+        ),
     }
 }
 
@@ -145,7 +151,7 @@ fn measure_text(
     text_context: &mut TextContext,
 ) -> taffy::Size<f32> {
     // Determine max width for text wrapping
-    let max_width = known_dimensions.width.or_else(|| match available_space.width {
+    let max_width = known_dimensions.width.or(match available_space.width {
         AvailableSpace::Definite(w) => Some(w),
         AvailableSpace::MaxContent => None, // No wrapping
         AvailableSpace::MinContent => Some(0.0), // Force minimum width
@@ -164,8 +170,7 @@ fn measure_text(
 
 // Re-export taffy types that users need
 pub use taffy::style::{
-    AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, JustifyContent,
-    Position,
+    AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, JustifyContent, Position,
 };
 pub use taffy::{NodeId, Style};
 
@@ -356,8 +361,14 @@ mod tests {
         );
 
         // Text should be offset by padding
-        assert_eq!(text_bounds.origin.x, 8.0, "text should be offset by left padding");
-        assert_eq!(text_bounds.origin.y, 4.0, "text should be offset by top padding");
+        assert_eq!(
+            text_bounds.origin.x, 8.0,
+            "text should be offset by left padding"
+        );
+        assert_eq!(
+            text_bounds.origin.y, 4.0,
+            "text should be offset by top padding"
+        );
     }
 
     #[test]
