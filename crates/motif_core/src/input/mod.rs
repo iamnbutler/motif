@@ -3,6 +3,9 @@
 //! Provides motif-native input types with logical coordinates,
 //! translating from winit's physical-pixel events.
 
+mod text_state;
+pub use text_state::TextEditState;
+
 use crate::{ElementId, Point};
 use std::collections::HashSet;
 

@@ -17,6 +17,7 @@ palette = { workspace = true }
 parley = { version = "0.7", features = ["accesskit"] }
 smallvec = "1.11"
 swash = "0.2"
+unicode-segmentation = "1.10"
 winit = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
