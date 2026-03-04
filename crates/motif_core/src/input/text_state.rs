@@ -26,6 +26,12 @@ pub enum HandleKeyResult {
     Cut(String),
     /// Paste requested - caller should provide clipboard content via `paste()`.
     Paste,
+    /// Enter pressed in single-line mode - submit the input.
+    Submit,
+    /// Tab pressed in single-line mode - move focus to next input.
+    FocusNext,
+    /// Shift+Tab pressed in single-line mode - move focus to previous input.
+    FocusPrev,
 }
 
 /// A history entry for undo/redo operations.
@@ -57,10 +63,18 @@ pub struct TextEditState {
     undo_stack: Vec<HistoryEntry>,
     /// Stack of undone edits for redo.
     redo_stack: Vec<HistoryEntry>,
+    /// Whether this is a multiline input (textarea) or single-line (input).
+    /// Affects Enter (newline vs submit) and Tab (tab char vs focus change).
+    multiline: bool,
 }
 
 impl TextEditState {
-    /// Creates a new empty text edit state.
+    /// Creates a new empty single-line text edit state.
+    ///
+    /// For single-line inputs:
+    /// - Enter returns `HandleKeyResult::Submit`
+    /// - Tab returns `HandleKeyResult::FocusNext`
+    /// - Shift+Tab returns `HandleKeyResult::FocusPrev`
     pub fn new() -> Self {
         Self {
             content: String::new(),
@@ -69,7 +83,30 @@ impl TextEditState {
             marked_range: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            multiline: false,
         }
+    }
+
+    /// Creates a new empty multiline text edit state.
+    ///
+    /// For multiline inputs (textareas):
+    /// - Enter inserts a newline
+    /// - Tab inserts a tab character
+    pub fn new_multiline() -> Self {
+        Self {
+            content: String::new(),
+            selected_range: 0..0,
+            selection_reversed: false,
+            marked_range: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            multiline: true,
+        }
+    }
+
+    /// Returns whether this is a multiline input.
+    pub fn is_multiline(&self) -> bool {
+        self.multiline
     }
 
     // === Content accessors ===
@@ -602,6 +639,7 @@ impl TextEditState {
     /// implement their own keyboard logic.
     pub fn handle_key_event(&mut self, key: &Key, modifiers: &Modifiers) -> HandleKeyResult {
         let bindings = InputBindings::new();
+        let shift = modifiers.state().shift_key();
 
         let Some(action) = bindings.action_for_key(key, modifiers) else {
             return HandleKeyResult::NotHandled;
@@ -618,12 +656,22 @@ impl TextEditState {
                 HandleKeyResult::Handled
             }
             InputAction::InsertNewline => {
-                self.insert_newline();
-                HandleKeyResult::Handled
+                if self.multiline {
+                    self.insert_newline();
+                    HandleKeyResult::Handled
+                } else {
+                    HandleKeyResult::Submit
+                }
             }
             InputAction::InsertTab => {
-                self.insert_tab();
-                HandleKeyResult::Handled
+                if self.multiline {
+                    self.insert_tab();
+                    HandleKeyResult::Handled
+                } else if shift {
+                    HandleKeyResult::FocusPrev
+                } else {
+                    HandleKeyResult::FocusNext
+                }
             }
 
             // Navigation
@@ -2157,5 +2205,81 @@ mod tests {
         let result = state.handle_key_event(&Key::Character("v".into()), &cmd_mod());
 
         assert_eq!(result, HandleKeyResult::Paste);
+    }
+
+    // ============================================================
+    // Task: Single-line Enter/Tab behavior
+    // ============================================================
+
+    #[test]
+    fn handle_key_event_enter_single_line_returns_submit() {
+        let mut state = TextEditState::new(); // single-line by default
+        state.set_content("hello");
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Enter), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Submit);
+        // Content should not change
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn handle_key_event_enter_multiline_inserts_newline() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello");
+        state.move_to(5);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Enter), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.content(), "hello\n");
+    }
+
+    #[test]
+    fn handle_key_event_tab_single_line_returns_focus_next() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Tab), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::FocusNext);
+        // Content should not change
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn handle_key_event_shift_tab_single_line_returns_focus_prev() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Tab), &shift_mod());
+
+        assert_eq!(result, HandleKeyResult::FocusPrev);
+        // Content should not change
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn handle_key_event_tab_multiline_inserts_tab() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello");
+        state.move_to(5);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Tab), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.content(), "hello\t");
+    }
+
+    #[test]
+    fn new_creates_single_line_state() {
+        let state = TextEditState::new();
+        assert!(!state.is_multiline());
+    }
+
+    #[test]
+    fn new_multiline_creates_multiline_state() {
+        let state = TextEditState::new_multiline();
+        assert!(state.is_multiline());
     }
 }

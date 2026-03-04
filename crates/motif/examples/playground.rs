@@ -829,6 +829,20 @@ impl ApplicationHandler for App {
                         HandleKeyResult::Paste => {
                             // TODO: Read from system clipboard and call paste()
                         }
+                        HandleKeyResult::Submit => {
+                            // In a real app: submit form, add todo item, etc.
+                            eprintln!("Submit: '{}'", self.text_edit_state.content());
+                        }
+                        HandleKeyResult::FocusNext => {
+                            // In a real app: move focus to next input
+                            eprintln!("Focus next (Tab)");
+                            self.text_input_focused = false;
+                        }
+                        HandleKeyResult::FocusPrev => {
+                            // In a real app: move focus to previous input
+                            eprintln!("Focus prev (Shift+Tab)");
+                            self.text_input_focused = false;
+                        }
                     }
 
                     if let Some(window) = &self.window {
