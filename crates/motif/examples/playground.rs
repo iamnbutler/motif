@@ -7,13 +7,13 @@
 
 use motif_core::{
     checkbox, div,
-    element::{self, Element, PaintContext},
+    element::{Element, LayoutContext, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
     input::{InputState, MouseButton, ScrollDelta, TextEditState},
     metal::{MetalRenderer, MetalSurface},
-    text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point,
-    Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext,
-    WindowContext,
+    text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, LayoutEngine,
+    ParentElement, Point, Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba,
+    TextContext, ViewContext, WindowContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
@@ -192,20 +192,21 @@ impl Render for ElementDemo {
         self.frame += 1;
 
         div()
-            .bounds(Rect::new(Point::new(500.0, 30.0), Size::new(280.0, 80.0)))
+            .size(Size::new(280.0, 80.0))
+            .flex_col()
+            .padding(16.0)
+            .gap(8.0)
             .background(Srgba::new(0.12, 0.14, 0.2, 1.0))
             .corner_radius(8.0)
             .border_color(Srgba::new(0.3, 0.5, 0.8, 1.0))
             .border_width(1.0)
             .child(
                 text(format!("Render view — frame {}", self.frame))
-                    .position(Point::new(516.0, 65.0))
                     .font_size(14.0)
                     .color(Srgba::new(0.8, 0.9, 1.0, 1.0)),
             )
             .child(
                 text("Stateful: owns data, &mut self")
-                    .position(Point::new(516.0, 88.0))
                     .font_size(11.0)
                     .color(Srgba::new(0.5, 0.6, 0.7, 1.0)),
             )
@@ -215,25 +216,20 @@ impl Render for ElementDemo {
 struct StatusCard {
     label: ArcStr,
     value: ArcStr,
-    position: Point,
     color: Srgba,
 }
 
 impl RenderOnce for StatusCard {
     fn render(self, _cx: &mut WindowContext) -> impl IntoElement {
         div()
-            .bounds(Rect::new(self.position, Size::new(130.0, 56.0)))
+            .size(Size::new(130.0, 56.0))
+            .flex_col()
+            .padding(12.0)
             .background(Srgba::new(0.12, 0.14, 0.2, 1.0))
             .corner_radius(6.0)
-            .child(
-                text(self.value)
-                    .position(Point::new(self.position.x + 12.0, self.position.y + 28.0))
-                    .font_size(18.0)
-                    .color(self.color),
-            )
+            .child(text(self.value).font_size(18.0).color(self.color))
             .child(
                 text(self.label)
-                    .position(Point::new(self.position.x + 12.0, self.position.y + 46.0))
                     .font_size(9.0)
                     .color(Srgba::new(0.45, 0.45, 0.5, 1.0)),
             )
@@ -251,6 +247,7 @@ struct App {
     scene: Scene,
     text_ctx: TextContext,
     hit_tree: HitTree,
+    layout_engine: LayoutEngine,
     element_demo: ElementDemo,
     debug_server: Option<DebugServer>,
     input_state: InputState,
@@ -275,6 +272,7 @@ impl Default for App {
             scene: Scene::new(),
             text_ctx: TextContext::new(),
             hit_tree: HitTree::new(),
+            layout_engine: LayoutEngine::new(),
             element_demo: ElementDemo { frame: 0 },
             debug_server,
             input_state: InputState::new(),
@@ -357,43 +355,98 @@ impl ApplicationHandler for App {
                         paint_section_label(&mut cx, &mut self.text_ctx, "ELEMENTS", 500.0, 20.0);
                     }
 
-                    // Render stateful view
+                    // Render stateful view (manually positioned at 500, 30)
                     {
-                        let mut wcx =
-                            WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
-                        element::render_view(&mut self.element_demo, &mut wcx, &mut self.hit_tree);
+                        let wcx = WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
+                        let mut el = self.element_demo.render(&mut ViewContext::new(wcx)).into_element();
+
+                        // Layout phase
+                        let mut layout_cx = LayoutContext::new(
+                            &mut self.layout_engine,
+                            &mut self.text_ctx,
+                            scale,
+                        );
+                        let node_id = el.request_layout(&mut layout_cx);
+                        self.layout_engine
+                            .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+
+                        // Paint at desired position with offset for children
+                        let layout_bounds = self.layout_engine.layout_bounds(node_id);
+                        let desired_pos = Point::new(500.0, 30.0);
+                        let offset = Point::new(
+                            desired_pos.x - layout_bounds.origin.x,
+                            desired_pos.y - layout_bounds.origin.y,
+                        );
+
+                        let mut pcx = PaintContext::new(
+                            &mut self.scene,
+                            &mut self.text_ctx,
+                            &mut self.hit_tree,
+                            &self.layout_engine,
+                            scale,
+                        );
+                        pcx.set_offset(offset);
+
+                        let paint_bounds = Rect::new(desired_pos, layout_bounds.size);
+                        el.paint(paint_bounds, &mut pcx);
                     }
 
-                    // Render stateless cards
+                    // Render stateless cards (manually positioned)
                     {
                         let quad_count = self.scene.quad_count();
                         let text_count = self.scene.text_run_count();
                         let cards = vec![
-                            StatusCard {
-                                label: "Quads".into(),
-                                value: ArcStr::from(format!("{}", quad_count)),
-                                position: Point::new(500.0, 120.0),
-                                color: Srgba::new(0.4, 0.9, 0.6, 1.0),
-                            },
-                            StatusCard {
-                                label: "Text runs".into(),
-                                value: ArcStr::from(format!("{}", text_count)),
-                                position: Point::new(646.0, 120.0),
-                                color: Srgba::new(0.6, 0.7, 1.0, 1.0),
-                            },
+                            (
+                                StatusCard {
+                                    label: "Quads".into(),
+                                    value: ArcStr::from(format!("{}", quad_count)),
+                                    color: Srgba::new(0.4, 0.9, 0.6, 1.0),
+                                },
+                                Point::new(500.0, 120.0),
+                            ),
+                            (
+                                StatusCard {
+                                    label: "Text runs".into(),
+                                    value: ArcStr::from(format!("{}", text_count)),
+                                    color: Srgba::new(0.6, 0.7, 1.0, 1.0),
+                                },
+                                Point::new(646.0, 120.0),
+                            ),
                         ];
 
-                        for card in cards {
+                        for (card, desired_pos) in cards {
                             let mut wcx =
                                 WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
                             let mut el = card.render(&mut wcx).into_element();
+
+                            // Layout phase
+                            let mut layout_cx = LayoutContext::new(
+                                &mut self.layout_engine,
+                                &mut self.text_ctx,
+                                scale,
+                            );
+                            let node_id = el.request_layout(&mut layout_cx);
+                            self.layout_engine
+                                .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+
+                            // Paint at desired position with offset for children
+                            let layout_bounds = self.layout_engine.layout_bounds(node_id);
+                            let offset = Point::new(
+                                desired_pos.x - layout_bounds.origin.x,
+                                desired_pos.y - layout_bounds.origin.y,
+                            );
+
                             let mut pcx = PaintContext::new(
                                 &mut self.scene,
                                 &mut self.text_ctx,
                                 &mut self.hit_tree,
+                                &self.layout_engine,
                                 scale,
                             );
-                            el.paint(&mut pcx);
+                            pcx.set_offset(offset);
+
+                            let paint_bounds = Rect::new(desired_pos, layout_bounds.size);
+                            el.paint(paint_bounds, &mut pcx);
                         }
                     }
 
@@ -549,16 +602,30 @@ impl ApplicationHandler for App {
 
                             let mut cb = checkbox(checkbox_id)
                                 .checked(self.checkbox_states[i])
-                                .position(Point::new(500.0, y))
                                 .hovered(is_hovered);
+
+                            // Layout phase
+                            let mut layout_cx = LayoutContext::new(
+                                &mut self.layout_engine,
+                                &mut self.text_ctx,
+                                scale,
+                            );
+                            let node_id = cb.request_layout(&mut layout_cx);
+                            self.layout_engine
+                                .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+
+                            // Paint at desired position (offset bounds)
+                            let mut bounds = self.layout_engine.layout_bounds(node_id);
+                            bounds.origin = Point::new(500.0, y);
 
                             let mut pcx = PaintContext::new(
                                 &mut self.scene,
                                 &mut self.text_ctx,
                                 &mut self.hit_tree,
+                                &self.layout_engine,
                                 scale,
                             );
-                            cb.paint(&mut pcx);
+                            cb.paint(bounds, &mut pcx);
 
                             // Label next to checkbox
                             let mut cx = DrawContext::new(&mut self.scene, scale);
@@ -576,10 +643,12 @@ impl ApplicationHandler for App {
                     {
                         let input_id = ElementId(3100);
                         let is_hovered = self.input_state.hovered() == Some(input_id);
+                        let input_bounds =
+                            Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0));
 
                         let mut input = text_input(self.text_edit_state.content(), input_id)
                             .placeholder("Type something...")
-                            .bounds(Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0)))
+                            .bounds(input_bounds)
                             .focused(self.text_input_focused)
                             .cursor_pos(self.text_edit_state.cursor_offset())
                             .selection(self.text_edit_state.selected_range().clone());
@@ -589,13 +658,25 @@ impl ApplicationHandler for App {
                             input = input.border_color(Srgba::new(0.5, 0.5, 0.55, 1.0));
                         }
 
+                        // Layout phase
+                        let mut layout_cx = LayoutContext::new(
+                            &mut self.layout_engine,
+                            &mut self.text_ctx,
+                            scale,
+                        );
+                        let node_id = input.request_layout(&mut layout_cx);
+                        self.layout_engine
+                            .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+
+                        // Paint at desired position
                         let mut pcx = PaintContext::new(
                             &mut self.scene,
                             &mut self.text_ctx,
                             &mut self.hit_tree,
+                            &self.layout_engine,
                             scale,
                         );
-                        input.paint(&mut pcx);
+                        input.paint(input_bounds, &mut pcx);
 
                         // Label
                         let mut cx = DrawContext::new(&mut self.scene, scale);

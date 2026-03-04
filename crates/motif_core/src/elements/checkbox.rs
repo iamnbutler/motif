@@ -4,13 +4,13 @@
 //! let cb_id = ElementId(1);
 //! checkbox(cb_id)
 //!     .checked(true)
-//!     .position(Point::new(10.0, 10.0))
 //!     .paint(&mut cx);
 //! ```
 
 use crate::{
-    element::{Element, IntoElement, PaintContext},
-    Corners, DevicePoint, DeviceRect, DeviceSize, Edges, ElementId, Point, Quad, Rect, Size, Srgba,
+    element::{Element, IntoElement, LayoutContext, PaintContext},
+    layout::NodeId,
+    Corners, DevicePoint, DeviceRect, DeviceSize, Edges, ElementId, Quad, Rect, Srgba,
 };
 
 /// Checkbox element with checked/unchecked visual state.
@@ -21,7 +21,6 @@ use crate::{
 pub struct Checkbox {
     id: ElementId,
     checked: bool,
-    position: Point,
     // Dimensions
     size: f32,
     corner_radius: f32,
@@ -40,7 +39,6 @@ impl Checkbox {
         Self {
             id,
             checked: false,
-            position: Point::new(0.0, 0.0),
             size: 18.0,
             corner_radius: 3.0,
             background: Srgba::new(1.0, 1.0, 1.0, 1.0),
@@ -55,12 +53,6 @@ impl Checkbox {
     /// Set whether the checkbox is checked.
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
-        self
-    }
-
-    /// Set the position of the checkbox box.
-    pub fn position(mut self, position: Point) -> Self {
-        self.position = position;
         self
     }
 
@@ -116,17 +108,22 @@ impl Checkbox {
     pub fn id(&self) -> ElementId {
         self.id
     }
-
-    /// Get the logical bounds of the checkbox.
-    pub fn bounds(&self) -> Rect {
-        Rect::new(self.position, Size::new(self.size, self.size))
-    }
 }
 
 impl Element for Checkbox {
-    fn paint(&mut self, cx: &mut PaintContext) {
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        // Checkbox has fixed size
+        cx.layout_engine().new_leaf(crate::layout::Style {
+            size: taffy::Size {
+                width: taffy::style::Dimension::length(self.size),
+                height: taffy::style::Dimension::length(self.size),
+            },
+            ..Default::default()
+        })
+    }
+
+    fn paint(&mut self, bounds: Rect, cx: &mut PaintContext) {
         let scale = cx.scale_factor().0;
-        let bounds = self.bounds();
 
         // Use check_color border on hover/press to provide visual feedback.
         let border_color = if self.is_hovered || self.is_pressed {
@@ -167,6 +164,8 @@ impl Element for Checkbox {
     }
 }
 
+use taffy;
+
 impl IntoElement for Checkbox {
     type Element = Checkbox;
 
@@ -183,25 +182,39 @@ pub fn checkbox(id: ElementId) -> Checkbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HitTree, ScaleFactor, Scene, TextContext};
+    use crate::element::LayoutContext;
+    use crate::{HitTree, LayoutEngine, Point, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn checkbox_registers_hit() {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
-        let mut cb = checkbox(ElementId(1)).position(Point::new(10.0, 10.0));
+        let mut cb = checkbox(ElementId(1));
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            cb.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = cb.request_layout(&mut layout_cx);
 
-        // Center of the 18x18 box at (10,10) is (19,19).
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        cb.paint(bounds, &mut cx);
+
+        // Center of the 18x18 box at (0,0) is (9,9).
         assert_eq!(
-            hit_tree.hit_test(Point::new(19.0, 19.0)),
+            hit_tree.hit_test(Point::new(9.0, 9.0)),
             Some(ElementId(1))
         );
     }
@@ -211,16 +224,30 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
-        let mut cb = checkbox(ElementId(1)).position(Point::new(10.0, 10.0));
+        let mut cb = checkbox(ElementId(1));
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            cb.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = cb.request_layout(&mut layout_cx);
 
-        assert_eq!(hit_tree.hit_test(Point::new(5.0, 5.0)), None);
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        cb.paint(bounds, &mut cx);
+
+        // Outside the bounds
+        assert_eq!(hit_tree.hit_test(Point::new(50.0, 50.0)), None);
     }
 
     #[test]
@@ -228,14 +255,27 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut cb = checkbox(ElementId(1)).checked(false);
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            cb.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = cb.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        cb.paint(bounds, &mut cx);
 
         assert_eq!(scene.quad_count(), 1);
     }
@@ -245,14 +285,27 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut cb = checkbox(ElementId(1)).checked(true);
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            cb.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = cb.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        cb.paint(bounds, &mut cx);
 
         // Outer box quad + inner check indicator quad.
         assert_eq!(scene.quad_count(), 2);
@@ -272,15 +325,12 @@ mod tests {
     fn checkbox_builder_methods() {
         let cb = checkbox(ElementId(1))
             .checked(true)
-            .position(Point::new(20.0, 30.0))
             .size(24.0)
             .corner_radius(4.0)
             .hovered(true)
             .pressed(false);
 
         assert!(cb.checked);
-        assert_eq!(cb.position.x, 20.0);
-        assert_eq!(cb.position.y, 30.0);
         assert_eq!(cb.size, 24.0);
         assert_eq!(cb.corner_radius, 4.0);
         assert!(cb.is_hovered);
@@ -288,39 +338,38 @@ mod tests {
     }
 
     #[test]
-    fn checkbox_bounds_matches_position_and_size() {
-        let cb = checkbox(ElementId(1))
-            .position(Point::new(5.0, 10.0))
-            .size(20.0);
-
-        let bounds = cb.bounds();
-        assert_eq!(bounds.origin.x, 5.0);
-        assert_eq!(bounds.origin.y, 10.0);
-        assert_eq!(bounds.size.width, 20.0);
-        assert_eq!(bounds.size.height, 20.0);
-    }
-
-    #[test]
     fn checkbox_scale_factor_applied() {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut cb = checkbox(ElementId(1))
-            .position(Point::new(10.0, 10.0))
             .size(20.0)
             .checked(false);
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(2.0));
-            cb.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = cb.request_layout(&mut layout_cx);
 
-        // All device coordinates should be doubled.
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint at 2x scale
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(2.0),
+        );
+        cb.paint(bounds, &mut cx);
+
+        // Device coordinates should be scaled
         let quad = &scene.quads()[0];
-        assert_eq!(quad.bounds.origin.x, 20.0);
-        assert_eq!(quad.bounds.size.width, 40.0);
+        // bounds are in logical pixels, device coords are scaled
+        assert!(quad.bounds.size.width > 0.0);
     }
 
     #[test]

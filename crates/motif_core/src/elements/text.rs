@@ -1,20 +1,21 @@
 //! Text element for rendering text content.
 
-use crate::element::{Element, IntoElement, PaintContext};
-use crate::{ArcStr, Point, TextRun};
+use crate::element::{Element, IntoElement, LayoutContext, PaintContext};
+use crate::layout::{MeasureContext, NodeId};
+use crate::{ArcStr, Rect, TextRun};
 use palette::Srgba;
 
-/// A text element that renders a string at a given position.
+/// A text element that renders a string.
+///
+/// Text elements size themselves based on their content using the layout engine.
 ///
 /// ```ignore
 /// text("Hello, World!")
-///     .position(Point::new(50.0, 100.0))
 ///     .font_size(24.0)
 ///     .color(Srgba::new(1.0, 1.0, 1.0, 1.0))
 /// ```
 pub struct Text {
     content: ArcStr,
-    position: Point,
     font_size: f32,
     color: Srgba,
 }
@@ -23,15 +24,9 @@ impl Text {
     pub fn new(content: impl Into<ArcStr>) -> Self {
         Self {
             content: content.into(),
-            position: Point::new(0.0, 0.0),
             font_size: 16.0,
             color: Srgba::new(1.0, 1.0, 1.0, 1.0),
         }
-    }
-
-    pub fn position(mut self, position: Point) -> Self {
-        self.position = position;
-        self
     }
 
     pub fn font_size(mut self, size: f32) -> Self {
@@ -46,7 +41,18 @@ impl Text {
 }
 
 impl Element for Text {
-    fn paint(&mut self, cx: &mut PaintContext) {
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        // Text uses MeasureContext to size itself based on content
+        cx.layout_engine().new_leaf_with_context(
+            crate::layout::Style::default(),
+            MeasureContext::Text {
+                content: self.content.to_string(),
+                font_size: self.font_size,
+            },
+        )
+    }
+
+    fn paint(&mut self, bounds: Rect, cx: &mut PaintContext) {
         if self.content.is_empty() {
             return;
         }
@@ -55,14 +61,15 @@ impl Element for Text {
         let scaled_font_size = self.font_size * scale.0;
         let layout = cx.text_ctx().layout_text(&self.content, scaled_font_size);
 
-        let device_position = scale.scale_point(self.position);
+        // Use bounds from layout, not manually specified position
+        let device_position = scale.scale_point(bounds.origin);
 
         // Get baseline offset for correct vertical positioning
         let line_metrics = layout.line_metrics();
         let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
 
         let device_origin =
-            crate::DevicePoint::new(device_position.x, device_position.y - baseline_offset);
+            crate::DevicePoint::new(device_position.x, device_position.y + baseline_offset);
 
         for run in layout.glyph_runs_with_font() {
             if let Some(font) = run.font_data {
@@ -127,11 +134,9 @@ mod tests {
     #[test]
     fn text_builder_chain() {
         let t = text("hello")
-            .position(Point::new(10.0, 20.0))
             .font_size(24.0)
             .color(Srgba::new(1.0, 0.0, 0.0, 1.0));
 
-        assert_eq!(t.position.x, 10.0);
         assert_eq!(t.font_size, 24.0);
     }
 
