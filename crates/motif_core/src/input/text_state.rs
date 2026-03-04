@@ -247,6 +247,102 @@ impl TextEditState {
         }
     }
 
+    /// Moves cursor to the previous word boundary.
+    pub fn word_left(&mut self) {
+        let start = if self.selected_range.is_empty() {
+            self.cursor_offset()
+        } else {
+            self.selected_range.start
+        };
+        let new_pos = self.previous_word_boundary(start);
+        self.move_to(new_pos);
+    }
+
+    /// Moves cursor to the next word boundary.
+    pub fn word_right(&mut self) {
+        let start = if self.selected_range.is_empty() {
+            self.cursor_offset()
+        } else {
+            self.selected_range.end
+        };
+        let new_pos = self.next_word_boundary(start);
+        self.move_to(new_pos);
+    }
+
+    /// Moves cursor to the start of the current line.
+    pub fn home(&mut self) {
+        let start = if self.selected_range.is_empty() {
+            self.cursor_offset()
+        } else {
+            self.selected_range.start
+        };
+        let new_pos = self.find_line_start(start);
+        self.move_to(new_pos);
+    }
+
+    /// Moves cursor to the end of the current line.
+    pub fn end(&mut self) {
+        let start = if self.selected_range.is_empty() {
+            self.cursor_offset()
+        } else {
+            self.selected_range.end
+        };
+        let new_pos = self.find_line_end(start);
+        self.move_to(new_pos);
+    }
+
+    /// Moves cursor to the beginning of the content.
+    pub fn move_to_beginning(&mut self) {
+        self.move_to(0);
+    }
+
+    /// Moves cursor to the end of the content.
+    pub fn move_to_end(&mut self) {
+        self.move_to(self.content.len());
+    }
+
+    // === Selection extension ===
+
+    /// Extends selection left by one grapheme.
+    pub fn select_left(&mut self) {
+        let new_pos = self.previous_boundary(self.cursor_offset());
+        self.select_to(new_pos);
+    }
+
+    /// Extends selection right by one grapheme.
+    pub fn select_right(&mut self) {
+        let new_pos = self.next_boundary(self.cursor_offset());
+        self.select_to(new_pos);
+    }
+
+    /// Extends selection to the previous word boundary.
+    pub fn select_word_left(&mut self) {
+        let new_pos = self.previous_word_boundary(self.cursor_offset());
+        self.select_to(new_pos);
+    }
+
+    /// Extends selection to the next word boundary.
+    pub fn select_word_right(&mut self) {
+        let new_pos = self.next_word_boundary(self.cursor_offset());
+        self.select_to(new_pos);
+    }
+
+    /// Selects all content.
+    pub fn select_all(&mut self) {
+        self.selected_range = 0..self.content.len();
+        self.selection_reversed = false;
+    }
+
+    /// Extends selection to the beginning of the content.
+    pub fn select_to_beginning(&mut self) {
+        self.select_to(0);
+    }
+
+    /// Extends selection to the end of the content.
+    pub fn select_to_end(&mut self) {
+        self.select_to(self.content.len());
+    }
+
     // === Text manipulation ===
 
     /// Inserts text at the cursor position, replacing any selection.
@@ -281,6 +377,58 @@ impl TextEditState {
             let next = self.next_boundary(self.cursor_offset());
             if next > self.cursor_offset() {
                 self.select_to(next);
+            }
+        }
+        if !self.selected_range.is_empty() {
+            self.insert_text("");
+        }
+    }
+
+    /// Deletes to the previous word boundary.
+    pub fn delete_word_left(&mut self) {
+        if self.selected_range.is_empty() {
+            let prev = self.previous_word_boundary(self.cursor_offset());
+            if prev < self.cursor_offset() {
+                self.select_to(prev);
+            }
+        }
+        if !self.selected_range.is_empty() {
+            self.insert_text("");
+        }
+    }
+
+    /// Deletes to the next word boundary.
+    pub fn delete_word_right(&mut self) {
+        if self.selected_range.is_empty() {
+            let next = self.next_word_boundary(self.cursor_offset());
+            if next > self.cursor_offset() {
+                self.select_to(next);
+            }
+        }
+        if !self.selected_range.is_empty() {
+            self.insert_text("");
+        }
+    }
+
+    /// Deletes to the beginning of the current line.
+    pub fn delete_to_beginning_of_line(&mut self) {
+        if self.selected_range.is_empty() {
+            let line_start = self.find_line_start(self.cursor_offset());
+            if line_start < self.cursor_offset() {
+                self.select_to(line_start);
+            }
+        }
+        if !self.selected_range.is_empty() {
+            self.insert_text("");
+        }
+    }
+
+    /// Deletes to the end of the current line.
+    pub fn delete_to_end_of_line(&mut self) {
+        if self.selected_range.is_empty() {
+            let line_end = self.find_line_end(self.cursor_offset());
+            if line_end > self.cursor_offset() {
+                self.select_to(line_end);
             }
         }
         if !self.selected_range.is_empty() {
@@ -785,5 +933,515 @@ mod tests {
         state.move_to(1); // after "a"
         state.delete_forward();
         assert_eq!(state.content(), "ab");
+    }
+
+    // ============================================================
+    // Task: Implement word-level cursor movement
+    // ============================================================
+
+    #[test]
+    fn word_left_moves_to_previous_word_start() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(8); // middle of "world"
+        state.word_left();
+        assert_eq!(state.cursor_offset(), 6); // start of "world"
+    }
+
+    #[test]
+    fn word_left_from_word_start_goes_to_previous_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(6); // start of "world"
+        state.word_left();
+        assert_eq!(state.cursor_offset(), 0); // start of "hello"
+    }
+
+    #[test]
+    fn word_left_at_start_stays_at_start() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(0);
+        state.word_left();
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn word_left_with_selection_collapses_then_moves() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.word_left();
+        // Should collapse to start of selection, then move to word boundary
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn word_right_moves_to_next_word_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(2); // middle of "hello"
+        state.word_right();
+        assert_eq!(state.cursor_offset(), 5); // end of "hello"
+    }
+
+    #[test]
+    fn word_right_from_word_end_goes_to_next_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5); // end of "hello"
+        state.word_right();
+        assert_eq!(state.cursor_offset(), 11); // end of "world"
+    }
+
+    #[test]
+    fn word_right_at_end_stays_at_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.word_right();
+        assert_eq!(state.cursor_offset(), 5);
+    }
+
+    #[test]
+    fn word_right_with_selection_collapses_then_moves() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.word_right();
+        // Should collapse to end of selection, then move to word boundary
+        assert_eq!(state.cursor_offset(), 11);
+    }
+
+    // ============================================================
+    // Task: Implement line-level cursor movement (home/end)
+    // ============================================================
+
+    #[test]
+    fn home_moves_to_line_start() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(8); // middle of "world"
+        state.home();
+        assert_eq!(state.cursor_offset(), 6); // start of second line
+    }
+
+    #[test]
+    fn home_on_first_line_moves_to_zero() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(3);
+        state.home();
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn home_with_selection_collapses_then_moves() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(3..8);
+        state.home();
+        assert_eq!(state.cursor_offset(), 0);
+        assert!(state.selected_range().is_empty());
+    }
+
+    #[test]
+    fn end_moves_to_line_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(2); // middle of "hello"
+        state.end();
+        assert_eq!(state.cursor_offset(), 5); // end of first line (before \n)
+    }
+
+    #[test]
+    fn end_on_last_line_moves_to_content_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(8);
+        state.end();
+        assert_eq!(state.cursor_offset(), 11);
+    }
+
+    #[test]
+    fn end_with_selection_collapses_then_moves() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(3..8);
+        state.end();
+        assert_eq!(state.cursor_offset(), 11);
+        assert!(state.selected_range().is_empty());
+    }
+
+    // ============================================================
+    // Task: Implement document-level cursor movement
+    // ============================================================
+
+    #[test]
+    fn move_to_beginning_moves_to_zero() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld\ntest");
+        state.move_to(10);
+        state.move_to_beginning();
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn move_to_beginning_with_selection_collapses() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(3..8);
+        state.move_to_beginning();
+        assert_eq!(state.cursor_offset(), 0);
+        assert!(state.selected_range().is_empty());
+    }
+
+    #[test]
+    fn move_to_end_moves_to_content_length() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld\ntest");
+        state.move_to(5);
+        state.move_to_end();
+        assert_eq!(state.cursor_offset(), 16);
+    }
+
+    #[test]
+    fn move_to_end_with_selection_collapses() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(3..8);
+        state.move_to_end();
+        assert_eq!(state.cursor_offset(), 11);
+        assert!(state.selected_range().is_empty());
+    }
+
+    // ============================================================
+    // Task: Implement selection extension (character level)
+    // ============================================================
+
+    #[test]
+    fn select_left_extends_selection_by_one_grapheme() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+        state.select_left();
+        assert_eq!(state.selected_range(), &(2..3));
+        assert!(state.selection_reversed());
+    }
+
+    #[test]
+    fn select_left_continues_extending() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+        state.select_left();
+        state.select_left();
+        assert_eq!(state.selected_range(), &(1..3));
+    }
+
+    #[test]
+    fn select_left_at_start_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(0);
+        state.select_left();
+        assert_eq!(state.selected_range(), &(0..0));
+    }
+
+    #[test]
+    fn select_right_extends_selection_by_one_grapheme() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(2);
+        state.select_right();
+        assert_eq!(state.selected_range(), &(2..3));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_right_continues_extending() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(2);
+        state.select_right();
+        state.select_right();
+        assert_eq!(state.selected_range(), &(2..4));
+    }
+
+    #[test]
+    fn select_right_at_end_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.select_right();
+        assert_eq!(state.selected_range(), &(5..5));
+    }
+
+    // ============================================================
+    // Task: Implement selection extension (word level)
+    // ============================================================
+
+    #[test]
+    fn select_word_left_extends_to_previous_word_boundary() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(8);
+        state.select_word_left();
+        assert_eq!(state.selected_range(), &(6..8));
+        assert!(state.selection_reversed());
+    }
+
+    #[test]
+    fn select_word_left_continues_extending() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world test");
+        state.move_to(14);
+        state.select_word_left();
+        state.select_word_left();
+        assert_eq!(state.selected_range(), &(6..14));
+    }
+
+    #[test]
+    fn select_word_right_extends_to_next_word_boundary() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(2);
+        state.select_word_right();
+        assert_eq!(state.selected_range(), &(2..5));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_word_right_continues_extending() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world test");
+        state.move_to(2);
+        state.select_word_right();
+        state.select_word_right();
+        assert_eq!(state.selected_range(), &(2..11));
+    }
+
+    // ============================================================
+    // Task: Implement selection extension (document level)
+    // ============================================================
+
+    #[test]
+    fn select_all_selects_entire_content() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5);
+        state.select_all();
+        assert_eq!(state.selected_range(), &(0..11));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_all_on_empty_content() {
+        let mut state = TextEditState::new();
+        state.set_content("");
+        state.select_all();
+        assert_eq!(state.selected_range(), &(0..0));
+    }
+
+    #[test]
+    fn select_to_beginning_extends_to_start() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(8);
+        state.select_to_beginning();
+        assert_eq!(state.selected_range(), &(0..8));
+        assert!(state.selection_reversed());
+    }
+
+    #[test]
+    fn select_to_beginning_from_selection_extends_from_anchor() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5);
+        state.select_to(8); // select 5..8
+        state.select_to_beginning();
+        assert_eq!(state.selected_range(), &(0..5)); // extends from anchor (5)
+        assert!(state.selection_reversed());
+    }
+
+    #[test]
+    fn select_to_end_extends_to_content_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(3);
+        state.select_to_end();
+        assert_eq!(state.selected_range(), &(3..11));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_to_end_from_selection_extends_from_anchor() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(8);
+        state.select_to(3); // select 3..8, reversed
+        state.select_to_end();
+        assert_eq!(state.selected_range(), &(8..11)); // extends from anchor (8)
+        assert!(!state.selection_reversed());
+    }
+
+    // ============================================================
+    // Task: Implement word deletion actions
+    // ============================================================
+
+    #[test]
+    fn delete_word_left_removes_to_previous_word_boundary() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(8); // middle of "world"
+        state.delete_word_left();
+        assert_eq!(state.content(), "hello rld");
+        assert_eq!(state.cursor_offset(), 6);
+    }
+
+    #[test]
+    fn delete_word_left_at_word_start_removes_previous_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(6); // start of "world"
+        state.delete_word_left();
+        assert_eq!(state.content(), "world");
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn delete_word_left_at_start_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(0);
+        state.delete_word_left();
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn delete_word_left_with_selection_removes_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.delete_word_left();
+        assert_eq!(state.content(), "herld");
+    }
+
+    #[test]
+    fn delete_word_right_removes_to_next_word_boundary() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(2); // middle of "hello"
+        state.delete_word_right();
+        assert_eq!(state.content(), "he world");
+        assert_eq!(state.cursor_offset(), 2);
+    }
+
+    #[test]
+    fn delete_word_right_at_word_end_removes_next_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5); // end of "hello"
+        state.delete_word_right();
+        assert_eq!(state.content(), "hello");
+        assert_eq!(state.cursor_offset(), 5);
+    }
+
+    #[test]
+    fn delete_word_right_at_end_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.delete_word_right();
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn delete_word_right_with_selection_removes_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.delete_word_right();
+        assert_eq!(state.content(), "herld");
+    }
+
+    // ============================================================
+    // Task: Implement line deletion actions
+    // ============================================================
+
+    #[test]
+    fn delete_to_beginning_of_line_removes_to_line_start() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(9); // after "wor" in "world"
+        state.delete_to_beginning_of_line();
+        assert_eq!(state.content(), "hello\nld"); // "wor" deleted
+        assert_eq!(state.cursor_offset(), 6);
+    }
+
+    #[test]
+    fn delete_to_beginning_of_line_on_first_line() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(6);
+        state.delete_to_beginning_of_line();
+        assert_eq!(state.content(), "world");
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn delete_to_beginning_of_line_at_line_start_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(6); // start of "world"
+        state.delete_to_beginning_of_line();
+        assert_eq!(state.content(), "hello\nworld");
+    }
+
+    #[test]
+    fn delete_to_beginning_of_line_with_selection_removes_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.delete_to_beginning_of_line();
+        assert_eq!(state.content(), "herld");
+    }
+
+    #[test]
+    fn delete_to_end_of_line_removes_to_line_end() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(2); // middle of "hello"
+        state.delete_to_end_of_line();
+        assert_eq!(state.content(), "he\nworld");
+        assert_eq!(state.cursor_offset(), 2);
+    }
+
+    #[test]
+    fn delete_to_end_of_line_on_last_line() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(8);
+        state.delete_to_end_of_line();
+        assert_eq!(state.content(), "hello\nwo");
+        assert_eq!(state.cursor_offset(), 8);
+    }
+
+    #[test]
+    fn delete_to_end_of_line_at_line_end_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello\nworld");
+        state.move_to(5); // end of "hello" (before \n)
+        state.delete_to_end_of_line();
+        assert_eq!(state.content(), "hello\nworld");
+    }
+
+    #[test]
+    fn delete_to_end_of_line_with_selection_removes_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(2..8);
+        state.delete_to_end_of_line();
+        assert_eq!(state.content(), "herld");
     }
 }
