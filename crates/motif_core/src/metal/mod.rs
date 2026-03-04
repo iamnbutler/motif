@@ -1,4 +1,34 @@
 //! Metal renderer implementation (macOS only).
+//!
+//! ## Metal / Rust struct alignment
+//!
+//! Any struct that crosses the CPU→GPU boundary via a Metal buffer **must**
+//! have matching layout in both Rust (`#[repr(C)]`) and the Metal shader.
+//! This is trickier than it sounds because Metal's alignment rules differ from
+//! Rust's:
+//!
+//! | Metal type | Size  | Alignment |
+//! |------------|-------|-----------|
+//! | `float`    | 4 B   | 4 B       |
+//! | `float2`   | 8 B   | 8 B       |
+//! | `float3`   | 12 B  | **16 B**  |
+//! | `float4`   | 16 B  | 16 B      |
+//!
+//! The dangerous one is **`float3`**: it is 12 bytes wide but has 16-byte
+//! alignment, so the compiler silently inserts 4 bytes of padding after it.
+//! A Rust `[f32; 3]` is only 12 bytes with 4-byte alignment — no padding —
+//! so the two sides would disagree on the struct layout.
+//!
+//! ### Safe design rule
+//!
+//! Prefer `float4` groups (4 × f32 = 16 bytes), which align naturally on both
+//! sides.  When a field genuinely requires a trailing scalar (like `has_clip`
+//! below), pad it to a multiple of 16 bytes with explicit `float` fields.
+//! Never use `float3` in a buffer-bound struct.
+//!
+//! The shaders in `shaders.metal` follow the same convention: the `has_clip`
+//! slot is padded with `_pad1`, `_pad2`, `_pad3` to keep the struct at 112
+//! bytes.  Compile-time assertions below verify that both sides agree.
 
 /// Metal shader source, compiled at runtime.
 const SHADER_SOURCE: &str = include_str!("shaders.metal");
@@ -24,7 +54,15 @@ const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [
 const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
 /// GPU-side quad instance data.
-/// Tightly packed for Metal buffer: 112 bytes per quad.
+///
+/// Tightly packed for Metal buffer: **112 bytes** per quad instance
+/// (6 × `float4` = 96 B, plus one `float` + 3-float pad = 16 B).
+///
+/// ## Adding fields
+///
+/// Keep the total size a multiple of 16 bytes and mirror every change in the
+/// `QuadInstance` struct in `shaders.metal`.  The compile-time assertion
+/// `QUAD_INSTANCE_SIZE_CHECK` below will catch any mismatch.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadInstance {
@@ -42,7 +80,12 @@ pub struct QuadInstance {
     pub clip_bounds: [f32; 4],
     /// 1.0 if clip is active, 0.0 otherwise
     pub has_clip: f32,
-    /// Padding for alignment (Metal likes 16-byte alignment)
+    /// Explicit padding to reach the next 16-byte boundary.
+    ///
+    /// Metal requires buffer structs to be 16-byte aligned.  `has_clip` is a
+    /// single `f32` (4 bytes), so three padding floats bring the trailing slot
+    /// to 16 bytes.  See the module-level doc for the full alignment story.
+    /// The matching `_pad1`/`_pad2`/`_pad3` fields live in `shaders.metal`.
     pub _padding: [f32; 3],
 }
 
@@ -89,6 +132,9 @@ impl QuadInstance {
 }
 
 /// GPU-side glyph instance data for text rendering.
+///
+/// **48 bytes** per glyph instance (3 × `float4`).  No padding needed because
+/// all fields are already `float4`.  Mirror any changes in `shaders.metal`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphInstance {
@@ -99,6 +145,17 @@ pub struct GlyphInstance {
     /// r, g, b, a (text color)
     pub color: [f32; 4],
 }
+
+// Compile-time layout checks: these fail with a clear error if either struct
+// is accidentally resized (e.g. a field is added without updating the shader).
+const _QUAD_INSTANCE_SIZE_CHECK: () = assert!(
+    std::mem::size_of::<QuadInstance>() == 112,
+    "QuadInstance must be 112 bytes to match shaders.metal QuadInstance"
+);
+const _GLYPH_INSTANCE_SIZE_CHECK: () = assert!(
+    std::mem::size_of::<GlyphInstance>() == 48,
+    "GlyphInstance must be 48 bytes to match shaders.metal GlyphInstance"
+);
 
 /// A region in the texture atlas for a cached glyph.
 #[derive(Clone, Copy, Debug)]
