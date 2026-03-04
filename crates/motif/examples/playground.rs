@@ -8,6 +8,7 @@
 use motif_core::{
     div,
     element::{self, Element, PaintContext},
+    focus::{FocusEvent, FocusHandle, FocusState},
     input::{InputState, MouseButton, ScrollDelta},
     metal::{MetalRenderer, MetalSurface},
     text, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point, Rect, Render,
@@ -103,7 +104,10 @@ fn paint_typography_section(cx: &mut DrawContext, text_ctx: &mut TextContext, x:
     let mut sample_y = baseline_y + 80.0;
     for size in sizes {
         cx.paint_text(
-            &format!("{}px — The quick brown fox jumps over the lazy dog", size as i32),
+            &format!(
+                "{}px — The quick brown fox jumps over the lazy dog",
+                size as i32
+            ),
             Point::new(x, sample_y),
             size,
             Srgba::new(0.85, 0.85, 0.85, 1.0),
@@ -249,6 +253,9 @@ struct App {
     element_demo: ElementDemo,
     debug_server: Option<DebugServer>,
     input_state: InputState,
+    focus_state: FocusState,
+    /// Focus handles for demo input fields
+    input_handles: [FocusHandle; 3],
     /// Click counter for demo
     click_count: u32,
 }
@@ -266,6 +273,8 @@ impl Default for App {
             element_demo: ElementDemo { frame: 0 },
             debug_server,
             input_state: InputState::new(),
+            focus_state: FocusState::new(),
+            input_handles: [FocusHandle::new(), FocusHandle::new(), FocusHandle::new()],
             click_count: 0,
         }
     }
@@ -337,11 +346,8 @@ impl ApplicationHandler for App {
 
                     // Render stateful view
                     {
-                        let mut wcx = WindowContext::new(
-                            &mut self.scene,
-                            &mut self.text_ctx,
-                            scale,
-                        );
+                        let mut wcx =
+                            WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
                         element::render_view(&mut self.element_demo, &mut wcx, &mut self.hit_tree);
                     }
 
@@ -365,11 +371,8 @@ impl ApplicationHandler for App {
                         ];
 
                         for card in cards {
-                            let mut wcx = WindowContext::new(
-                                &mut self.scene,
-                                &mut self.text_ctx,
-                                scale,
-                            );
+                            let mut wcx =
+                                WindowContext::new(&mut self.scene, &mut self.text_ctx, scale);
                             let mut el = card.render(&mut wcx).into_element();
                             let mut pcx = PaintContext::new(
                                 &mut self.scene,
@@ -384,11 +387,18 @@ impl ApplicationHandler for App {
                     // --- Section: Interactive Button ---
                     {
                         let mut cx = DrawContext::new(&mut self.scene, scale);
-                        paint_section_label(&mut cx, &mut self.text_ctx, "INTERACTIONS", 500.0, 200.0);
+                        paint_section_label(
+                            &mut cx,
+                            &mut self.text_ctx,
+                            "INTERACTIONS",
+                            500.0,
+                            200.0,
+                        );
 
                         // Paint an interactive button
                         let button_id = ElementId(1000); // Fixed ID for the demo button
-                        let button_bounds = Rect::new(Point::new(500.0, 220.0), Size::new(180.0, 50.0));
+                        let button_bounds =
+                            Rect::new(Point::new(500.0, 220.0), Size::new(180.0, 50.0));
 
                         // Determine button visual state
                         let is_hovered = self.input_state.hovered() == Some(button_id);
@@ -409,9 +419,103 @@ impl ApplicationHandler for App {
                         let label = format!("Clicks: {}", self.click_count);
                         cx.paint_text(
                             &label,
-                            Point::new(button_bounds.origin.x + 20.0, button_bounds.origin.y + 16.0),
+                            Point::new(
+                                button_bounds.origin.x + 20.0,
+                                button_bounds.origin.y + 16.0,
+                            ),
                             18.0,
                             Srgba::new(1.0, 1.0, 1.0, 1.0),
+                            &mut self.text_ctx,
+                        );
+                    }
+
+                    // --- Section: Focus Demo ---
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "FOCUS", 500.0, 290.0);
+
+                        // Three focusable "input" boxes
+                        let labels = ["Input 1", "Input 2", "Input 3"];
+                        for (i, (handle, label)) in
+                            self.input_handles.iter().zip(labels.iter()).enumerate()
+                        {
+                            let y = 310.0 + i as f32 * 50.0;
+                            let bounds = Rect::new(Point::new(500.0, y), Size::new(280.0, 40.0));
+                            let element_id = ElementId(2000 + i as u64);
+
+                            let is_focused = handle.is_focused(&self.focus_state);
+                            let is_hovered = self.input_state.hovered() == Some(element_id);
+
+                            // Background
+                            let bg_color = if is_focused {
+                                Srgba::new(0.15, 0.18, 0.25, 1.0)
+                            } else {
+                                Srgba::new(0.1, 0.1, 0.14, 1.0)
+                            };
+
+                            // Border
+                            let border_color = if is_focused {
+                                Srgba::new(0.4, 0.7, 1.0, 1.0) // Blue when focused
+                            } else if is_hovered {
+                                Srgba::new(0.3, 0.4, 0.5, 1.0) // Subtle on hover
+                            } else {
+                                Srgba::new(0.2, 0.2, 0.25, 1.0) // Dim border
+                            };
+
+                            let mut quad = motif_core::Quad::new(
+                                motif_core::DeviceRect::new(
+                                    motif_core::DevicePoint::new(
+                                        bounds.origin.x * scale.0,
+                                        bounds.origin.y * scale.0,
+                                    ),
+                                    motif_core::DeviceSize::new(
+                                        bounds.size.width * scale.0,
+                                        bounds.size.height * scale.0,
+                                    ),
+                                ),
+                                bg_color,
+                            );
+                            quad.border_color = border_color;
+                            quad.border_widths =
+                                motif_core::Edges::all(if is_focused { 2.0 } else { 1.0 });
+                            quad.corner_radii = motif_core::Corners::all(4.0);
+                            cx.paint(quad);
+
+                            // Register for hit testing
+                            self.hit_tree.push(element_id, bounds);
+
+                            // Label text
+                            let text_color = if is_focused {
+                                Srgba::new(0.9, 0.9, 0.95, 1.0)
+                            } else {
+                                Srgba::new(0.5, 0.5, 0.55, 1.0)
+                            };
+                            cx.paint_text(
+                                *label,
+                                Point::new(bounds.origin.x + 12.0, bounds.origin.y + 14.0),
+                                14.0,
+                                text_color,
+                                &mut self.text_ctx,
+                            );
+
+                            // Show focus indicator
+                            if is_focused {
+                                cx.paint_text(
+                                    "(focused)",
+                                    Point::new(bounds.origin.x + 200.0, bounds.origin.y + 14.0),
+                                    11.0,
+                                    Srgba::new(0.4, 0.7, 1.0, 0.8),
+                                    &mut self.text_ctx,
+                                );
+                            }
+                        }
+
+                        // Instructions
+                        cx.paint_text(
+                            "Click to focus • Tab to cycle (future)",
+                            Point::new(500.0, 470.0),
+                            10.0,
+                            Srgba::new(0.4, 0.4, 0.45, 1.0),
                             &mut self.text_ctx,
                         );
                     }
@@ -459,11 +563,7 @@ impl ApplicationHandler for App {
                     if let Some(ref debug_server) = self.debug_server {
                         let phys = window.inner_size();
                         let viewport = (phys.width as f32, phys.height as f32);
-                        let snapshot = SceneSnapshot::from_scene(
-                            &self.scene,
-                            viewport,
-                            scale.0,
-                        );
+                        let snapshot = SceneSnapshot::from_scene(&self.scene, viewport, scale.0);
                         debug_server.update_scene(snapshot);
 
                         // Update window position for input simulation
@@ -484,10 +584,13 @@ impl ApplicationHandler for App {
             }
             // --- Input events ---
             WindowEvent::CursorMoved { position, .. } => {
-                let scale = self.window.as_ref()
+                let scale = self
+                    .window
+                    .as_ref()
                     .map(|w| w.scale_factor() as f32)
                     .unwrap_or(1.0);
-                self.input_state.handle_cursor_moved(position.x, position.y, scale);
+                self.input_state
+                    .handle_cursor_moved(position.x, position.y, scale);
 
                 // Update hover state from hit tree
                 if let Some(pos) = self.input_state.cursor_position {
@@ -516,11 +619,35 @@ impl ApplicationHandler for App {
                     self.input_state.begin_press();
                 } else {
                     // Interaction tracking: check for click
-                    if let Some(_clicked_element) = self.input_state.end_press() {
-                        self.click_count += 1;
+                    if let Some(clicked_element) = self.input_state.end_press() {
+                        // Check if clicked on button
+                        if clicked_element == ElementId(1000) {
+                            self.click_count += 1;
+                        }
+                        // Check if clicked on focusable inputs (IDs 2000-2002)
+                        let id = clicked_element.0;
+                        if id >= 2000 && id < 2003 {
+                            let index = (id - 2000) as usize;
+                            self.input_handles[index].focus(&mut self.focus_state);
+                        }
+                    } else {
+                        // Clicked outside any element - blur focus
+                        self.focus_state.blur();
                     }
                     // Raw input tracking
                     self.input_state.handle_mouse_button(btn, false);
+                }
+
+                // Process focus events (for logging/debugging)
+                for event in self.focus_state.take_events() {
+                    match event {
+                        FocusEvent::Focus { id } => {
+                            eprintln!("Focus: {:?}", id);
+                        }
+                        FocusEvent::Blur { id } => {
+                            eprintln!("Blur: {:?}", id);
+                        }
+                    }
                 }
 
                 // Request redraw for press feedback
@@ -529,20 +656,20 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
-                let scale = self.window.as_ref()
+                let scale = self
+                    .window
+                    .as_ref()
                     .map(|w| w.scale_factor() as f32)
                     .unwrap_or(1.0);
-                self.input_state.handle_scroll(ScrollDelta::from_winit(delta, scale));
+                self.input_state
+                    .handle_scroll(ScrollDelta::from_winit(delta, scale));
             }
             WindowEvent::ModifiersChanged(mods) => {
                 self.input_state.handle_modifiers_changed(mods.state());
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                self.input_state.handle_key(
-                    event.logical_key,
-                    event.physical_key,
-                    event.state,
-                );
+                self.input_state
+                    .handle_key(event.logical_key, event.physical_key, event.state);
             }
             _ => {}
         }
@@ -562,7 +689,13 @@ fn paint_section_label(
     x: f32,
     y: f32,
 ) {
-    cx.paint_text(label, Point::new(x, y), 10.0, Srgba::new(0.4, 0.4, 0.45, 1.0), text_ctx);
+    cx.paint_text(
+        label,
+        Point::new(x, y),
+        10.0,
+        Srgba::new(0.4, 0.4, 0.45, 1.0),
+        text_ctx,
+    );
 }
 
 fn main() {
