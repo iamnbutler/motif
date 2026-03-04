@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T08:00:00Z",
-  "last_run_id": "22663571765",
+  "last_run": "2026-03-04T16:00:00Z",
+  "last_run_id": "22676882020",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -36,7 +36,7 @@
       "branch": "repo-assist/fix-issue-12-release-workflow",
       "pr_number": 23,
       "status": "failed_push_issue",
-      "description": "Added .github/workflows/release.yml (validate→draft-release→publish pipeline) and extended scripts/release.sh with bump <version> subcommand. Push failed — issue #23 created with patch artifact. Maintainer can apply manually from run 22656017116 artifacts."
+      "description": "Added .github/workflows/release.yml (validate->draft-release->publish pipeline) and extended scripts/release.sh with bump <version> subcommand. Push failed — issue #23 created with patch artifact. Maintainer can apply manually from run 22656017116 artifacts."
     }
   },
   "improvement_prs": {
@@ -77,8 +77,8 @@
       "run_id": "22653577535",
       "branch": "repo-assist/improve-todomvc-example",
       "pr_number": 20,
-      "status": "open_draft",
-      "description": "Implemented TodoMVC example in crates/motif/examples/todomvc.rs (~700 lines). Text input, checkbox toggle, hover-reveal delete, All/Active/Completed filter tabs, items-remaining count, clear-completed button. Resolves p1/p2 TODOs from spool todomvc stream."
+      "status": "open_draft_superseded",
+      "description": "Implemented TodoMVC example. Now superseded by maintainer's PR #35 (merged). PR #20 should be closed."
     },
     "element_list_debug": {
       "date": "2026-03-04",
@@ -102,7 +102,7 @@
       "branch": "repo-assist/improve-metal-alignment-docs",
       "pr_number": 24,
       "status": "open_draft",
-      "description": "Added module-level doc comment to metal/mod.rs explaining the float3 16-byte alignment gotcha (table: float/float2/float3/float4 sizes vs alignments), safe design rule, improved _padding field docs, and compile-time const assertions for QuadInstance (112 B) and GlyphInstance (48 B). Resolves p3 spool task 'Document Metal struct alignment gotcha'."
+      "description": "Added module-level doc comment to metal/mod.rs explaining the float3 16-byte alignment gotcha, improved _padding field docs, and compile-time const assertions. Resolves p3 spool task 'Document Metal struct alignment gotcha'."
     },
     "keyboard_simulation": {
       "date": "2026-03-04",
@@ -110,15 +110,31 @@
       "branch": "repo-assist/improve-keyboard-simulation",
       "pr_number": 25,
       "status": "open_draft",
-      "description": "Added key_down/key_up/key_press functions to input_sim.rs using macOS CGEvent keyboard API + non-macOS stubs. Added server dispatch (input.key_down/up/press). CLI key-name lookup table (letters a-z, digits, arrows, F-keys, modifiers, special keys) + parse_input_key + format_input_key + 18 new tests. Resolves p2 spool task 'Simulate keyboard events'."
+      "description": "Added key_down/key_up/key_press functions to input_sim.rs using macOS CGEvent keyboard API + non-macOS stubs. 18 new tests. Resolves p2 spool task 'Simulate keyboard events'."
     },
     "inject_debug_text": {
       "date": "2026-03-04",
       "run_id": "22663571765",
       "branch": "repo-assist/improve-inject-debug-text",
-      "pr_number": 26,
+      "pr_number": 27,
       "status": "open_draft",
-      "description": "Added OverlayText struct to snapshot.rs; DebugOverlays gains texts Vec with shared next_id counter; remove/clear work on both kinds; DebugServer::overlay_texts(); debug.draw_text dispatch; debug.list returns unified kind-tagged array; draw.text CLI command with space-safe content parsing; format_debug_list shows Quads+Texts tables; 10 new integration tests. Resolves p2 spool task 'Inject debug text'."
+      "description": "Added OverlayText struct; debug.draw_text server method; draw.text CLI command; 10 new integration tests. Resolves p2 spool task 'Inject debug text'."
+    },
+    "multi_click_detection": {
+      "date": "2026-03-04",
+      "run_id": "22676182627",
+      "branch": "repo-assist/improve-multi-click-detection",
+      "pr_number": 36,
+      "status": "open_draft",
+      "description": "Extended InputState.end_press() with consecutive-click tracking. click_count() accessor returns 1=single, 2=double, 3=triple. 8 unit tests. Resolves p1 spool task 'Double-click detection in InputState'."
+    },
+    "screenshot_diff": {
+      "date": "2026-03-04",
+      "run_id": "22676882020",
+      "branch": "repo-assist/improve-screenshot-diff",
+      "pr_number": null,
+      "status": "submitted_patch",
+      "description": "Added DiffResult struct; diff_screenshots(path_a, path_b, output_path, threshold) using existing image crate; screenshot.diff server command; parse_screenshot_diff CLI parser; format_screenshot_diff formatter; 8 unit tests. Resolves p2 spool task 'Screenshot diffing utility' (mlr44ma9-70y8). Build fails on Linux due to fontconfig (known infrastructure issue)."
     }
   },
   "labels_applied": {
@@ -141,7 +157,9 @@
     "release_workflow",
     "metal_alignment_docs",
     "keyboard_simulation",
-    "inject_debug_text"
+    "inject_debug_text",
+    "multi_click_detection",
+    "screenshot_diff"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
@@ -150,19 +168,17 @@
   "devtools_investigation": {
     "date": "2026-03-04",
     "run_id": "22654239399",
-    "findings": "scene.quads, scene.text_runs, input.state, debug.draw_quad, debug.clear, screenshot all already implemented in server.rs. 'Query element tree (p1)' TODO is NOT fully implemented. PR #21 adds element.list (flat HitTree dump: id, bounds, z_index). Full element tree query still needs: parent-child tracking in DrawContext, component type names in HitEntry. Could implement 'element.inspect <id>' in a future run once #21 lands."
+    "findings": "scene.quads, scene.text_runs, input.state, debug.draw_quad, debug.clear, screenshot all already implemented in server.rs. 'Query element tree (p1)' TODO is NOT fully implemented. PR #21 adds element.list (flat HitTree dump: id, bounds, z_index). Full element tree query still needs: parent-child tracking in DrawContext, component type names in HitEntry."
   },
   "ci_status_checks": {
     "2026-03-04": {
-      "pr16": "pending (0 checks - CI did not run on Repo Assist draft PR branches)",
-      "pr20": "pending (0 checks - CI did not run on Repo Assist draft PR branches)",
-      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. No CI runs found for any of PRs #16-#22 in pull_request event workflow runs. This may be because draft PRs from github-actions bot do not trigger workflows. Will monitor on 2026-03-18 nudge date."
+      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. No CI runs found for any Repo Assist draft PR branches. This may be because draft PRs from github-actions bot do not trigger workflows. All PRs show build failure on Linux due to missing fontconfig — same infrastructure issue. Will nudge open PRs on 2026-03-18 if not reviewed."
     }
   },
   "focus_module_findings": {
     "date": "2026-03-04",
     "run_id": "22656684883",
-    "findings": "focus.rs already has FocusId (atomic counter), FocusHandle (Arc-based), FocusEvent (Focus/Blur), FocusState (tracks current focus + pending events) with comprehensive tests. accessibility.rs has FocusManager (tab order navigation). What is missing: (1) DrawContext integration so elements can call ctx.focus_handle() to claim focus, (2) InputState routing keyboard events to focused element. This is a good multi-file change for a future run once the element PRs (#18, #19) merge."
+    "findings": "focus.rs already has FocusId (atomic counter), FocusHandle (Arc-based), FocusEvent (Focus/Blur), FocusState (tracks current focus + pending events) with comprehensive tests. accessibility.rs has FocusManager (tab order navigation). What is missing: (1) DrawContext integration so elements can call ctx.focus_handle() to claim focus, (2) InputState routing keyboard events to focused element. Good multi-file change after #18/#19 merge."
   },
-  "notes": "Run 14 (22663571765): Task 10 — implemented inject debug text PR (branch repo-assist/improve-inject-debug-text, expected PR #26). OverlayText struct; shared ID counter with quads; debug.draw_text server method; draw.text CLI command; 10 new integration tests. Resolves p2 spool task 'Inject debug text'. Build fails on Linux due to missing fontconfig (same infrastructure issue as all prior PRs). Task 11 — updated Monthly Activity Summary. Next priorities: (a) On 2026-03-18 nudge PRs if not reviewed. (b) Focus management integration into DrawContext (good for after #18/#19 merge). (c) Screenshot diffing utility (p2 devtools TODO) — good next devtools feature. (d) element.inspect <id> after #21 merges. (e) Cursor management (p3 input TODO). (f) Release workflow retry if maintainer prefers not to apply patch manually."
+  "notes": "Run 15 (22676882020): Task 10 — implemented screenshot diffing utility (branch repo-assist/improve-screenshot-diff). DiffResult struct; diff_screenshots() with threshold and optional diff image output; screenshot.diff server command; CLI command parse_screenshot_diff + format_screenshot_diff; 8 unit tests. Resolves p2 spool task 'Screenshot diffing utility' (mlr44ma9-70y8). Build fails on Linux due to missing fontconfig (same infrastructure issue as all prior PRs). Task 11 — updated Monthly Activity Summary. Next priorities: (a) On 2026-03-18 nudge PRs #21/#22/#25/#27/#36 if not reviewed. (b) Focus management integration into DrawContext (good for after #18/#19 merge). (c) Visual regression test harness (p3) — builds on screenshot diff. (d) element.inspect <id> after #21 merges. (e) Per-item inline text editing (p1 todomvc) after #36 merges."
 }
