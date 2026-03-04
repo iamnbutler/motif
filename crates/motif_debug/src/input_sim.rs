@@ -231,6 +231,77 @@ pub fn drag(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> SimResult {
     ))
 }
 
+/// Press a key down by virtual key code.
+///
+/// Virtual key codes are macOS-specific `u16` values defined in
+/// `<Carbon/Carbon.h>`. Common codes:
+///
+/// | Key           | Code | Key          | Code |
+/// |---------------|------|--------------|------|
+/// | Return/Enter  |   36 | Tab          |   48 |
+/// | Space         |   49 | Delete/BkSp  |   51 |
+/// | Escape        |   53 | Left arrow   |  123 |
+/// | Right arrow   |  124 | Down arrow   |  125 |
+/// | Up arrow      |  126 | F1           |  122 |
+/// | A             |    0 | S            |    1 |
+/// | D             |    2 | Z            |    6 |
+/// | C             |    8 | V            |    9 |
+#[cfg(target_os = "macos")]
+pub fn key_down(virtual_key: u16) -> SimResult {
+    let source = match CGEventSource::new(CGEventSourceStateID::HIDSystemState) {
+        Ok(s) => s,
+        Err(_) => return SimResult::err("Failed to create event source"),
+    };
+
+    let event = match CGEvent::new_keyboard_event(source, virtual_key, true) {
+        Ok(e) => e,
+        Err(_) => return SimResult::err("Failed to create key down event"),
+    };
+
+    event.post(CGEventTapLocation::HID);
+    SimResult::ok(format!("Key {} pressed", virtual_key))
+}
+
+/// Release a key by virtual key code.
+#[cfg(target_os = "macos")]
+pub fn key_up(virtual_key: u16) -> SimResult {
+    let source = match CGEventSource::new(CGEventSourceStateID::HIDSystemState) {
+        Ok(s) => s,
+        Err(_) => return SimResult::err("Failed to create event source"),
+    };
+
+    let event = match CGEvent::new_keyboard_event(source, virtual_key, false) {
+        Ok(e) => e,
+        Err(_) => return SimResult::err("Failed to create key up event"),
+    };
+
+    event.post(CGEventTapLocation::HID);
+    SimResult::ok(format!("Key {} released", virtual_key))
+}
+
+/// Press and release a key by virtual key code.
+#[cfg(target_os = "macos")]
+pub fn key_press(virtual_key: u16) -> SimResult {
+    let source = match CGEventSource::new(CGEventSourceStateID::HIDSystemState) {
+        Ok(s) => s,
+        Err(_) => return SimResult::err("Failed to create event source"),
+    };
+
+    let down = match CGEvent::new_keyboard_event(source.clone(), virtual_key, true) {
+        Ok(e) => e,
+        Err(_) => return SimResult::err("Failed to create key down event"),
+    };
+
+    let up = match CGEvent::new_keyboard_event(source, virtual_key, false) {
+        Ok(e) => e,
+        Err(_) => return SimResult::err("Failed to create key up event"),
+    };
+
+    down.post(CGEventTapLocation::HID);
+    up.post(CGEventTapLocation::HID);
+    SimResult::ok(format!("Key {} pressed and released", virtual_key))
+}
+
 // Stub implementations for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
 pub fn move_mouse_to(_screen_x: f64, _screen_y: f64) -> SimResult {
@@ -276,6 +347,21 @@ pub fn activate_window(_window_x: f32, _window_y: f32) -> SimResult {
 }
 
 #[cfg(not(target_os = "macos"))]
+pub fn key_down(_virtual_key: u16) -> SimResult {
+    SimResult::err("Keyboard simulation only supported on macOS")
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn key_up(_virtual_key: u16) -> SimResult {
+    SimResult::err("Keyboard simulation only supported on macOS")
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn key_press(_virtual_key: u16) -> SimResult {
+    SimResult::err("Keyboard simulation only supported on macOS")
+}
+
+#[cfg(not(target_os = "macos"))]
 pub fn activate_window(_window_x: f32, _window_y: f32) -> SimResult {
     SimResult::err("Window activation only supported on macOS")
 }
@@ -309,5 +395,29 @@ mod tests {
         let r = SimResult::err("failed");
         assert!(!r.success);
         assert_eq!(r.message, "failed");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn key_down_stub_returns_error_on_non_macos() {
+        let r = key_down(36);
+        assert!(!r.success);
+        assert!(r.message.contains("macOS"));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn key_up_stub_returns_error_on_non_macos() {
+        let r = key_up(36);
+        assert!(!r.success);
+        assert!(r.message.contains("macOS"));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn key_press_stub_returns_error_on_non_macos() {
+        let r = key_press(49);
+        assert!(!r.success);
+        assert!(r.message.contains("macOS"));
     }
 }
