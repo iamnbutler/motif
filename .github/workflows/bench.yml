@@ -18,22 +18,32 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Run benchmark
-        run: |
-          cargo bench --bench quad_render 2>&1 | tee /tmp/bench_output.txt
+      - name: Run scene_build benchmark (Criterion)
+        run: cargo bench --bench scene_build -- --noplot
+
+      - name: Run quad_render benchmark
+        run: cargo bench --bench quad_render 2>&1 | tee /tmp/quad_render_output.txt
         env:
           MOTIF_BENCH_JSON: "1"
 
-      - name: Append to benches.jsonl
+      - name: Collect benchmark results
         run: |
           mkdir -p docs
+          TIMESTAMP=$(date +%s)
 
-          # Extract JSON line from benchmark output (benchmark outputs JSON when MOTIF_BENCH_JSON=1)
-          if grep -q '^{' /tmp/bench_output.txt; then
-            grep '^{' /tmp/bench_output.txt >> docs/benches.jsonl
-          else
-            echo "Warning: No JSON output found from benchmark"
-            exit 0
+          # Criterion results from scene_build
+          for est in target/criterion/*/new/estimates.json; do
+            if [ -f "$est" ]; then
+              BENCH_NAME=$(echo "$est" | sed 's|target/criterion/\(.*\)/new/estimates.json|\1|')
+              # Extract mean estimate (in nanoseconds)
+              MEAN_NS=$(jq '.mean.point_estimate' "$est")
+              echo "{\"timestamp\":\"$TIMESTAMP\",\"benchmark\":\"scene_build/$BENCH_NAME\",\"mean_ns\":$MEAN_NS}" >> docs/benches.jsonl
+            fi
+          done
+
+          # quad_render results (already JSON)
+          if grep -q '^{' /tmp/quad_render_output.txt; then
+            grep '^{' /tmp/quad_render_output.txt >> docs/benches.jsonl
           fi
 
       - name: Commit benchmark results
