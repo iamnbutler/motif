@@ -9,7 +9,7 @@ use motif_core::{
     checkbox, div,
     element::{self, Element, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
-    input::{InputState, MouseButton, ScrollDelta},
+    input::{InputState, MouseButton, ScrollDelta, TextEditState},
     metal::{MetalRenderer, MetalSurface},
     text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point,
     Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext,
@@ -261,8 +261,7 @@ struct App {
     click_count: u32,
     // --- Controls demo state ---
     checkbox_states: [bool; 3],
-    text_input_value: String,
-    text_input_cursor: usize,
+    text_edit_state: TextEditState,
     text_input_focused: bool,
 }
 
@@ -283,8 +282,12 @@ impl Default for App {
             input_handles: [FocusHandle::new(), FocusHandle::new(), FocusHandle::new()],
             click_count: 0,
             checkbox_states: [true, false, false],
-            text_input_value: String::from("Hello, Motif!"),
-            text_input_cursor: 13,
+            text_edit_state: {
+                let mut state = TextEditState::new();
+                state.set_content("Hello, Motif!");
+                state.move_to(13); // cursor at end
+                state
+            },
             text_input_focused: false,
         }
     }
@@ -574,11 +577,12 @@ impl ApplicationHandler for App {
                         let input_id = ElementId(3100);
                         let is_hovered = self.input_state.hovered() == Some(input_id);
 
-                        let mut input = text_input(&self.text_input_value, input_id)
+                        let mut input = text_input(self.text_edit_state.content(), input_id)
                             .placeholder("Type something...")
                             .bounds(Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0)))
                             .focused(self.text_input_focused)
-                            .cursor_pos(self.text_input_cursor);
+                            .cursor_pos(self.text_edit_state.cursor_offset())
+                            .selection(self.text_edit_state.selected_range().clone());
 
                         // Add hover effect via border color
                         if is_hovered && !self.text_input_focused {
@@ -596,7 +600,7 @@ impl ApplicationHandler for App {
                         // Label
                         let mut cx = DrawContext::new(&mut self.scene, scale);
                         cx.paint_text(
-                            "TextInput element:",
+                            "TextInput (using TextEditState):",
                             Point::new(500.0, 605.0),
                             10.0,
                             Srgba::new(0.5, 0.5, 0.55, 1.0),
@@ -721,7 +725,42 @@ impl ApplicationHandler for App {
                             self.checkbox_states[index] = !self.checkbox_states[index];
                         }
                         // Check if clicked on text input (ID 3100)
-                        self.text_input_focused = id == 3100;
+                        if id == 3100 {
+                            self.text_input_focused = true;
+
+                            // Click-to-cursor: convert click position to byte offset
+                            if let Some(click_pos) = self.input_state.cursor_position {
+                                // Text input bounds (must match rendering)
+                                let input_bounds =
+                                    Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0));
+                                let padding = 8.0;
+                                let font_size = 14.0;
+
+                                // Calculate x position relative to text start
+                                let text_x = click_pos.x - input_bounds.origin.x - padding;
+
+                                // Get scale factor
+                                let scale = self
+                                    .window
+                                    .as_ref()
+                                    .map(|w| w.scale_factor() as f32)
+                                    .unwrap_or(1.0);
+
+                                // Layout the text to get index for position
+                                let layout = self
+                                    .text_ctx
+                                    .layout_text(self.text_edit_state.content(), font_size * scale);
+
+                                // Convert x to scaled coordinates and find index
+                                let index = layout
+                                    .index_for_x(text_x * scale, self.text_edit_state.content());
+
+                                // Move cursor to clicked position
+                                self.text_edit_state.move_to(index);
+                            }
+                        } else {
+                            self.text_input_focused = false;
+                        }
                     } else {
                         // Clicked outside any element - blur focus
                         self.focus_state.blur();
@@ -769,67 +808,29 @@ impl ApplicationHandler for App {
 
                 // Handle text input when focused
                 if self.text_input_focused && event.state == winit::event::ElementState::Pressed {
-                    use winit::keyboard::Key;
-                    match &event.logical_key {
-                        Key::Character(c) => {
-                            let s = c.as_str();
-                            self.text_input_value.insert_str(self.text_input_cursor, s);
-                            self.text_input_cursor += s.len();
-                        }
-                        Key::Named(winit::keyboard::NamedKey::Backspace) => {
-                            if self.text_input_cursor > 0 {
-                                // Find prev char boundary
-                                let mut new_pos = self.text_input_cursor - 1;
-                                while new_pos > 0
-                                    && !self.text_input_value.is_char_boundary(new_pos)
-                                {
-                                    new_pos -= 1;
-                                }
-                                self.text_input_value.drain(new_pos..self.text_input_cursor);
-                                self.text_input_cursor = new_pos;
-                            }
-                        }
-                        Key::Named(winit::keyboard::NamedKey::Delete) => {
-                            if self.text_input_cursor < self.text_input_value.len() {
-                                // Find next char boundary
-                                let mut end = self.text_input_cursor + 1;
-                                while end < self.text_input_value.len()
-                                    && !self.text_input_value.is_char_boundary(end)
-                                {
-                                    end += 1;
-                                }
-                                self.text_input_value.drain(self.text_input_cursor..end);
-                            }
-                        }
-                        Key::Named(winit::keyboard::NamedKey::ArrowLeft) => {
-                            if self.text_input_cursor > 0 {
-                                self.text_input_cursor -= 1;
-                                while self.text_input_cursor > 0
-                                    && !self
-                                        .text_input_value
-                                        .is_char_boundary(self.text_input_cursor)
-                                {
-                                    self.text_input_cursor -= 1;
-                                }
-                            }
-                        }
-                        Key::Named(winit::keyboard::NamedKey::ArrowRight) => {
-                            if self.text_input_cursor < self.text_input_value.len() {
-                                self.text_input_cursor += 1;
-                                while self.text_input_cursor < self.text_input_value.len()
-                                    && !self
-                                        .text_input_value
-                                        .is_char_boundary(self.text_input_cursor)
-                                {
-                                    self.text_input_cursor += 1;
-                                }
-                            }
-                        }
-                        Key::Named(winit::keyboard::NamedKey::Escape) => {
+                    use motif_core::input::HandleKeyResult;
+
+                    let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);
+                    match self
+                        .text_edit_state
+                        .handle_key_event(&event.logical_key, &modifiers)
+                    {
+                        HandleKeyResult::Handled => {}
+                        HandleKeyResult::NotHandled => {}
+                        HandleKeyResult::Blur => {
                             self.text_input_focused = false;
                         }
-                        _ => {}
+                        HandleKeyResult::Copy(_text) => {
+                            // TODO: Copy to system clipboard
+                        }
+                        HandleKeyResult::Cut(_text) => {
+                            // TODO: Copy to system clipboard (text already removed)
+                        }
+                        HandleKeyResult::Paste => {
+                            // TODO: Read from system clipboard and call paste()
+                        }
                     }
+
                     if let Some(window) = &self.window {
                         window.request_redraw();
                     }

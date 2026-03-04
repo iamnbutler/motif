@@ -6,6 +6,27 @@
 
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
+use winit::event::Modifiers;
+use winit::keyboard::Key;
+
+use super::bindings::{InputAction, InputBindings};
+
+/// Result of handling a key event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HandleKeyResult {
+    /// The key was handled and the input state was modified.
+    Handled,
+    /// The key was not recognized by the input bindings.
+    NotHandled,
+    /// The escape key was pressed - blur focus.
+    Blur,
+    /// Copy requested - contains the text to copy.
+    Copy(String),
+    /// Cut requested - contains the text that was cut.
+    Cut(String),
+    /// Paste requested - caller should provide clipboard content via `paste()`.
+    Paste,
+}
 
 /// A history entry for undo/redo operations.
 #[derive(Clone, Debug)]
@@ -563,6 +584,172 @@ impl TextEditState {
     /// Inserts a tab at the cursor position.
     pub fn insert_tab(&mut self) {
         self.insert_text("\t");
+    }
+
+    // === Key event handling ===
+
+    /// Handles a key event using the default input bindings.
+    ///
+    /// Returns a `HandleKeyResult` indicating what happened:
+    /// - `Handled`: The key modified the input state
+    /// - `NotHandled`: The key wasn't recognized
+    /// - `Blur`: Escape was pressed, blur focus
+    /// - `Copy(text)`: Copy requested, caller should copy text to clipboard
+    /// - `Cut(text)`: Cut requested, text was removed and should be copied to clipboard
+    /// - `Paste`: Paste requested, caller should call `paste()` with clipboard content
+    ///
+    /// This provides centralized keybinding handling so consumers don't need to
+    /// implement their own keyboard logic.
+    pub fn handle_key_event(&mut self, key: &Key, modifiers: &Modifiers) -> HandleKeyResult {
+        let bindings = InputBindings::new();
+
+        let Some(action) = bindings.action_for_key(key, modifiers) else {
+            return HandleKeyResult::NotHandled;
+        };
+
+        match action {
+            // Character input
+            InputAction::InsertCharacter => {
+                if let Key::Character(c) = key {
+                    self.insert_text(c.as_str());
+                } else if let Key::Named(winit::keyboard::NamedKey::Space) = key {
+                    self.insert_text(" ");
+                }
+                HandleKeyResult::Handled
+            }
+            InputAction::InsertNewline => {
+                self.insert_newline();
+                HandleKeyResult::Handled
+            }
+            InputAction::InsertTab => {
+                self.insert_tab();
+                HandleKeyResult::Handled
+            }
+
+            // Navigation
+            InputAction::Left => {
+                self.left();
+                HandleKeyResult::Handled
+            }
+            InputAction::Right => {
+                self.right();
+                HandleKeyResult::Handled
+            }
+            InputAction::WordLeft => {
+                self.word_left();
+                HandleKeyResult::Handled
+            }
+            InputAction::WordRight => {
+                self.word_right();
+                HandleKeyResult::Handled
+            }
+            InputAction::Home => {
+                self.home();
+                HandleKeyResult::Handled
+            }
+            InputAction::End => {
+                self.end();
+                HandleKeyResult::Handled
+            }
+            InputAction::MoveToBeginning => {
+                self.move_to_beginning();
+                HandleKeyResult::Handled
+            }
+            InputAction::MoveToEnd => {
+                self.move_to_end();
+                HandleKeyResult::Handled
+            }
+
+            // Selection
+            InputAction::SelectLeft => {
+                self.select_left();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectRight => {
+                self.select_right();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectWordLeft => {
+                self.select_word_left();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectWordRight => {
+                self.select_word_right();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectHome => {
+                let line_start = self.find_line_start(self.cursor_offset());
+                self.select_to(line_start);
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectEnd => {
+                let line_end = self.find_line_end(self.cursor_offset());
+                self.select_to(line_end);
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectToBeginning => {
+                self.select_to_beginning();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectToEnd => {
+                self.select_to_end();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectAll => {
+                self.select_all();
+                HandleKeyResult::Handled
+            }
+
+            // Deletion
+            InputAction::Backspace => {
+                self.delete_backward();
+                HandleKeyResult::Handled
+            }
+            InputAction::Delete => {
+                self.delete_forward();
+                HandleKeyResult::Handled
+            }
+            InputAction::DeleteWordLeft => {
+                self.delete_word_left();
+                HandleKeyResult::Handled
+            }
+            InputAction::DeleteWordRight => {
+                self.delete_word_right();
+                HandleKeyResult::Handled
+            }
+            InputAction::DeleteToBeginningOfLine => {
+                self.delete_to_beginning_of_line();
+                HandleKeyResult::Handled
+            }
+            InputAction::DeleteToEndOfLine => {
+                self.delete_to_end_of_line();
+                HandleKeyResult::Handled
+            }
+
+            // Clipboard - return results for caller to handle
+            InputAction::Copy => {
+                let text = self.selected_text().to_string();
+                HandleKeyResult::Copy(text)
+            }
+            InputAction::Cut => {
+                let text = self.cut_selected_text();
+                HandleKeyResult::Cut(text)
+            }
+            InputAction::Paste => HandleKeyResult::Paste,
+
+            // History
+            InputAction::Undo => {
+                self.undo();
+                HandleKeyResult::Handled
+            }
+            InputAction::Redo => {
+                self.redo();
+                HandleKeyResult::Handled
+            }
+
+            // Focus
+            InputAction::Escape => HandleKeyResult::Blur,
+        }
     }
 }
 
@@ -1818,5 +2005,157 @@ mod tests {
         state.set_selected_range(5..6);
         state.insert_tab();
         assert_eq!(state.content(), "hello\tworld");
+    }
+
+    // ============================================================
+    // Task: Implement handle_key_event (centralized keybinding)
+    // ============================================================
+
+    use super::HandleKeyResult;
+    use winit::event::Modifiers;
+    use winit::keyboard::{Key, ModifiersState, NamedKey};
+
+    fn no_mods() -> Modifiers {
+        Modifiers::default()
+    }
+
+    fn shift_mod() -> Modifiers {
+        Modifiers::from(ModifiersState::SHIFT)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn cmd_mod() -> Modifiers {
+        Modifiers::from(ModifiersState::SUPER)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn cmd_mod() -> Modifiers {
+        Modifiers::from(ModifiersState::CONTROL)
+    }
+
+    #[test]
+    fn handle_key_event_character_inserts_text() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+
+        let result = state.handle_key_event(&Key::Character("!".into()), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.content(), "hello!");
+    }
+
+    #[test]
+    fn handle_key_event_space_inserts_space() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Space), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.content(), "hello ");
+    }
+
+    #[test]
+    fn handle_key_event_backspace_deletes() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Backspace), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.content(), "hell");
+    }
+
+    #[test]
+    fn handle_key_event_left_moves_cursor() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::ArrowLeft), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.cursor_offset(), 2);
+    }
+
+    #[test]
+    fn handle_key_event_shift_left_selects() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::ArrowLeft), &shift_mod());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.selected_range(), &(2..3));
+    }
+
+    #[test]
+    fn handle_key_event_cmd_a_selects_all() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+
+        let result = state.handle_key_event(&Key::Character("a".into()), &cmd_mod());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.selected_range(), &(0..5));
+    }
+
+    #[test]
+    fn handle_key_event_escape_blurs() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::Escape), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Blur);
+    }
+
+    #[test]
+    fn handle_key_event_unknown_key_not_handled() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+
+        // F1 key isn't handled by input bindings
+        let result = state.handle_key_event(&Key::Named(NamedKey::F1), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::NotHandled);
+    }
+
+    #[test]
+    fn handle_key_event_copy_returns_copy_result() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_selected_range(1..4);
+
+        let result = state.handle_key_event(&Key::Character("c".into()), &cmd_mod());
+
+        assert_eq!(result, HandleKeyResult::Copy("ell".to_string()));
+    }
+
+    #[test]
+    fn handle_key_event_cut_returns_cut_result() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_selected_range(1..4);
+
+        let result = state.handle_key_event(&Key::Character("x".into()), &cmd_mod());
+
+        assert_eq!(result, HandleKeyResult::Cut("ell".to_string()));
+        assert_eq!(state.content(), "ho");
+    }
+
+    #[test]
+    fn handle_key_event_paste_returns_paste_result() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+
+        let result = state.handle_key_event(&Key::Character("v".into()), &cmd_mod());
+
+        assert_eq!(result, HandleKeyResult::Paste);
     }
 }
