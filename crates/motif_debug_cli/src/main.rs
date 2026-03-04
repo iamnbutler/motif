@@ -82,6 +82,7 @@ fn print_usage() {
     eprintln!("  scene.quads              List all quads in the scene");
     eprintln!("  scene.text_runs          List all text runs in the scene");
     eprintln!("  input.state              Show current input state (cursor, buttons, modifiers)");
+    eprintln!("  element.list             List all hit-testable elements (bounds + z-order)");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
@@ -550,6 +551,45 @@ fn format_scene_text_runs(value: &serde_json::Value) -> String {
     out
 }
 
+fn format_element_list(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No element data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No hit-testable elements registered.\n".to_string();
+    }
+
+    out.push_str("Elements (hit tree)\n");
+    out.push_str("───────────────────────────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "  {:<12}  {:<5}  {:<30}  {:}\n",
+        "ELEMENT ID", "Z", "POSITION", "SIZE"
+    ));
+    out.push_str(
+        "  ────────────  ─────  ──────────────────────────────  ──────────────\n",
+    );
+
+    for e in arr.iter() {
+        let id = e["id"].as_u64().unwrap_or(0);
+        let z = e["z_index"].as_u64().unwrap_or(0);
+        let x = e["bounds"]["x"].as_f64().unwrap_or(0.0);
+        let y = e["bounds"]["y"].as_f64().unwrap_or(0.0);
+        let w = e["bounds"]["w"].as_f64().unwrap_or(0.0);
+        let h = e["bounds"]["h"].as_f64().unwrap_or(0.0);
+
+        out.push_str(&format!(
+            "  {:<12}  {:<5}  ({:>7.1}, {:>7.1})              {:>5.0} x {:<5.0}\n",
+            id, z, x, y, w, h
+        ));
+    }
+
+    out.push_str(&format!("\n  Total: {} elements\n", arr.len()));
+    out
+}
+
 fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode: bool) {
     if let Some(err) = &response.error {
         if json_mode {
@@ -583,6 +623,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
         "input.state" => print!("{}", format_input_state(result)),
+        "element.list" => print!("{}", format_element_list(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),
