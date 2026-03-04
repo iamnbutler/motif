@@ -26,6 +26,6 @@ pub mod snapshot;
 
 pub use input_sim::{SimResult, WindowPosition};
 pub use protocol::{DebugError, DebugRequest, DebugResponse};
-pub use screenshot::capture_window_to_png;
+pub use screenshot::{capture_window_to_png, diff_screenshots, DiffResult};
 pub use server::DebugServer;
 pub use snapshot::{InputStateSnapshot, OverlayQuad, SceneSnapshot};
