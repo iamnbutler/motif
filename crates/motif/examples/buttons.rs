@@ -7,11 +7,11 @@
 
 use motif_core::{
     button,
-    element::PaintContext,
+    element::{LayoutContext, PaintContext},
     input::{InputState, MouseButton},
     metal::{MetalRenderer, MetalSurface},
-    DrawContext, Element, ElementId, HitTree, Point, Rect, Renderer, ScaleFactor, Scene, Size,
-    Srgba, TextContext,
+    DrawContext, Element, ElementId, HitTree, LayoutEngine, Point, Rect, Renderer, ScaleFactor,
+    Scene, Size, Srgba, TextContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
@@ -34,6 +34,7 @@ struct App {
     scene: Scene,
     text_ctx: TextContext,
     hit_tree: HitTree,
+    layout_engine: LayoutEngine,
     debug_server: Option<DebugServer>,
     input_state: InputState,
     /// How many buttons are revealed (1-16)
@@ -49,6 +50,7 @@ impl Default for App {
             scene: Scene::new(),
             text_ctx: TextContext::new(),
             hit_tree: HitTree::new(),
+            layout_engine: LayoutEngine::new(),
             debug_server: DebugServer::new().ok(),
             input_state: InputState::new(),
             revealed: 1, // Start with just button 1 visible
@@ -142,7 +144,6 @@ impl ApplicationHandler for App {
                         let label = format!("{}", i + 1);
 
                         let mut btn = button(label, id)
-                            .bounds(bounds)
                             .font_size(32.0)
                             .corner_radius(12.0)
                             .hovered(is_hovered)
@@ -163,13 +164,29 @@ impl ApplicationHandler for App {
                                 .text_color(Srgba::new(0.5, 0.5, 0.55, 1.0));
                         }
 
+                        // Layout phase
+                        let mut layout_cx =
+                            LayoutContext::new(&mut self.layout_engine, &mut self.text_ctx, scale);
+                        let node_id = btn.request_layout(&mut layout_cx);
+                        self.layout_engine.compute_layout(
+                            node_id,
+                            800.0,
+                            600.0,
+                            &mut self.text_ctx,
+                        );
+
+                        // Paint at desired position (use computed size but manual position)
+                        let computed = self.layout_engine.layout_bounds(node_id);
+                        let paint_bounds = Rect::new(bounds.origin, computed.size.max(bounds.size));
+
                         let mut pcx = PaintContext::new(
                             &mut self.scene,
                             &mut self.text_ctx,
                             &mut self.hit_tree,
+                            &self.layout_engine,
                             scale,
                         );
-                        btn.paint(&mut pcx);
+                        btn.paint(paint_bounds, &mut pcx);
                     }
 
                     // Show completion message

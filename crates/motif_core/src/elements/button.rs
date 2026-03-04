@@ -8,15 +8,15 @@
 //! ```
 
 use crate::{
-    element::{Element, IntoElement, PaintContext},
-    ArcStr, ElementId, Point, Rect, Size, Srgba, TextRun,
+    element::{Element, IntoElement, LayoutContext, PaintContext},
+    layout::{MeasureContext, NodeId},
+    ArcStr, ElementId, Rect, Srgba, TextRun,
 };
 
 /// Interactive button element.
 pub struct Button {
     label: ArcStr,
     id: ElementId,
-    bounds: Option<Rect>,
     // Visual customization
     background: Srgba,
     hover_background: Srgba,
@@ -35,7 +35,6 @@ impl Button {
         Self {
             label: label.into(),
             id,
-            bounds: None,
             background: Srgba::new(0.2, 0.4, 0.8, 1.0),
             hover_background: Srgba::new(0.3, 0.5, 0.9, 1.0),
             press_background: Srgba::new(0.15, 0.3, 0.6, 1.0),
@@ -46,23 +45,6 @@ impl Button {
             is_hovered: false,
             is_pressed: false,
         }
-    }
-
-    /// Set the button's position and size.
-    pub fn bounds(mut self, bounds: Rect) -> Self {
-        self.bounds = Some(bounds);
-        self
-    }
-
-    /// Set the button's position (size auto-calculated from label).
-    pub fn position(mut self, position: Point) -> Self {
-        // Size will be calculated during paint if not set
-        if let Some(ref mut b) = self.bounds {
-            b.origin = position;
-        } else {
-            self.bounds = Some(Rect::new(position, Size::new(0.0, 0.0)));
-        }
-        self
     }
 
     /// Set whether the button is currently hovered.
@@ -126,26 +108,27 @@ impl Button {
 }
 
 impl Element for Button {
-    fn paint(&mut self, cx: &mut PaintContext) {
-        // Calculate bounds from label if not set
-        let bounds = if let Some(b) = self.bounds {
-            if b.size.width == 0.0 || b.size.height == 0.0 {
-                // Auto-size based on text
-                let layout = cx.text_ctx().layout_text(&self.label, self.font_size);
-                let width = layout.width() + self.padding * 2.0;
-                let height = self.font_size + self.padding * 2.0;
-                Rect::new(b.origin, Size::new(width, height))
-            } else {
-                b
-            }
-        } else {
-            // Default position at origin
-            let layout = cx.text_ctx().layout_text(&self.label, self.font_size);
-            let width = layout.width() + self.padding * 2.0;
-            let height = self.font_size + self.padding * 2.0;
-            Rect::new(Point::new(0.0, 0.0), Size::new(width, height))
-        };
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        // Button sizes itself based on text content + padding
+        // Use MeasureContext for the text, then add padding in the style
+        cx.layout_engine().new_leaf_with_context(
+            crate::layout::Style {
+                padding: taffy::Rect {
+                    left: taffy::style::LengthPercentage::length(self.padding),
+                    right: taffy::style::LengthPercentage::length(self.padding),
+                    top: taffy::style::LengthPercentage::length(self.padding),
+                    bottom: taffy::style::LengthPercentage::length(self.padding),
+                },
+                ..Default::default()
+            },
+            MeasureContext::Text {
+                content: self.label.to_string(),
+                font_size: self.font_size,
+            },
+        )
+    }
 
+    fn paint(&mut self, bounds: Rect, cx: &mut PaintContext) {
         // Determine background color based on state
         let bg_color = if self.is_pressed {
             self.press_background
@@ -200,6 +183,8 @@ impl Element for Button {
     }
 }
 
+use taffy;
+
 impl IntoElement for Button {
     type Element = Button;
 
@@ -216,28 +201,42 @@ pub fn button(label: impl Into<ArcStr>, id: ElementId) -> Button {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HitTree, ScaleFactor, Scene, TextContext};
+    use crate::element::LayoutContext;
+    use crate::{HitTree, LayoutEngine, Point, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn button_registers_hit() {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
-        let mut btn = button("Test", ElementId(1))
-            .bounds(Rect::new(Point::new(10.0, 10.0), Size::new(100.0, 40.0)));
+        let mut btn = button("Test", ElementId(1));
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            btn.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = btn.request_layout(&mut layout_cx);
 
-        // Should be registered in hit tree
-        assert_eq!(
-            hit_tree.hit_test(Point::new(50.0, 30.0)),
-            Some(ElementId(1))
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
         );
+        btn.paint(bounds, &mut cx);
+
+        // Should be registered in hit tree at the computed bounds
+        let center = Point::new(
+            bounds.origin.x + bounds.size.width / 2.0,
+            bounds.origin.y + bounds.size.height / 2.0,
+        );
+        assert_eq!(hit_tree.hit_test(center), Some(ElementId(1)));
     }
 
     #[test]
@@ -245,15 +244,27 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
-        let mut btn = button("Test", ElementId(1))
-            .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 40.0)));
+        let mut btn = button("Test", ElementId(1));
 
-        {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
-            btn.paint(&mut cx);
-        }
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = btn.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        btn.paint(bounds, &mut cx);
 
         assert!(scene.quad_count() > 0);
     }

@@ -4,14 +4,15 @@
 //! let id = ElementId(1);
 //! text_input("Hello", id)
 //!     .placeholder("Enter text...")
-//!     .bounds(Rect::new(Point::new(10.0, 10.0), Size::new(200.0, 32.0)))
+//!     .size(Size::new(200.0, 32.0))
 //!     .focused(true)
 //!     .cursor_pos(5)
 //!     .paint(&mut cx);
 //! ```
 
 use crate::{
-    element::{Element, IntoElement, PaintContext},
+    element::{Element, IntoElement, LayoutContext, PaintContext},
+    layout::NodeId,
     ArcStr, ElementId, Point, Rect, Size, Srgba, TextRun,
 };
 
@@ -194,7 +195,18 @@ impl TextInput {
 }
 
 impl Element for TextInput {
-    fn paint(&mut self, cx: &mut PaintContext) {
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        // TextInput uses its configured size
+        cx.layout_engine().new_leaf(crate::layout::Style {
+            size: taffy::Size {
+                width: taffy::style::Dimension::length(self.bounds.size.width),
+                height: taffy::style::Dimension::length(self.bounds.size.height),
+            },
+            ..Default::default()
+        })
+    }
+
+    fn paint(&mut self, bounds: Rect, cx: &mut PaintContext) {
         let scale = cx.scale_factor().0;
 
         // 1. Background + border quad
@@ -206,11 +218,8 @@ impl Element for TextInput {
 
         let mut quad = crate::Quad::new(
             crate::DeviceRect::new(
-                crate::DevicePoint::new(self.bounds.origin.x * scale, self.bounds.origin.y * scale),
-                crate::DeviceSize::new(
-                    self.bounds.size.width * scale,
-                    self.bounds.size.height * scale,
-                ),
+                crate::DevicePoint::new(bounds.origin.x * scale, bounds.origin.y * scale),
+                crate::DeviceSize::new(bounds.size.width * scale, bounds.size.height * scale),
             ),
             self.background,
         );
@@ -239,9 +248,9 @@ impl Element for TextInput {
                 layout.width() / scale
             };
 
-            let sel_x = self.bounds.origin.x + self.padding + sel_start_x;
+            let sel_x = bounds.origin.x + self.padding + sel_start_x;
             let sel_width = sel_end_x - sel_start_x;
-            let sel_top = self.bounds.origin.y + (self.bounds.size.height - self.font_size) / 2.0;
+            let sel_top = bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
 
             if sel_width > 0.0 {
                 let sel_quad = crate::Quad::new(
@@ -266,11 +275,11 @@ impl Element for TextInput {
             let scaled_font_size = self.font_size * scale;
             let layout = cx.text_ctx().layout_text(&display_text, scaled_font_size);
 
-            let text_x = self.bounds.origin.x + self.padding;
+            let text_x = bounds.origin.x + self.padding;
             let line_metrics = layout.line_metrics();
             let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
             // Vertically center the text within the bounds
-            let text_y = self.bounds.origin.y + (self.bounds.size.height + self.font_size) / 2.0;
+            let text_y = bounds.origin.y + (bounds.size.height + self.font_size) / 2.0;
 
             let device_origin =
                 crate::DevicePoint::new(text_x * scale, text_y * scale - baseline_offset);
@@ -309,9 +318,8 @@ impl Element for TextInput {
                 (layout_with_marker.width() - marker_layout.width()) / scale
             };
 
-            let cursor_x = self.bounds.origin.x + self.padding + cursor_x_logical;
-            let cursor_top =
-                self.bounds.origin.y + (self.bounds.size.height - self.font_size) / 2.0;
+            let cursor_x = bounds.origin.x + self.padding + cursor_x_logical;
+            let cursor_top = bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
 
             let cursor_quad = crate::Quad::new(
                 crate::DeviceRect::new(
@@ -325,9 +333,11 @@ impl Element for TextInput {
         }
 
         // 5. Hit-test registration
-        cx.register_hit(self.id, self.bounds);
+        cx.register_hit(self.id, bounds);
     }
 }
+
+use taffy;
 
 impl IntoElement for TextInput {
     type Element = TextInput;
@@ -347,15 +357,8 @@ pub fn text_input(value: &str, id: ElementId) -> TextInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HitTree, ScaleFactor, Scene, TextContext};
-
-    fn make_cx<'a>(
-        scene: &'a mut Scene,
-        text_ctx: &'a mut TextContext,
-        hit_tree: &'a mut HitTree,
-    ) -> PaintContext<'a> {
-        PaintContext::new(scene, text_ctx, hit_tree, ScaleFactor(1.0))
-    }
+    use crate::element::LayoutContext;
+    use crate::{HitTree, LayoutEngine, Point, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn text_input_defaults() {
@@ -389,12 +392,24 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("", ElementId(1))
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)));
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         // At least the background quad
         assert!(scene.quad_count() >= 1);
@@ -405,13 +420,25 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("Hi", ElementId(1))
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)))
             .focused(true);
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         // background quad + cursor quad = 2
         assert!(
@@ -426,13 +453,25 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("Hi", ElementId(1))
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)))
             .focused(false);
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         // Only the background quad; no cursor
         assert_eq!(scene.quad_count(), 1);
@@ -443,18 +482,32 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("", ElementId(42))
-            .bounds(Rect::new(Point::new(10.0, 10.0), Size::new(200.0, 32.0)));
+            .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)));
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
 
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
+
+        // Hit test at center of the input (100, 16)
         assert_eq!(
-            hit_tree.hit_test(Point::new(50.0, 26.0)),
+            hit_tree.hit_test(Point::new(100.0, 16.0)),
             Some(ElementId(42))
         );
-        assert_eq!(hit_tree.hit_test(Point::new(5.0, 5.0)), None);
+        // Outside bounds
+        assert_eq!(hit_tree.hit_test(Point::new(250.0, 50.0)), None);
     }
 
     #[test]
@@ -475,13 +528,25 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("", ElementId(1))
             .placeholder("Type something...")
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)));
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         // Placeholder triggers a text run
         assert!(scene.text_run_count() > 0);
@@ -492,12 +557,24 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         let mut input = text_input("Hello", ElementId(1))
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)));
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         assert!(scene.text_run_count() > 0);
     }
@@ -507,13 +584,25 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
 
         // Empty value AND no placeholder → no text run
         let mut input = text_input("", ElementId(1))
             .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)));
 
-        let mut cx = make_cx(&mut scene, &mut text_ctx, &mut hit_tree);
-        input.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
 
         assert_eq!(scene.text_run_count(), 0);
     }

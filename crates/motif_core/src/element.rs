@@ -3,8 +3,15 @@
 //! Two-tier component model:
 //! - **Views** (`Render`): Stateful components that own data and persist across frames.
 //! - **Elements** (`RenderOnce`): Stateless components consumed on render.
+//!
+//! Element lifecycle:
+//! 1. `request_layout()` - build layout tree, return NodeId
+//! 2. Layout engine computes bounds
+//! 3. `paint()` - draw at computed bounds
 
-use crate::{ElementId, HitTree, Rect, ScaleFactor, Scene, TextContext};
+use crate::{
+    ElementId, HitTree, LayoutEngine, NodeId, Point, Rect, ScaleFactor, Scene, TextContext,
+};
 
 /// Views are stateful components that persist across frames.
 ///
@@ -56,8 +63,19 @@ pub trait IntoElement: Sized {
 /// Most users should implement `Render` or `RenderOnce` instead.
 /// This is for primitive element types like Div and Text.
 pub trait Element: 'static {
-    /// Paint this element to the scene.
-    fn paint(&mut self, cx: &mut PaintContext);
+    /// Request layout for this element.
+    ///
+    /// Called during the layout phase. Elements should:
+    /// 1. Request layout for any children
+    /// 2. Create a layout node with their style and children's NodeIds
+    /// 3. Return their NodeId
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId;
+
+    /// Paint this element at the given bounds.
+    ///
+    /// Called after layout has been computed. The bounds are the
+    /// computed position and size from the layout engine.
+    fn paint(&mut self, bounds: Rect, cx: &mut PaintContext);
 }
 
 /// Trait for elements that can accept children.
@@ -82,15 +100,31 @@ pub trait ParentElement: Sized {
 /// Type-erased element wrapper.
 ///
 /// Allows heterogeneous collections of elements (e.g. Div children).
-pub struct AnyElement(Box<dyn Element>);
+pub struct AnyElement {
+    element: Box<dyn Element>,
+    node_id: Option<NodeId>,
+}
 
 impl AnyElement {
     pub fn new(element: impl Element) -> Self {
-        Self(Box::new(element))
+        Self {
+            element: Box::new(element),
+            node_id: None,
+        }
     }
 
+    /// Request layout for this element.
+    pub fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        let node_id = self.element.request_layout(cx);
+        self.node_id = Some(node_id);
+        node_id
+    }
+
+    /// Paint this element. Must call request_layout first.
     pub fn paint(&mut self, cx: &mut PaintContext) {
-        self.0.paint(cx);
+        let node_id = self.node_id.expect("must call request_layout before paint");
+        let bounds = cx.layout_bounds(node_id);
+        self.element.paint(bounds, cx);
     }
 }
 
@@ -128,6 +162,39 @@ impl<V: 'static> std::ops::Deref for ViewContext<'_, V> {
 impl<V: 'static> std::ops::DerefMut for ViewContext<'_, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { std::mem::transmute(&mut self.window) }
+    }
+}
+
+/// Context for the layout phase.
+pub struct LayoutContext<'a> {
+    pub(crate) layout_engine: &'a mut LayoutEngine,
+    pub(crate) text_ctx: &'a mut TextContext,
+    pub(crate) scale_factor: ScaleFactor,
+}
+
+impl<'a> LayoutContext<'a> {
+    pub fn new(
+        layout_engine: &'a mut LayoutEngine,
+        text_ctx: &'a mut TextContext,
+        scale_factor: ScaleFactor,
+    ) -> Self {
+        Self {
+            layout_engine,
+            text_ctx,
+            scale_factor,
+        }
+    }
+
+    pub fn layout_engine(&mut self) -> &mut LayoutEngine {
+        self.layout_engine
+    }
+
+    pub fn text_ctx(&mut self) -> &mut TextContext {
+        self.text_ctx
+    }
+
+    pub fn scale_factor(&self) -> ScaleFactor {
+        self.scale_factor
     }
 }
 
@@ -169,7 +236,11 @@ pub struct PaintContext<'a> {
     pub(crate) scene: &'a mut Scene,
     pub(crate) text_ctx: &'a mut TextContext,
     pub(crate) hit_tree: &'a mut HitTree,
+    pub(crate) layout_engine: &'a LayoutEngine,
     pub(crate) scale_factor: ScaleFactor,
+    /// Offset between layout position and actual paint position.
+    /// Applied to all layout_bounds results.
+    pub(crate) offset: Point,
 }
 
 impl<'a> PaintContext<'a> {
@@ -177,13 +248,16 @@ impl<'a> PaintContext<'a> {
         scene: &'a mut Scene,
         text_ctx: &'a mut TextContext,
         hit_tree: &'a mut HitTree,
+        layout_engine: &'a LayoutEngine,
         scale_factor: ScaleFactor,
     ) -> Self {
         Self {
             scene,
             text_ctx,
             hit_tree,
+            layout_engine,
             scale_factor,
+            offset: Point::new(0.0, 0.0),
         }
     }
 
@@ -203,6 +277,25 @@ impl<'a> PaintContext<'a> {
         self.scale_factor
     }
 
+    /// Get computed layout bounds for a node, adjusted by current offset.
+    pub fn layout_bounds(&self, node_id: NodeId) -> Rect {
+        let mut bounds = self.layout_engine.layout_bounds(node_id);
+        bounds.origin.x += self.offset.x;
+        bounds.origin.y += self.offset.y;
+        bounds
+    }
+
+    /// Set the paint offset. This is the difference between where layout says
+    /// an element should be and where it's actually being painted.
+    pub fn set_offset(&mut self, offset: Point) {
+        self.offset = offset;
+    }
+
+    /// Get the current paint offset.
+    pub fn offset(&self) -> Point {
+        self.offset
+    }
+
     /// Register an element for hit testing.
     pub fn register_hit(&mut self, id: ElementId, bounds: Rect) {
         self.hit_tree.push(id, bounds);
@@ -215,7 +308,23 @@ impl<'a> PaintContext<'a> {
 }
 
 /// Render a view and paint its element tree to the scene.
-pub fn render_view<V: Render>(view: &mut V, cx: &mut WindowContext, hit_tree: &mut HitTree) {
+///
+/// This performs the full element lifecycle:
+/// 1. Call view.render() to get the element tree
+/// 2. Request layout for all elements
+/// 3. Compute layout
+/// 4. Paint all elements at their computed bounds
+pub fn render_view<V: Render>(
+    view: &mut V,
+    cx: &mut WindowContext,
+    layout_engine: &mut LayoutEngine,
+    hit_tree: &mut HitTree,
+    window_size: crate::Size,
+) {
+    // Clear layout for fresh computation
+    layout_engine.clear();
+
+    // Render phase: build element tree
     let mut view_cx = ViewContext::<V>::new(WindowContext {
         scene: cx.scene,
         text_ctx: cx.text_ctx,
@@ -224,20 +333,47 @@ pub fn render_view<V: Render>(view: &mut V, cx: &mut WindowContext, hit_tree: &m
     let element = view.render(&mut view_cx);
     let mut element = element.into_element();
 
-    let mut paint_cx = PaintContext {
-        scene: cx.scene,
-        text_ctx: cx.text_ctx,
-        hit_tree,
-        scale_factor: cx.scale_factor,
-    };
-    element.paint(&mut paint_cx);
+    // Layout phase: request layout for all elements
+    {
+        let mut layout_cx = LayoutContext {
+            layout_engine: &mut *layout_engine,
+            text_ctx: cx.text_ctx,
+            scale_factor: cx.scale_factor,
+        };
+        let root_node = element.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(
+            root_node,
+            window_size.width * cx.scale_factor.0,
+            window_size.height * cx.scale_factor.0,
+            cx.text_ctx,
+        );
+
+        // Paint phase: paint at computed bounds
+        let root_bounds = layout_engine.layout_bounds(root_node);
+        let mut paint_cx = PaintContext {
+            scene: cx.scene,
+            text_ctx: cx.text_ctx,
+            hit_tree,
+            layout_engine,
+            scale_factor: cx.scale_factor,
+            offset: Point::new(0.0, 0.0),
+        };
+        element.paint(root_bounds, &mut paint_cx);
+    }
 }
 
 /// Empty element that renders nothing.
 pub struct Empty;
 
 impl Element for Empty {
-    fn paint(&mut self, _cx: &mut PaintContext) {}
+    fn request_layout(&mut self, cx: &mut LayoutContext) -> NodeId {
+        // Empty element has zero size
+        cx.layout_engine.new_leaf(crate::layout::Style::default())
+    }
+
+    fn paint(&mut self, _bounds: Rect, _cx: &mut PaintContext) {}
 }
 
 impl IntoElement for Empty {
@@ -250,16 +386,33 @@ impl IntoElement for Empty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ElementId, HitTree, Point, Rect, Size};
+    use crate::{ElementId, HitTree, LayoutEngine, Point, Rect, Size};
 
     #[test]
     fn empty_element_paints_nothing() {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+        let mut layout_engine = LayoutEngine::new();
+
+        // Request layout
         let mut empty = Empty;
-        empty.paint(&mut cx);
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = empty.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        empty.paint(bounds, &mut cx);
         assert_eq!(scene.quad_count(), 0);
     }
 
@@ -269,7 +422,23 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
-        let mut cx = PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+        let mut layout_engine = LayoutEngine::new();
+
+        // Request layout
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let _node_id = any.request_layout(&mut layout_cx);
+
+        // Compute layout
+        layout_engine.compute_layout(_node_id, 800.0, 600.0, &mut text_ctx);
+
+        // Paint
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
         any.paint(&mut cx);
         assert_eq!(scene.quad_count(), 0);
     }
@@ -279,10 +448,16 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let layout_engine = LayoutEngine::new();
 
         {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+            let mut cx = PaintContext::new(
+                &mut scene,
+                &mut text_ctx,
+                &mut hit_tree,
+                &layout_engine,
+                ScaleFactor(1.0),
+            );
             let id = ElementId(42);
             let bounds = Rect::new(Point::new(100.0, 100.0), Size::new(200.0, 50.0));
             cx.register_hit(id, bounds);
@@ -302,10 +477,16 @@ mod tests {
         let mut scene = Scene::new();
         let mut text_ctx = TextContext::new();
         let mut hit_tree = HitTree::new();
+        let layout_engine = LayoutEngine::new();
 
         {
-            let mut cx =
-                PaintContext::new(&mut scene, &mut text_ctx, &mut hit_tree, ScaleFactor(1.0));
+            let mut cx = PaintContext::new(
+                &mut scene,
+                &mut text_ctx,
+                &mut hit_tree,
+                &layout_engine,
+                ScaleFactor(1.0),
+            );
 
             // Back element
             cx.register_hit(
