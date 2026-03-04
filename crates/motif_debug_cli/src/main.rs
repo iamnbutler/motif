@@ -262,7 +262,10 @@ fn format_input_move(value: &serde_json::Value) -> String {
     let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    format!("Moved to ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+    format!(
+        "Moved to ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n",
+        lx, ly, sx, sy
+    )
 }
 
 fn format_input_click(value: &serde_json::Value) -> String {
@@ -272,17 +275,25 @@ fn format_input_click(value: &serde_json::Value) -> String {
     let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    format!("Clicked at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+    format!(
+        "Clicked at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n",
+        lx, ly, sx, sy
+    )
 }
 
 fn format_input_mouse_down(value: &serde_json::Value) -> String {
-    let local = value.get("mouse_down_at").unwrap_or(&serde_json::Value::Null);
+    let local = value
+        .get("mouse_down_at")
+        .unwrap_or(&serde_json::Value::Null);
     let screen = value.get("screen").unwrap_or(&serde_json::Value::Null);
     let lx = local.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    format!("Mouse down at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+    format!(
+        "Mouse down at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n",
+        lx, ly, sx, sy
+    )
 }
 
 fn format_input_mouse_up(value: &serde_json::Value) -> String {
@@ -292,7 +303,10 @@ fn format_input_mouse_up(value: &serde_json::Value) -> String {
     let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    format!("Mouse up at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+    format!(
+        "Mouse up at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n",
+        lx, ly, sx, sy
+    )
 }
 
 fn format_input_drag(value: &serde_json::Value) -> String {
@@ -303,7 +317,10 @@ fn format_input_drag(value: &serde_json::Value) -> String {
     let fy = from.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let tx = to.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let ty = to.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    format!("Dragged from ({:.1}, {:.1}) to ({:.1}, {:.1})\n", fx, fy, tx, ty)
+    format!(
+        "Dragged from ({:.1}, {:.1}) to ({:.1}, {:.1})\n",
+        fx, fy, tx, ty
+    )
 }
 
 fn format_debug_list(value: &serde_json::Value) -> String {
@@ -444,10 +461,7 @@ fn format_input_state(value: &serde_json::Value) -> String {
         if buttons.is_empty() {
             out.push_str("  Buttons:       (none)\n");
         } else {
-            let btn_str: Vec<&str> = buttons
-                .iter()
-                .filter_map(|b| b.as_str())
-                .collect();
+            let btn_str: Vec<&str> = buttons.iter().filter_map(|b| b.as_str()).collect();
             out.push_str(&format!("  Buttons:       {}\n", btn_str.join(", ")));
         }
     }
@@ -458,7 +472,11 @@ fn format_input_state(value: &serde_json::Value) -> String {
         if mods.get("shift").and_then(|v| v.as_bool()).unwrap_or(false) {
             active.push("shift");
         }
-        if mods.get("control").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if mods
+            .get("control")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
             active.push("control");
         }
         if mods.get("alt").and_then(|v| v.as_bool()).unwrap_or(false) {

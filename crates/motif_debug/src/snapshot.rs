@@ -351,13 +351,12 @@ impl SceneSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use linebender_resource_handle::Blob;
     use motif_core::input::ModifiersState;
     use motif_core::Point;
     use motif_core::{
-        Corners, DevicePoint, DeviceRect, DeviceSize, Edges, FontData, Quad, Scene, Srgba,
-        TextRun,
+        Corners, DevicePoint, DeviceRect, DeviceSize, Edges, FontData, Quad, Scene, Srgba, TextRun,
     };
-    use linebender_resource_handle::Blob;
 
     #[test]
     fn input_snapshot_from_empty_state() {
@@ -441,7 +440,10 @@ mod tests {
 
         assert_eq!(json["cursor_position"]["x"], 100.0);
         assert_eq!(json["cursor_position"]["y"], 200.0);
-        assert!(json["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
+        assert!(json["mouse_buttons"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("left")));
         assert_eq!(json["modifiers"]["alt"], true);
         assert_eq!(json["modifiers"]["shift"], false);
         assert_eq!(json["hovered_element"], 123);

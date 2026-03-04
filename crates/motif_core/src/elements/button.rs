@@ -178,11 +178,13 @@ impl Element for Button {
         let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
         let text_y = bounds.origin.y + (bounds.size.height + self.font_size) / 2.0;
 
-        let device_origin = crate::DevicePoint::new(text_x * scale, text_y * scale - baseline_offset);
+        let device_origin =
+            crate::DevicePoint::new(text_x * scale, text_y * scale - baseline_offset);
 
         for run in layout.glyph_runs_with_font() {
             if let Some(font) = run.font_data {
-                let mut text_run = TextRun::new(device_origin, self.text_color, run.font_size, font);
+                let mut text_run =
+                    TextRun::new(device_origin, self.text_color, run.font_size, font);
                 text_run.normalized_coords = run.normalized_coords;
 
                 for glyph in run.glyphs {
@@ -214,7 +216,7 @@ pub fn button(label: impl Into<ArcStr>, id: ElementId) -> Button {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HitTree, Scene, ScaleFactor, TextContext};
+    use crate::{HitTree, ScaleFactor, Scene, TextContext};
 
     #[test]
     fn button_registers_hit() {

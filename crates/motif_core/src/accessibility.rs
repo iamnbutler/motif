@@ -234,11 +234,7 @@ mod tests {
 
     #[test]
     fn access_node_basic_properties() {
-        let node = AccessNode::new(
-            AccessId(1),
-            AccessRole::Button,
-            "Submit".to_string(),
-        );
+        let node = AccessNode::new(AccessId(1), AccessRole::Button, "Submit".to_string());
 
         assert_eq!(node.id, AccessId(1));
         assert_eq!(node.role, AccessRole::Button);
@@ -278,7 +274,7 @@ mod tests {
         assert_eq!(ak_bounds.x0, 10.0);
         assert_eq!(ak_bounds.y0, 20.0);
         assert_eq!(ak_bounds.x1, 110.0); // x + width
-        assert_eq!(ak_bounds.y1, 70.0);  // y + height
+        assert_eq!(ak_bounds.y1, 70.0); // y + height
     }
 
     // AccessTree tests
@@ -292,8 +288,16 @@ mod tests {
     #[test]
     fn access_tree_push_and_get_nodes() {
         let mut tree = AccessTree::new(AccessId(1));
-        tree.push(AccessNode::new(AccessId(1), AccessRole::Window, "App".to_string()));
-        tree.push(AccessNode::new(AccessId(2), AccessRole::Button, "OK".to_string()));
+        tree.push(AccessNode::new(
+            AccessId(1),
+            AccessRole::Window,
+            "App".to_string(),
+        ));
+        tree.push(AccessNode::new(
+            AccessId(2),
+            AccessRole::Button,
+            "OK".to_string(),
+        ));
 
         assert_eq!(tree.node_count(), 2);
         assert_eq!(tree.get(AccessId(2)).map(|n| n.name.as_str()), Some("OK"));
@@ -306,7 +310,11 @@ mod tests {
             AccessNode::new(AccessId(1), AccessRole::Window, "App".to_string())
                 .with_child(AccessId(2)),
         );
-        tree.push(AccessNode::new(AccessId(2), AccessRole::Button, "OK".to_string()));
+        tree.push(AccessNode::new(
+            AccessId(2),
+            AccessRole::Button,
+            "OK".to_string(),
+        ));
 
         let update = tree.build_initial_update(None);
 
@@ -319,8 +327,16 @@ mod tests {
     #[test]
     fn access_tree_clear_resets() {
         let mut tree = AccessTree::new(AccessId(1));
-        tree.push(AccessNode::new(AccessId(1), AccessRole::Window, "App".to_string()));
-        tree.push(AccessNode::new(AccessId(2), AccessRole::Button, "OK".to_string()));
+        tree.push(AccessNode::new(
+            AccessId(1),
+            AccessRole::Window,
+            "App".to_string(),
+        ));
+        tree.push(AccessNode::new(
+            AccessId(2),
+            AccessRole::Button,
+            "OK".to_string(),
+        ));
 
         tree.clear();
 

@@ -119,7 +119,10 @@ impl ApplicationHandler for App {
                         cx.paint_quad(
                             Rect::new(
                                 Point::new(0.0, 0.0),
-                                Size::new(phys.width as f32 / scale.0, phys.height as f32 / scale.0),
+                                Size::new(
+                                    phys.width as f32 / scale.0,
+                                    phys.height as f32 / scale.0,
+                                ),
                             ),
                             Srgba::new(0.06, 0.06, 0.08, 1.0),
                         );

@@ -1,7 +1,7 @@
 //! Text element for rendering text content.
 
 use crate::element::{Element, IntoElement, PaintContext};
-use crate::{Point, ArcStr, TextRun};
+use crate::{ArcStr, Point, TextRun};
 use palette::Srgba;
 
 /// A text element that renders a string at a given position.
@@ -61,15 +61,12 @@ impl Element for Text {
         let line_metrics = layout.line_metrics();
         let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
 
-        let device_origin = crate::DevicePoint::new(
-            device_position.x,
-            device_position.y - baseline_offset,
-        );
+        let device_origin =
+            crate::DevicePoint::new(device_position.x, device_position.y - baseline_offset);
 
         for run in layout.glyph_runs_with_font() {
             if let Some(font) = run.font_data {
-                let mut text_run =
-                    TextRun::new(device_origin, self.color, run.font_size, font);
+                let mut text_run = TextRun::new(device_origin, self.color, run.font_size, font);
                 text_run.normalized_coords = run.normalized_coords;
 
                 for glyph in run.glyphs {

@@ -140,10 +140,8 @@ impl<'a> DrawContext<'a> {
         let line_metrics = layout.line_metrics();
         let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
 
-        let device_origin = DevicePoint::new(
-            device_position.x,
-            device_position.y - baseline_offset,
-        );
+        let device_origin =
+            DevicePoint::new(device_position.x, device_position.y - baseline_offset);
 
         // Create accessibility node if enabled
         if self.access_tree.is_some() {
@@ -166,8 +164,8 @@ impl<'a> DrawContext<'a> {
             );
 
             let access_id = self.next_access_id();
-            let node = AccessNode::new(access_id, AccessRole::Label, text.to_string())
-                .with_bounds(bounds);
+            let node =
+                AccessNode::new(access_id, AccessRole::Label, text.to_string()).with_bounds(bounds);
 
             // We need to use the access_tree, but it's behind Option<&mut>
             // Take it temporarily to satisfy borrow checker
@@ -280,12 +278,15 @@ mod tests {
         );
 
         // Paint with clip
-        cx.with_clip(Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 50.0)), |cx| {
-            cx.paint_quad(
-                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
-                Srgba::new(0.0, 1.0, 0.0, 1.0),
-            );
-        });
+        cx.with_clip(
+            Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 50.0)),
+            |cx| {
+                cx.paint_quad(
+                    Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                    Srgba::new(0.0, 1.0, 0.0, 1.0),
+                );
+            },
+        );
 
         let quads = scene.quads();
         // First quad has no clip
@@ -320,7 +321,10 @@ mod tests {
         assert_eq!(text_run.origin.x, 10.0);
         // Y position is adjusted for baseline - origin is above baseline
         // so the text baseline lands at the specified position
-        assert!(text_run.origin.y < 50.0, "origin should be above baseline position");
+        assert!(
+            text_run.origin.y < 50.0,
+            "origin should be above baseline position"
+        );
     }
 
     #[test]
@@ -345,8 +349,14 @@ mod tests {
         assert_eq!(text_run.origin.x, 110.0);
         // Y position is offset (200+20=220) minus baseline offset
         // so origin is above 220 but offset is correctly applied
-        assert!(text_run.origin.y < 220.0, "origin should be above baseline position");
-        assert!(text_run.origin.y > 200.0, "origin should be below the offset y");
+        assert!(
+            text_run.origin.y < 220.0,
+            "origin should be above baseline position"
+        );
+        assert!(
+            text_run.origin.y > 200.0,
+            "origin should be below the offset y"
+        );
     }
 
     #[test]
@@ -371,7 +381,9 @@ mod tests {
         assert!(access_tree.node_count() > 0, "should create access node");
 
         // Find the text node (it will have a generated ID starting from 1)
-        let node = access_tree.get(AccessId(1)).expect("should have node with ID 1");
+        let node = access_tree
+            .get(AccessId(1))
+            .expect("should have node with ID 1");
         assert_eq!(node.role, AccessRole::Label);
         assert_eq!(node.name, "Hello World");
         assert!(node.bounds.is_some(), "should have bounds");

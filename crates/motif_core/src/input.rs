@@ -122,10 +122,7 @@ impl InputState {
 
     /// Handle cursor moved. Takes physical coordinates and scale factor.
     pub fn handle_cursor_moved(&mut self, physical_x: f64, physical_y: f64, scale: f32) {
-        let logical = Point::new(
-            physical_x as f32 / scale,
-            physical_y as f32 / scale,
-        );
+        let logical = Point::new(physical_x as f32 / scale, physical_y as f32 / scale);
         self.cursor_position = Some(logical);
         self.push_event(InputEvent::Mouse(MouseEvent {
             kind: MouseEventKind::Move,
@@ -164,7 +161,11 @@ impl InputState {
             self.mouse_buttons.remove(&button);
         }
 
-        let kind = if pressed { MouseEventKind::Down } else { MouseEventKind::Up };
+        let kind = if pressed {
+            MouseEventKind::Down
+        } else {
+            MouseEventKind::Up
+        };
         self.push_event(InputEvent::Mouse(MouseEvent {
             kind,
             position: self.cursor_position,
@@ -261,9 +262,7 @@ impl ScrollDelta {
     /// Convert from winit scroll delta, scaling to logical pixels.
     pub fn from_winit(delta: winit::event::MouseScrollDelta, scale: f32) -> Self {
         match delta {
-            winit::event::MouseScrollDelta::LineDelta(x, y) => {
-                ScrollDelta::Lines { x, y }
-            }
+            winit::event::MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Lines { x, y },
             winit::event::MouseScrollDelta::PixelDelta(pos) => {
                 // Convert physical pixels to logical
                 ScrollDelta::Pixels {
@@ -349,12 +348,30 @@ mod tests {
     fn mouse_button_from_winit() {
         use winit::event::MouseButton as WinitButton;
 
-        assert_eq!(MouseButton::from_winit(WinitButton::Left), MouseButton::Left);
-        assert_eq!(MouseButton::from_winit(WinitButton::Right), MouseButton::Right);
-        assert_eq!(MouseButton::from_winit(WinitButton::Middle), MouseButton::Middle);
-        assert_eq!(MouseButton::from_winit(WinitButton::Back), MouseButton::Back);
-        assert_eq!(MouseButton::from_winit(WinitButton::Forward), MouseButton::Forward);
-        assert_eq!(MouseButton::from_winit(WinitButton::Other(42)), MouseButton::Other(42));
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Left),
+            MouseButton::Left
+        );
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Right),
+            MouseButton::Right
+        );
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Middle),
+            MouseButton::Middle
+        );
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Back),
+            MouseButton::Back
+        );
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Forward),
+            MouseButton::Forward
+        );
+        assert_eq!(
+            MouseButton::from_winit(WinitButton::Other(42)),
+            MouseButton::Other(42)
+        );
     }
 
     #[test]
@@ -404,7 +421,11 @@ mod tests {
 
         let events = state.take_events();
         match &events[0] {
-            InputEvent::Mouse(MouseEvent { kind: MouseEventKind::Move, position, .. }) => {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Move,
+                position,
+                ..
+            }) => {
                 assert_eq!(*position, Some(Point::new(100.0, 200.0)));
             }
             _ => panic!("expected mouse move event"),
@@ -423,7 +444,10 @@ mod tests {
 
         let events = state.take_events();
         match &events[0] {
-            InputEvent::Mouse(MouseEvent { kind: MouseEventKind::Leave, .. }) => {}
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Leave,
+                ..
+            }) => {}
             _ => panic!("expected mouse leave event"),
         }
     }
@@ -445,13 +469,21 @@ mod tests {
 
         let events = state.take_events();
         match &events[0] {
-            InputEvent::Mouse(MouseEvent { kind: MouseEventKind::Down, button, .. }) => {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Down,
+                button,
+                ..
+            }) => {
                 assert_eq!(*button, Some(MouseButton::Left));
             }
             _ => panic!("expected mouse down event"),
         }
         match &events[1] {
-            InputEvent::Mouse(MouseEvent { kind: MouseEventKind::Up, button, .. }) => {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Up,
+                button,
+                ..
+            }) => {
                 assert_eq!(*button, Some(MouseButton::Left));
             }
             _ => panic!("expected mouse up event"),
@@ -469,7 +501,10 @@ mod tests {
         assert_eq!(state.event_count(), 1);
         let events = state.take_events();
         match &events[0] {
-            InputEvent::Mouse(MouseEvent { kind: MouseEventKind::Scroll { delta: d }, .. }) => {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Scroll { delta: d },
+                ..
+            }) => {
                 assert_eq!(*d, delta);
             }
             _ => panic!("expected scroll event"),
@@ -510,7 +545,12 @@ mod tests {
         assert_eq!(state.event_count(), 1);
         let events = state.take_events();
         match &events[0] {
-            InputEvent::Key(KeyEvent { key, physical_key, state: key_state, modifiers }) => {
+            InputEvent::Key(KeyEvent {
+                key,
+                physical_key,
+                state: key_state,
+                modifiers,
+            }) => {
                 assert_eq!(*key, Key::Character("a".into()));
                 assert_eq!(*physical_key, PhysicalKey::Code(KeyCode::KeyA));
                 assert_eq!(*key_state, ElementState::Pressed);

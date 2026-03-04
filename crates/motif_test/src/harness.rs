@@ -2,7 +2,9 @@
 //!
 //! Provides a real Metal rendering environment for tests.
 
-use motif_core::{DeviceRect, ElementId, HitTree, Point, Quad, Rect, ScaleFactor, Scene, Size, TextContext};
+use motif_core::{
+    DeviceRect, ElementId, HitTree, Point, Quad, Rect, ScaleFactor, Scene, Size, TextContext,
+};
 use palette::Srgba;
 
 /// Test harness for integration testing with real Metal rendering.
@@ -232,7 +234,11 @@ mod tests {
         let id = harness.element_id();
 
         harness.render(|cx| {
-            cx.paint_hit_quad(id, rect(0.0, 0.0, 100.0, 100.0), Srgba::new(1.0, 0.0, 0.0, 1.0));
+            cx.paint_hit_quad(
+                id,
+                rect(0.0, 0.0, 100.0, 100.0),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
         });
         assert_eq!(harness.scene.quad_count(), 1);
         assert_eq!(harness.hit_tree.len(), 1);
@@ -252,7 +258,11 @@ mod tests {
         let button = harness.element_id();
 
         harness.render(|cx| {
-            cx.paint_hit_quad(button, rect(100.0, 100.0, 200.0, 50.0), Srgba::new(0.2, 0.4, 0.8, 1.0));
+            cx.paint_hit_quad(
+                button,
+                rect(100.0, 100.0, 200.0, 50.0),
+                Srgba::new(0.2, 0.4, 0.8, 1.0),
+            );
         });
 
         harness.assert_hit(pt(150.0, 125.0), button);
@@ -266,8 +276,16 @@ mod tests {
         let front = harness.element_id();
 
         harness.render(|cx| {
-            cx.paint_hit_quad(back, rect(100.0, 100.0, 200.0, 200.0), Srgba::new(1.0, 0.0, 0.0, 1.0));
-            cx.paint_hit_quad(front, rect(150.0, 150.0, 100.0, 100.0), Srgba::new(0.0, 1.0, 0.0, 1.0));
+            cx.paint_hit_quad(
+                back,
+                rect(100.0, 100.0, 200.0, 200.0),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
+            cx.paint_hit_quad(
+                front,
+                rect(150.0, 150.0, 100.0, 100.0),
+                Srgba::new(0.0, 1.0, 0.0, 1.0),
+            );
         });
 
         // In overlap: front wins
@@ -284,8 +302,16 @@ mod tests {
         let child = harness.element_id();
 
         harness.render(|cx| {
-            cx.paint_hit_quad(parent, rect(50.0, 50.0, 300.0, 200.0), Srgba::new(0.2, 0.2, 0.2, 1.0));
-            cx.paint_hit_quad(child, rect(100.0, 100.0, 100.0, 50.0), Srgba::new(0.8, 0.2, 0.2, 1.0));
+            cx.paint_hit_quad(
+                parent,
+                rect(50.0, 50.0, 300.0, 200.0),
+                Srgba::new(0.2, 0.2, 0.2, 1.0),
+            );
+            cx.paint_hit_quad(
+                child,
+                rect(100.0, 100.0, 100.0, 50.0),
+                Srgba::new(0.8, 0.2, 0.2, 1.0),
+            );
         });
 
         harness.assert_hit_all(pt(125.0, 115.0), &[child, parent]);
@@ -299,7 +325,10 @@ mod tests {
 
         harness.render(|cx| {
             cx.paint_quad(rect(0.0, 0.0, 100.0, 100.0), Srgba::new(1.0, 0.0, 0.0, 1.0));
-            cx.paint_quad(rect(50.0, 50.0, 100.0, 100.0), Srgba::new(0.0, 1.0, 0.0, 1.0));
+            cx.paint_quad(
+                rect(50.0, 50.0, 100.0, 100.0),
+                Srgba::new(0.0, 1.0, 0.0, 1.0),
+            );
         });
 
         assert_eq!(harness.scene.quad_count(), 2);
@@ -311,7 +340,10 @@ mod tests {
         // Default scale is 2.0 (retina)
 
         harness.render(|cx| {
-            cx.paint_quad(rect(100.0, 100.0, 50.0, 50.0), Srgba::new(1.0, 1.0, 1.0, 1.0));
+            cx.paint_quad(
+                rect(100.0, 100.0, 50.0, 50.0),
+                Srgba::new(1.0, 1.0, 1.0, 1.0),
+            );
         });
 
         let quads = harness.scene.quads();
@@ -370,7 +402,10 @@ mod tests {
 
         harness.render(|cx| {
             // Paint but don't register (decorative, not interactive)
-            cx.paint_quad(rect(100.0, 100.0, 100.0, 100.0), Srgba::new(1.0, 0.0, 0.0, 1.0));
+            cx.paint_quad(
+                rect(100.0, 100.0, 100.0, 100.0),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
         });
 
         assert_eq!(harness.scene.quad_count(), 1);
