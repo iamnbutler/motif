@@ -331,6 +331,7 @@ impl DebugServer {
                     ),
                 }
             }
+            "input.activate" => Self::handle_input_activate(request, window_position),
             "input.move_to" => Self::handle_input_move(request, window_position),
             "input.click" => Self::handle_input_click(request, window_position),
             "input.mouse_down" => Self::handle_input_mouse_down(request, window_position),
@@ -515,6 +516,22 @@ impl DebugServer {
     }
 
     // --- Input simulation handlers ---
+
+    fn handle_input_activate(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let result = input_sim::activate_window(pos.x, pos.y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({ "activated": true, "message": result.message }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
 
     fn handle_input_move(
         request: &DebugRequest,

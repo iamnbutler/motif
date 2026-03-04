@@ -17,6 +17,9 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"
+objc2 = "0.5"
+objc2-app-kit = { version = "0.2", features = ["NSRunningApplication"] }
+objc2-foundation = "0.2"
 
 [dev-dependencies]
 linebender_resource_handle = "0.1"

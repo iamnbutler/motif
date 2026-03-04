@@ -91,6 +91,7 @@ fn print_usage() {
     eprintln!("  debug.list                     List all debug overlays");
     eprintln!();
     eprintln!("INPUT SIMULATION COMMANDS:");
+    eprintln!("  input.activate                 Bring the app window to front");
     eprintln!("  input.move_to <x> <y>          Move mouse to window-local coordinates");
     eprintln!("  input.click <x> <y>            Click at window-local coordinates");
     eprintln!("  input.mouse_down <x> <y>       Press mouse button at coordinates");
@@ -247,6 +248,11 @@ fn format_debug_remove(value: &serde_json::Value) -> String {
     } else {
         "Overlay not found.\n".to_string()
     }
+}
+
+fn format_input_activate(value: &serde_json::Value) -> String {
+    let pid = value.get("pid").and_then(|v| v.as_u64()).unwrap_or(0);
+    format!("Activated app (pid: {})\n", pid)
 }
 
 fn format_input_move(value: &serde_json::Value) -> String {
@@ -564,6 +570,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "debug.clear" => print!("{}", format_debug_clear(result)),
         "debug.remove" => print!("{}", format_debug_remove(result)),
         "debug.list" => print!("{}", format_debug_list(result)),
+        "input.activate" => print!("{}", format_input_activate(result)),
         "input.move_to" => print!("{}", format_input_move(result)),
         "input.click" => print!("{}", format_input_click(result)),
         "input.mouse_down" => print!("{}", format_input_mouse_down(result)),

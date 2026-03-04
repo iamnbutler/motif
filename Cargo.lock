@@ -1481,6 +1481,9 @@ dependencies = [
  "image",
  "linebender_resource_handle",
  "motif_core",
+ "objc2 0.5.2",
+ "objc2-app-kit",
+ "objc2-foundation 0.2.2",
  "serde",
  "serde_json",
 ]

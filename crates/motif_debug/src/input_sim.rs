@@ -257,6 +257,29 @@ pub fn drag(_from_x: f64, _from_y: f64, _to_x: f64, _to_y: f64) -> SimResult {
     SimResult::err("Input simulation only supported on macOS")
 }
 
+/// Activate (bring to front) the current application using NSRunningApplication.
+#[cfg(target_os = "macos")]
+pub fn activate_window(_window_x: f32, _window_y: f32) -> SimResult {
+    use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
+
+    // SAFETY: NSRunningApplication::currentApplication() and activateWithOptions()
+    // are safe to call from any thread. We're just requesting the OS bring our
+    // app to the foreground.
+    let current = unsafe { NSRunningApplication::currentApplication() };
+    let success = unsafe { current.activateWithOptions(NSApplicationActivationOptions::empty()) };
+
+    if success {
+        SimResult::ok("App activated")
+    } else {
+        SimResult::err("Failed to activate app")
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn activate_window(_window_x: f32, _window_y: f32) -> SimResult {
+    SimResult::err("Window activation only supported on macOS")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
