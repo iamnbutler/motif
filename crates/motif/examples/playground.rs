@@ -6,13 +6,14 @@
 //! Run with: cargo run --example playground
 
 use motif_core::{
-    div,
+    checkbox, div,
     element::{self, Element, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
     input::{InputState, MouseButton, ScrollDelta},
     metal::{MetalRenderer, MetalSurface},
-    text, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point, Rect, Render,
-    RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
+    text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point,
+    Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext,
+    WindowContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
@@ -258,6 +259,11 @@ struct App {
     input_handles: [FocusHandle; 3],
     /// Click counter for demo
     click_count: u32,
+    // --- Controls demo state ---
+    checkbox_states: [bool; 3],
+    text_input_value: String,
+    text_input_cursor: usize,
+    text_input_focused: bool,
 }
 
 impl Default for App {
@@ -276,6 +282,10 @@ impl Default for App {
             focus_state: FocusState::new(),
             input_handles: [FocusHandle::new(), FocusHandle::new(), FocusHandle::new()],
             click_count: 0,
+            checkbox_states: [true, false, false],
+            text_input_value: String::from("Hello, Motif!"),
+            text_input_cursor: 13,
+            text_input_focused: false,
         }
     }
 }
@@ -520,6 +530,80 @@ impl ApplicationHandler for App {
                         );
                     }
 
+                    // --- Section: Controls (Checkbox, TextInput) ---
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "CONTROLS", 500.0, 500.0);
+                    }
+
+                    // Checkboxes
+                    {
+                        let labels = ["Enable feature", "Dark mode", "Notifications"];
+                        for (i, label) in labels.iter().enumerate() {
+                            let checkbox_id = ElementId(3000 + i as u64);
+                            let y = 520.0 + i as f32 * 32.0;
+                            let is_hovered = self.input_state.hovered() == Some(checkbox_id);
+
+                            let mut cb = checkbox(checkbox_id)
+                                .checked(self.checkbox_states[i])
+                                .position(Point::new(500.0, y))
+                                .hovered(is_hovered);
+
+                            let mut pcx = PaintContext::new(
+                                &mut self.scene,
+                                &mut self.text_ctx,
+                                &mut self.hit_tree,
+                                scale,
+                            );
+                            cb.paint(&mut pcx);
+
+                            // Label next to checkbox
+                            let mut cx = DrawContext::new(&mut self.scene, scale);
+                            cx.paint_text(
+                                label,
+                                Point::new(526.0, y + 4.0),
+                                13.0,
+                                Srgba::new(0.8, 0.8, 0.85, 1.0),
+                                &mut self.text_ctx,
+                            );
+                        }
+                    }
+
+                    // Text input
+                    {
+                        let input_id = ElementId(3100);
+                        let is_hovered = self.input_state.hovered() == Some(input_id);
+
+                        let mut input = text_input(&self.text_input_value, input_id)
+                            .placeholder("Type something...")
+                            .bounds(Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0)))
+                            .focused(self.text_input_focused)
+                            .cursor_pos(self.text_input_cursor);
+
+                        // Add hover effect via border color
+                        if is_hovered && !self.text_input_focused {
+                            input = input.border_color(Srgba::new(0.5, 0.5, 0.55, 1.0));
+                        }
+
+                        let mut pcx = PaintContext::new(
+                            &mut self.scene,
+                            &mut self.text_ctx,
+                            &mut self.hit_tree,
+                            scale,
+                        );
+                        input.paint(&mut pcx);
+
+                        // Label
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        cx.paint_text(
+                            "TextInput element:",
+                            Point::new(500.0, 605.0),
+                            10.0,
+                            Srgba::new(0.5, 0.5, 0.55, 1.0),
+                            &mut self.text_ctx,
+                        );
+                    }
+
                     // --- Debug overlays ---
                     // Paint any debug overlay quads on top of the scene.
                     if let Some(ref debug_server) = self.debug_server {
@@ -620,19 +704,28 @@ impl ApplicationHandler for App {
                 } else {
                     // Interaction tracking: check for click
                     if let Some(clicked_element) = self.input_state.end_press() {
+                        let id = clicked_element.0;
+
                         // Check if clicked on button
                         if clicked_element == ElementId(1000) {
                             self.click_count += 1;
                         }
                         // Check if clicked on focusable inputs (IDs 2000-2002)
-                        let id = clicked_element.0;
                         if (2000..2003).contains(&id) {
                             let index = (id - 2000) as usize;
                             self.input_handles[index].focus(&mut self.focus_state);
                         }
+                        // Check if clicked on checkboxes (IDs 3000-3002)
+                        if (3000..3003).contains(&id) {
+                            let index = (id - 3000) as usize;
+                            self.checkbox_states[index] = !self.checkbox_states[index];
+                        }
+                        // Check if clicked on text input (ID 3100)
+                        self.text_input_focused = id == 3100;
                     } else {
                         // Clicked outside any element - blur focus
                         self.focus_state.blur();
+                        self.text_input_focused = false;
                     }
                     // Raw input tracking
                     self.input_state.handle_mouse_button(btn, false);
@@ -668,8 +761,79 @@ impl ApplicationHandler for App {
                 self.input_state.handle_modifiers_changed(mods.state());
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                self.input_state
-                    .handle_key(event.logical_key, event.physical_key, event.state);
+                self.input_state.handle_key(
+                    event.logical_key.clone(),
+                    event.physical_key,
+                    event.state,
+                );
+
+                // Handle text input when focused
+                if self.text_input_focused && event.state == winit::event::ElementState::Pressed {
+                    use winit::keyboard::Key;
+                    match &event.logical_key {
+                        Key::Character(c) => {
+                            let s = c.as_str();
+                            self.text_input_value.insert_str(self.text_input_cursor, s);
+                            self.text_input_cursor += s.len();
+                        }
+                        Key::Named(winit::keyboard::NamedKey::Backspace) => {
+                            if self.text_input_cursor > 0 {
+                                // Find prev char boundary
+                                let mut new_pos = self.text_input_cursor - 1;
+                                while new_pos > 0
+                                    && !self.text_input_value.is_char_boundary(new_pos)
+                                {
+                                    new_pos -= 1;
+                                }
+                                self.text_input_value.drain(new_pos..self.text_input_cursor);
+                                self.text_input_cursor = new_pos;
+                            }
+                        }
+                        Key::Named(winit::keyboard::NamedKey::Delete) => {
+                            if self.text_input_cursor < self.text_input_value.len() {
+                                // Find next char boundary
+                                let mut end = self.text_input_cursor + 1;
+                                while end < self.text_input_value.len()
+                                    && !self.text_input_value.is_char_boundary(end)
+                                {
+                                    end += 1;
+                                }
+                                self.text_input_value.drain(self.text_input_cursor..end);
+                            }
+                        }
+                        Key::Named(winit::keyboard::NamedKey::ArrowLeft) => {
+                            if self.text_input_cursor > 0 {
+                                self.text_input_cursor -= 1;
+                                while self.text_input_cursor > 0
+                                    && !self
+                                        .text_input_value
+                                        .is_char_boundary(self.text_input_cursor)
+                                {
+                                    self.text_input_cursor -= 1;
+                                }
+                            }
+                        }
+                        Key::Named(winit::keyboard::NamedKey::ArrowRight) => {
+                            if self.text_input_cursor < self.text_input_value.len() {
+                                self.text_input_cursor += 1;
+                                while self.text_input_cursor < self.text_input_value.len()
+                                    && !self
+                                        .text_input_value
+                                        .is_char_boundary(self.text_input_cursor)
+                                {
+                                    self.text_input_cursor += 1;
+                                }
+                            }
+                        }
+                        Key::Named(winit::keyboard::NamedKey::Escape) => {
+                            self.text_input_focused = false;
+                        }
+                        _ => {}
+                    }
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
+                }
             }
             _ => {}
         }
