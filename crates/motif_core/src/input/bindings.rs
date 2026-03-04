@@ -90,17 +90,11 @@ pub enum InputAction {
 /// Maps keyboard events to input actions.
 ///
 /// Provides platform-specific defaults for macOS vs other platforms.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct InputBindings {
     // This struct exists for future customization.
     // Currently we just use the static platform defaults.
     _private: (),
-}
-
-impl Default for InputBindings {
-    fn default() -> Self {
-        Self { _private: () }
-    }
 }
 
 impl InputBindings {

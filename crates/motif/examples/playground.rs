@@ -731,10 +731,8 @@ impl ApplicationHandler for App {
                             // Click-to-cursor: convert click position to byte offset
                             if let Some(click_pos) = self.input_state.cursor_position {
                                 // Text input bounds (must match rendering)
-                                let input_bounds = Rect::new(
-                                    Point::new(500.0, 620.0),
-                                    Size::new(280.0, 36.0),
-                                );
+                                let input_bounds =
+                                    Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0));
                                 let padding = 8.0;
                                 let font_size = 14.0;
 
@@ -813,7 +811,10 @@ impl ApplicationHandler for App {
                     use motif_core::input::HandleKeyResult;
 
                     let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);
-                    match self.text_edit_state.handle_key_event(&event.logical_key, &modifiers) {
+                    match self
+                        .text_edit_state
+                        .handle_key_event(&event.logical_key, &modifiers)
+                    {
                         HandleKeyResult::Handled => {}
                         HandleKeyResult::NotHandled => {}
                         HandleKeyResult::Blur => {
