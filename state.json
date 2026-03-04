@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T04:30:00Z",
-  "last_run_id": "22654239399",
+  "last_run": "2026-03-04T05:00:00Z",
+  "last_run_id": "22654530783",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -72,6 +72,14 @@
       "pr_number": 20,
       "status": "open_draft",
       "description": "Implemented TodoMVC example in crates/motif/examples/todomvc.rs (~700 lines). Text input, checkbox toggle, hover-reveal delete, All/Active/Completed filter tabs, items-remaining count, clear-completed button. Resolves p1/p2 TODOs from spool todomvc stream. Uses raw DrawContext/HitTree/InputState API; no dependency on draft Checkbox/TextInput PRs."
+    },
+    "element_list_debug": {
+      "date": "2026-03-04",
+      "run_id": "22654530783",
+      "branch": "repo-assist/improve-element-list-debug-command",
+      "pr_number": 21,
+      "status": "open_draft",
+      "description": "Added element.list debug command: flat HitTree dump (id, bounds, z_index). Adds update_hit_tree() to DebugServer, HitEntryInfo to snapshot.rs, CLI formatter. Stepping stone toward 'Query element tree (p1)' devtools TODO."
     }
   },
   "labels_applied": {
@@ -88,7 +96,8 @@
     "contributing_docs",
     "checkbox_element",
     "text_input_element",
-    "todomvc_example"
+    "todomvc_example",
+    "element_list_debug"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
@@ -97,14 +106,14 @@
   "devtools_investigation": {
     "date": "2026-03-04",
     "run_id": "22654239399",
-    "findings": "scene.quads, scene.text_runs, input.state, debug.draw_quad, debug.clear, screenshot all already implemented in server.rs. 'Query element tree (p1)' TODO is NOT implemented. HitTree has element bounds + z_index but no hierarchy/type info. Full element tree query needs architectural work: track component composition across frames, add type names to HitEntry, parent-child links. Could implement 'element.list' as flat HitTree dump (stepping stone) in a future run."
+    "findings": "scene.quads, scene.text_runs, input.state, debug.draw_quad, debug.clear, screenshot all already implemented in server.rs. 'Query element tree (p1)' TODO is NOT fully implemented. PR #21 adds element.list (flat HitTree dump: id, bounds, z_index). Full element tree query still needs: parent-child tracking in DrawContext, component type names in HitEntry. Could implement 'element.inspect <id>' in a future run once #21 lands."
   },
   "ci_status_checks": {
     "2026-03-04": {
       "pr16": "pending (0 checks - macOS CI not yet scheduled)",
       "pr20": "pending (0 checks - macOS CI not yet scheduled)",
-      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#20 all created 2026-03-04."
+      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#21 all created 2026-03-04."
     }
   },
-  "notes": "Run 8 (22654239399): Task 5 — CI pending on all PRs (macOS checks not yet run, total_count=0). Task 10 — investigated devtools; element.tree needs architectural work, deferred. Task 11 — rewrote Monthly Activity Summary cleanly (removed duplicate content). PRs #16-#20 all open draft, 0 CI checks run. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) Consider 'element.list' debug method (flat HitTree dump) as next Task 10 item. (c) Focus management (p2 TODO) is a good candidate after TextInput/Checkbox PRs merge."
+  "notes": "Run 9 (22654530783): Task 10 — implemented element.list debug command (PR #21). Uses flat HitTree dump as stepping stone toward Query element tree (p1). Task 11 — updated Monthly Activity Summary with new PR. PRs #16-#21 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) Hot reload boundary design (p1) not yet started."
 }
