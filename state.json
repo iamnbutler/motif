@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T06:00:00Z",
-  "last_run_id": "22656017116",
+  "last_run": "2026-03-04T06:30:00Z",
+  "last_run_id": "22656684883",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -35,8 +35,8 @@
       "date": "2026-03-04",
       "branch": "repo-assist/fix-issue-12-release-workflow",
       "pr_number": 23,
-      "status": "open_draft",
-      "description": "Added .github/workflows/release.yml (validate→draft-release→publish pipeline) and extended scripts/release.sh with bump <version> subcommand. Implements #12 release automation."
+      "status": "failed_push_issue",
+      "description": "Added .github/workflows/release.yml (validate→draft-release→publish pipeline) and extended scripts/release.sh with bump <version> subcommand. Push failed — issue #23 created with patch artifact. Maintainer can apply manually from run 22656017116 artifacts."
     }
   },
   "improvement_prs": {
@@ -96,13 +96,13 @@
       "status": "open_draft",
       "description": "Added motif::hot module with RenderFn type alias, hot::call(), and hot::connect(). Documents stable boundary contract (what is safe to change between hot patches). Updates hot.rs example to use new API. Resolves p1 spool task 'Design hot-reloadable render function boundary'."
     },
-    "release_workflow": {
+    "metal_alignment_docs": {
       "date": "2026-03-04",
-      "run_id": "22656017116",
-      "branch": "repo-assist/fix-issue-12-release-workflow",
-      "pr_number": 23,
+      "run_id": "22656684883",
+      "branch": "repo-assist/improve-metal-alignment-docs",
+      "pr_number": 24,
       "status": "open_draft",
-      "description": "Added .github/workflows/release.yml with three jobs: validate (fmt/clippy/test/dry-run publish on macOS), draft-release (auto changelog + GitHub draft release), publish (crates.io on release published event). Extended scripts/release.sh with 'bump <version>' subcommand. Closes #12."
+      "description": "Added module-level doc comment to metal/mod.rs explaining the float3 16-byte alignment gotcha (table: float/float2/float3/float4 sizes vs alignments), safe design rule, improved _padding field docs, and compile-time const assertions for QuadInstance (112 B) and GlyphInstance (48 B). Resolves p3 spool task 'Document Metal struct alignment gotcha'."
     }
   },
   "labels_applied": {
@@ -122,7 +122,8 @@
     "todomvc_example",
     "element_list_debug",
     "hot_render_boundary",
-    "release_workflow"
+    "release_workflow",
+    "metal_alignment_docs"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
@@ -135,10 +136,15 @@
   },
   "ci_status_checks": {
     "2026-03-04": {
-      "pr16": "pending (0 checks - macOS CI not yet scheduled)",
-      "pr20": "pending (0 checks - macOS CI not yet scheduled)",
-      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#23 all created 2026-03-04."
+      "pr16": "pending (0 checks - CI did not run on Repo Assist draft PR branches)",
+      "pr20": "pending (0 checks - CI did not run on Repo Assist draft PR branches)",
+      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. No CI runs found for any of PRs #16-#22 in pull_request event workflow runs. This may be because draft PRs from github-actions bot do not trigger workflows. Will monitor on 2026-03-18 nudge date."
     }
   },
-  "notes": "Run 11 (22656017116): Task 2 — implemented release workflow (PR #23). Adds .github/workflows/release.yml (validate→draft-release→publish pipeline) and extends scripts/release.sh with bump <version> subcommand. Closes #12. Also commented on #12 with implementation summary. Task 11 — updated Monthly Activity Summary. PRs #16-#23 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) All p1 spool tasks now addressed; all open issues now have PRs — p2 items: focus management, inject debug text, simulate keyboard events, screenshot diffing. (e) Release notes via Anthropic API is a natural next step once PR #23 pipeline is in use."
+  "focus_module_findings": {
+    "date": "2026-03-04",
+    "run_id": "22656684883",
+    "findings": "focus.rs already has FocusId (atomic counter), FocusHandle (Arc-based), FocusEvent (Focus/Blur), FocusState (tracks current focus + pending events) with comprehensive tests. accessibility.rs has FocusManager (tab order navigation). What is missing: (1) DrawContext integration so elements can call ctx.focus_handle() to claim focus, (2) InputState routing keyboard events to focused element. This is a good multi-file change for a future run once the element PRs (#18, #19) merge."
+  },
+  "notes": "Run 12 (22656684883): Task 10 — implemented Metal alignment docs PR (branch repo-assist/improve-metal-alignment-docs, expected PR #24). Module-level doc table + safe design rule + improved _padding field doc + compile-time size assertions (QuadInstance=112B, GlyphInstance=48B). Resolves p3 spool task. Task 5 — confirmed no CI runs on Repo Assist PR branches (likely because bot-created draft PRs don't trigger workflows). Task 11 — updated Monthly Activity Summary. Next priorities: (a) On 2026-03-18 nudge PRs if not reviewed. (b) Focus management integration into DrawContext (good for after #18/#19 merge). (c) Release workflow retry if maintainer prefers not to apply patch manually. (d) 'element.inspect <id>' after #21 merges."
 }
