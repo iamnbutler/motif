@@ -9,7 +9,7 @@ use motif_core::{
     checkbox, div,
     element::{self, Element, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
-    input::{InputState, MouseButton, ScrollDelta},
+    input::{InputState, MouseButton, ScrollDelta, TextEditState},
     metal::{MetalRenderer, MetalSurface},
     text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point,
     Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext,
@@ -261,8 +261,7 @@ struct App {
     click_count: u32,
     // --- Controls demo state ---
     checkbox_states: [bool; 3],
-    text_input_value: String,
-    text_input_cursor: usize,
+    text_edit_state: TextEditState,
     text_input_focused: bool,
 }
 
@@ -283,8 +282,12 @@ impl Default for App {
             input_handles: [FocusHandle::new(), FocusHandle::new(), FocusHandle::new()],
             click_count: 0,
             checkbox_states: [true, false, false],
-            text_input_value: String::from("Hello, Motif!"),
-            text_input_cursor: 13,
+            text_edit_state: {
+                let mut state = TextEditState::new();
+                state.set_content("Hello, Motif!");
+                state.move_to(13); // cursor at end
+                state
+            },
             text_input_focused: false,
         }
     }
@@ -574,11 +577,12 @@ impl ApplicationHandler for App {
                         let input_id = ElementId(3100);
                         let is_hovered = self.input_state.hovered() == Some(input_id);
 
-                        let mut input = text_input(&self.text_input_value, input_id)
+                        let mut input = text_input(self.text_edit_state.content(), input_id)
                             .placeholder("Type something...")
                             .bounds(Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0)))
                             .focused(self.text_input_focused)
-                            .cursor_pos(self.text_input_cursor);
+                            .cursor_pos(self.text_edit_state.cursor_offset())
+                            .selection(self.text_edit_state.selected_range().clone());
 
                         // Add hover effect via border color
                         if is_hovered && !self.text_input_focused {
@@ -596,7 +600,7 @@ impl ApplicationHandler for App {
                         // Label
                         let mut cx = DrawContext::new(&mut self.scene, scale);
                         cx.paint_text(
-                            "TextInput element:",
+                            "TextInput (using TextEditState):",
                             Point::new(500.0, 605.0),
                             10.0,
                             Srgba::new(0.5, 0.5, 0.55, 1.0),
@@ -769,66 +773,91 @@ impl ApplicationHandler for App {
 
                 // Handle text input when focused
                 if self.text_input_focused && event.state == winit::event::ElementState::Pressed {
-                    use winit::keyboard::Key;
+                    use winit::keyboard::{Key, NamedKey};
+                    let mods = self.input_state.modifiers;
+                    let shift = mods.shift_key();
+                    let word_mod = if cfg!(target_os = "macos") {
+                        mods.alt_key()
+                    } else {
+                        mods.control_key()
+                    };
+
                     match &event.logical_key {
                         Key::Character(c) => {
-                            let s = c.as_str();
-                            self.text_input_value.insert_str(self.text_input_cursor, s);
-                            self.text_input_cursor += s.len();
+                            self.text_edit_state.insert_text(c.as_str());
                         }
-                        Key::Named(winit::keyboard::NamedKey::Backspace) => {
-                            if self.text_input_cursor > 0 {
-                                // Find prev char boundary
-                                let mut new_pos = self.text_input_cursor - 1;
-                                while new_pos > 0
-                                    && !self.text_input_value.is_char_boundary(new_pos)
-                                {
-                                    new_pos -= 1;
-                                }
-                                self.text_input_value.drain(new_pos..self.text_input_cursor);
-                                self.text_input_cursor = new_pos;
+                        Key::Named(NamedKey::Backspace) => {
+                            if word_mod {
+                                self.text_edit_state.delete_word_left();
+                            } else {
+                                self.text_edit_state.delete_backward();
                             }
                         }
-                        Key::Named(winit::keyboard::NamedKey::Delete) => {
-                            if self.text_input_cursor < self.text_input_value.len() {
-                                // Find next char boundary
-                                let mut end = self.text_input_cursor + 1;
-                                while end < self.text_input_value.len()
-                                    && !self.text_input_value.is_char_boundary(end)
-                                {
-                                    end += 1;
-                                }
-                                self.text_input_value.drain(self.text_input_cursor..end);
+                        Key::Named(NamedKey::Delete) => {
+                            if word_mod {
+                                self.text_edit_state.delete_word_right();
+                            } else {
+                                self.text_edit_state.delete_forward();
                             }
                         }
-                        Key::Named(winit::keyboard::NamedKey::ArrowLeft) => {
-                            if self.text_input_cursor > 0 {
-                                self.text_input_cursor -= 1;
-                                while self.text_input_cursor > 0
-                                    && !self
-                                        .text_input_value
-                                        .is_char_boundary(self.text_input_cursor)
-                                {
-                                    self.text_input_cursor -= 1;
-                                }
+                        Key::Named(NamedKey::ArrowLeft) => {
+                            if shift && word_mod {
+                                self.text_edit_state.select_word_left();
+                            } else if shift {
+                                self.text_edit_state.select_left();
+                            } else if word_mod {
+                                self.text_edit_state.word_left();
+                            } else {
+                                self.text_edit_state.left();
                             }
                         }
-                        Key::Named(winit::keyboard::NamedKey::ArrowRight) => {
-                            if self.text_input_cursor < self.text_input_value.len() {
-                                self.text_input_cursor += 1;
-                                while self.text_input_cursor < self.text_input_value.len()
-                                    && !self
-                                        .text_input_value
-                                        .is_char_boundary(self.text_input_cursor)
-                                {
-                                    self.text_input_cursor += 1;
-                                }
+                        Key::Named(NamedKey::ArrowRight) => {
+                            if shift && word_mod {
+                                self.text_edit_state.select_word_right();
+                            } else if shift {
+                                self.text_edit_state.select_right();
+                            } else if word_mod {
+                                self.text_edit_state.word_right();
+                            } else {
+                                self.text_edit_state.right();
                             }
                         }
-                        Key::Named(winit::keyboard::NamedKey::Escape) => {
+                        Key::Named(NamedKey::Home) => {
+                            if shift {
+                                self.text_edit_state.select_to_beginning();
+                            } else {
+                                self.text_edit_state.home();
+                            }
+                        }
+                        Key::Named(NamedKey::End) => {
+                            if shift {
+                                self.text_edit_state.select_to_end();
+                            } else {
+                                self.text_edit_state.end();
+                            }
+                        }
+                        Key::Named(NamedKey::Escape) => {
                             self.text_input_focused = false;
                         }
-                        _ => {}
+                        _ => {
+                            // Handle Cmd+A (select all) on macOS, Ctrl+A elsewhere
+                            if let Key::Character(c) = &event.logical_key {
+                                let cmd = if cfg!(target_os = "macos") {
+                                    mods.super_key()
+                                } else {
+                                    mods.control_key()
+                                };
+                                if cmd && c.as_str().eq_ignore_ascii_case("a") {
+                                    self.text_edit_state.select_all();
+                                } else if cmd && c.as_str().eq_ignore_ascii_case("z") {
+                                    if shift {
+                                        self.text_edit_state.redo();
+                                    } else {
+                                        self.text_edit_state.undo();
+                                    }
+                                }
+                            }
+                        }
                     }
                     if let Some(window) = &self.window {
                         window.request_redraw();
