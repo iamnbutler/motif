@@ -15,6 +15,8 @@ accesskit_winit = "0.32"
 motif_core = { version = "0.0.1", path = "../motif_core" }
 glamour = "0.18"
 winit = "0.30"
+subsecond = { version = "0.7.3", optional = true }
+cargo-hot = { version = "0.1", package = "cargo-hot-protocol", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -28,3 +30,7 @@ harness = false
 [[bench]]
 name = "quad_render"
 harness = false
+
+[features]
+subsecond = ["dep:subsecond"]
+hot = ["dep:cargo-hot"]
