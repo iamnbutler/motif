@@ -11,6 +11,14 @@ pub use text_state::{HandleKeyResult, TextEditState};
 
 use crate::{ElementId, Point};
 use std::collections::HashSet;
+use std::time::{Duration, Instant};
+
+/// Maximum time between consecutive clicks to count as a multi-click sequence.
+const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(400);
+
+/// Maximum squared distance between click positions for multi-click detection,
+/// in logical pixels. Using squared distance (4² = 16) avoids a sqrt call.
+const DOUBLE_CLICK_MAX_DIST_SQ: f32 = 4.0 * 4.0;
 
 // Re-export winit keyboard types (well-designed, handles international layouts)
 pub use winit::event::ElementState;
@@ -103,6 +111,15 @@ pub struct InputState {
     hovered: Option<ElementId>,
     /// Element where mouse button was pressed (for click detection).
     pressed: Option<ElementId>,
+    /// Position of the last completed click (for multi-click detection).
+    last_click_position: Option<Point>,
+    /// Time of the last completed click (for multi-click detection).
+    last_click_time: Option<Instant>,
+    /// Consecutive click count for the most recent click sequence.
+    ///
+    /// 1 = single click, 2 = double click, 3 = triple click, etc.
+    /// Updated by [`end_press`]; query after `end_press` returns `Some`.
+    click_count: u32,
 }
 
 impl InputState {
@@ -239,10 +256,52 @@ impl InputState {
 
     /// End a press gesture. Returns the clicked element if the press started and
     /// ended on the same element. Call this on mouse button up (before handle_mouse_button).
+    ///
+    /// On a successful click, also updates [`click_count`] to reflect the number of
+    /// consecutive clicks (1 = single, 2 = double, 3 = triple, …).
     pub fn end_press(&mut self) -> Option<ElementId> {
+        self.end_press_at(Instant::now())
+    }
+
+    /// Returns the consecutive click count from the most recent successful click.
+    ///
+    /// 1 = single click, 2 = double click, 3 = triple click, etc.
+    /// This value is only meaningful after [`end_press`] returns `Some`.
+    pub fn click_count(&self) -> u32 {
+        self.click_count
+    }
+
+    /// Inner implementation of `end_press` with an explicit timestamp for testability.
+    fn end_press_at(&mut self, now: Instant) -> Option<ElementId> {
         let pressed = self.pressed.take();
-        // Click detected if we're still hovering the same element we pressed
+        // Click detected if we're still hovering the same element we pressed.
         if pressed.is_some() && pressed == self.hovered {
+            let pos = self.cursor_position;
+
+            // Determine whether this is a continuation of a multi-click sequence.
+            let within_time = self
+                .last_click_time
+                .map(|t| now.duration_since(t) <= DOUBLE_CLICK_INTERVAL)
+                .unwrap_or(false);
+
+            let within_distance = match (self.last_click_position, pos) {
+                (Some(last), Some(cur)) => {
+                    let dx = cur.x - last.x;
+                    let dy = cur.y - last.y;
+                    dx * dx + dy * dy <= DOUBLE_CLICK_MAX_DIST_SQ
+                }
+                _ => false,
+            };
+
+            if within_time && within_distance {
+                self.click_count = self.click_count.saturating_add(1);
+            } else {
+                self.click_count = 1;
+            }
+
+            self.last_click_time = Some(now);
+            self.last_click_position = pos;
+
             pressed
         } else {
             None
@@ -662,5 +721,173 @@ mod tests {
         let click = state.end_press();
 
         assert!(click.is_none());
+    }
+
+    // --- Multi-click / double-click detection tests ---
+
+    #[test]
+    fn click_count_zero_before_any_click() {
+        let state = InputState::new();
+        assert_eq!(state.click_count(), 0);
+    }
+
+    #[test]
+    fn first_click_count_is_one() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        state.cursor_position = Some(Point::new(100.0, 100.0));
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        let click = state.end_press_at(t0);
+
+        assert_eq!(click, Some(elem));
+        assert_eq!(state.click_count(), 1);
+    }
+
+    #[test]
+    fn double_click_within_interval() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        state.cursor_position = Some(Point::new(100.0, 100.0));
+        state.set_hovered(Some(elem));
+
+        // First click
+        state.begin_press();
+        let click1 = state.end_press_at(t0);
+        assert_eq!(click1, Some(elem));
+        assert_eq!(state.click_count(), 1);
+
+        // Second click 200 ms later at the same spot
+        state.begin_press();
+        let click2 = state.end_press_at(t0 + Duration::from_millis(200));
+        assert_eq!(click2, Some(elem));
+        assert_eq!(state.click_count(), 2);
+    }
+
+    #[test]
+    fn triple_click_within_interval() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        state.cursor_position = Some(Point::new(50.0, 50.0));
+        state.set_hovered(Some(elem));
+
+        state.begin_press();
+        state.end_press_at(t0);
+
+        state.begin_press();
+        state.end_press_at(t0 + Duration::from_millis(150));
+
+        state.begin_press();
+        let click3 = state.end_press_at(t0 + Duration::from_millis(300));
+        assert_eq!(click3, Some(elem));
+        assert_eq!(state.click_count(), 3);
+    }
+
+    #[test]
+    fn slow_second_click_resets_count_to_one() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        state.cursor_position = Some(Point::new(100.0, 100.0));
+        state.set_hovered(Some(elem));
+
+        // First click
+        state.begin_press();
+        state.end_press_at(t0);
+        assert_eq!(state.click_count(), 1);
+
+        // Second click well outside the double-click interval (600 ms)
+        state.begin_press();
+        let click2 = state.end_press_at(t0 + Duration::from_millis(600));
+        assert_eq!(click2, Some(elem));
+        assert_eq!(state.click_count(), 1, "slow click should reset to 1");
+    }
+
+    #[test]
+    fn far_second_click_resets_count_to_one() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        // First click at (100, 100)
+        state.cursor_position = Some(Point::new(100.0, 100.0));
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        state.end_press_at(t0);
+        assert_eq!(state.click_count(), 1);
+
+        // Second click 200 ms later but 20 logical pixels away (> 4 px threshold)
+        state.cursor_position = Some(Point::new(120.0, 100.0));
+        state.set_hovered(Some(elem));
+        state.begin_press();
+        let click2 = state.end_press_at(t0 + Duration::from_millis(200));
+        assert_eq!(click2, Some(elem));
+        assert_eq!(state.click_count(), 1, "distant click should reset to 1");
+    }
+
+    #[test]
+    fn failed_press_does_not_update_click_count() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem1 = ElementId(1);
+        let elem2 = ElementId(2);
+        let t0 = Instant::now();
+
+        // Complete a real click → count = 1
+        state.cursor_position = Some(Point::new(50.0, 50.0));
+        state.set_hovered(Some(elem1));
+        state.begin_press();
+        state.end_press_at(t0);
+        assert_eq!(state.click_count(), 1);
+
+        // Drag: press elem1 but release over elem2 → no click, count stays 1
+        state.set_hovered(Some(elem1));
+        state.begin_press();
+        state.set_hovered(Some(elem2));
+        let drag = state.end_press_at(t0 + Duration::from_millis(100));
+        assert!(drag.is_none(), "drag should not register as a click");
+        assert_eq!(
+            state.click_count(),
+            1,
+            "count should not change on a failed press"
+        );
+    }
+
+    #[test]
+    fn double_click_exactly_at_interval_boundary() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+        let t0 = Instant::now();
+
+        state.cursor_position = Some(Point::new(10.0, 10.0));
+        state.set_hovered(Some(elem));
+
+        state.begin_press();
+        state.end_press_at(t0);
+
+        // Exactly at the interval boundary — should still count as double-click
+        state.begin_press();
+        state.end_press_at(t0 + DOUBLE_CLICK_INTERVAL);
+        assert_eq!(state.click_count(), 2);
     }
 }
