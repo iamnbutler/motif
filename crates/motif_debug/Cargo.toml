@@ -11,15 +11,15 @@ description = "Debug server and devtools protocol for motif"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-motif_core = { version = "0.0.1", path = "../motif_core" }
+serde_json = { workspace = true }
+motif_core = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"
-objc2 = "0.5"
-objc2-app-kit = { version = "0.2", features = ["NSRunningApplication"] }
-objc2-foundation = "0.2"
+objc2 = { workspace = true }
+objc2-app-kit = { workspace = true, features = ["NSRunningApplication"] }
+objc2-foundation = { workspace = true }
 
 [dev-dependencies]
 linebender_resource_handle = "0.1"

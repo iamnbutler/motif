@@ -10,20 +10,20 @@ categories.workspace = true
 description = "Core types and rendering primitives for the motif UI framework"
 
 [dependencies]
-accesskit = "0.24"
+accesskit = { workspace = true }
 glam = "0.32"
-glamour = "0.18"
-palette = "0.7"
+glamour = { workspace = true }
+palette = { workspace = true }
 parley = { version = "0.7", features = ["accesskit"] }
 smallvec = "1.11"
 swash = "0.2"
-winit = "0.30"
+winit = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 metal = "0.29"
-objc2 = "0.5"
-objc2-foundation = "0.2"
-objc2-app-kit = { version = "0.2", features = ["NSView", "NSWindow"] }
+objc2 = { workspace = true }
+objc2-foundation = { workspace = true }
+objc2-app-kit = { workspace = true, features = ["NSView", "NSWindow"] }
 core-graphics-types = "0.1"
 foreign-types = "0.5"
 

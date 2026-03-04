@@ -15,5 +15,5 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-motif_debug = { version = "0.0.1", path = "../motif_debug" }
-serde_json = "1"
+motif_debug = { workspace = true }
+serde_json = { workspace = true }
