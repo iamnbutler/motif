@@ -102,8 +102,7 @@ impl DebugClient {
             ));
         }
 
-        serde_json::from_str(&line)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        serde_json::from_str(&line).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -140,12 +139,13 @@ mod tests {
         let pid = std::process::id();
         let path = format!("/tmp/motif-debug-test-cli-{pid}-{id}.sock");
 
-        let _server =
-            DebugServer::with_path(PathBuf::from(&path)).expect("server should start");
+        let _server = DebugServer::with_path(PathBuf::from(&path)).expect("server should start");
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         let mut client = DebugClient::connect(&path).expect("should connect");
-        let resp = client.send("scene.stats", None).expect("should get response");
+        let resp = client
+            .send("scene.stats", None)
+            .expect("should get response");
 
         // No snapshot has been pushed, so we expect an error response.
         assert_eq!(resp.id, 1);
@@ -164,19 +164,24 @@ mod tests {
         let pid = std::process::id();
         let path = format!("/tmp/motif-debug-test-cli-inc-{pid}-{id}.sock");
 
-        let server =
-            DebugServer::with_path(PathBuf::from(&path)).expect("server should start");
+        let server = DebugServer::with_path(PathBuf::from(&path)).expect("server should start");
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         let mut client = DebugClient::connect(&path).expect("should connect");
 
-        let resp1 = client.send("scene.stats", None).expect("should get response 1");
+        let resp1 = client
+            .send("scene.stats", None)
+            .expect("should get response 1");
         assert_eq!(resp1.id, 1);
 
-        let resp2 = client.send("scene.stats", None).expect("should get response 2");
+        let resp2 = client
+            .send("scene.stats", None)
+            .expect("should get response 2");
         assert_eq!(resp2.id, 2);
 
-        let resp3 = client.send("nonexistent", None).expect("should get response 3");
+        let resp3 = client
+            .send("nonexistent", None)
+            .expect("should get response 3");
         assert_eq!(resp3.id, 3);
 
         // Keep server alive until all assertions pass.

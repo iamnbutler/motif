@@ -2,8 +2,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use motif_core::{DrawContext, Point, Rect, ScaleFactor, Scene, Size, Srgba};
-use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 
 const QUAD_COUNT: usize = 10_000;
 
@@ -94,9 +94,9 @@ fn bench_scene_clear(c: &mut Criterion) {
 
 #[cfg(target_os = "macos")]
 fn bench_quad_instance_conversion(c: &mut Criterion) {
+    use glamour::{Point2, Size2};
     use motif_core::metal::QuadInstance;
     use motif_core::{DeviceRect, Quad};
-    use glamour::{Point2, Size2};
 
     let mut group = c.benchmark_group("metal");
     group.throughput(Throughput::Elements(QUAD_COUNT as u64));
@@ -121,10 +121,7 @@ fn bench_quad_instance_conversion(c: &mut Criterion) {
 
     group.bench_function("quad_to_instance", |b| {
         b.iter(|| {
-            let instances: Vec<QuadInstance> = quads
-                .iter()
-                .map(QuadInstance::from_quad)
-                .collect();
+            let instances: Vec<QuadInstance> = quads.iter().map(QuadInstance::from_quad).collect();
             black_box(instances.len())
         });
     });

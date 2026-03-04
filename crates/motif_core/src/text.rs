@@ -136,9 +136,12 @@ impl TextLayout {
             for item in line.items() {
                 if let parley::layout::PositionedLayoutItem::GlyphRun(run) = item {
                     let font_data = run.run().font();
-                    let font_ref = FontRef::from_index(font_data.data.as_ref(), font_data.index as usize)?;
+                    let font_ref =
+                        FontRef::from_index(font_data.data.as_ref(), font_data.index as usize)?;
                     let normalized_coords: Vec<i16> = run.run().normalized_coords().to_vec();
-                    let swash_metrics = font_ref.metrics(&normalized_coords).scale(run.run().font_size());
+                    let swash_metrics = font_ref
+                        .metrics(&normalized_coords)
+                        .scale(run.run().font_size());
                     return Some(FontMetrics::from_swash(&swash_metrics));
                 }
             }
@@ -156,7 +159,7 @@ impl TextLayout {
                         let glyphs: Vec<PositionedGlyph> = run
                             .positioned_glyphs()
                             .map(|g| PositionedGlyph {
-                                id: g.id as u32,
+                                id: g.id,
                                 x: g.x,
                                 y: g.y,
                                 advance: g.advance,
@@ -336,7 +339,7 @@ impl TextLayout {
                         let glyphs: Vec<PositionedGlyph> = run
                             .positioned_glyphs()
                             .map(|g| PositionedGlyph {
-                                id: g.id as u32,
+                                id: g.id,
                                 x: g.x,
                                 y: g.y,
                                 advance: g.advance,
@@ -347,9 +350,7 @@ impl TextLayout {
                         let font = inner_run.font();
 
                         // Get normalized coordinates for variable fonts
-                        let normalized_coords: Vec<i16> = inner_run
-                            .normalized_coords()
-                            .to_vec();
+                        let normalized_coords: Vec<i16> = inner_run.normalized_coords().to_vec();
 
                         Some(GlyphRunWithFont {
                             glyphs,
@@ -432,12 +433,8 @@ mod tests {
         for run in layout.glyph_runs_with_font() {
             let font_data = run.font_data.as_ref().unwrap();
             for glyph in &run.glyphs {
-                let rasterized = cache.rasterize(
-                    font_data,
-                    &run.normalized_coords,
-                    glyph.id,
-                    run.font_size,
-                );
+                let rasterized =
+                    cache.rasterize(font_data, &run.normalized_coords, glyph.id, run.font_size);
 
                 assert!(rasterized.is_some(), "should rasterize glyph");
                 let rast = rasterized.unwrap();

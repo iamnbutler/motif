@@ -25,6 +25,7 @@ pub struct DebugOverlays {
 
 impl DebugOverlays {
     /// Add a new overlay quad. Returns the assigned ID.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_quad(
         &mut self,
         x: f32,
@@ -291,44 +292,34 @@ impl DebugServer {
                 let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
                 match guard.as_ref() {
                     Some(snap) => DebugResponse::ok(request.id, snap.stats()),
-                    None => DebugResponse::err(
-                        request.id,
-                        -32000,
-                        "No scene snapshot available yet",
-                    ),
+                    None => {
+                        DebugResponse::err(request.id, -32000, "No scene snapshot available yet")
+                    }
                 }
             }
             "scene.quads" => {
                 let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
                 match guard.as_ref() {
                     Some(snap) => DebugResponse::ok(request.id, snap.quads_json()),
-                    None => DebugResponse::err(
-                        request.id,
-                        -32000,
-                        "No scene snapshot available yet",
-                    ),
+                    None => {
+                        DebugResponse::err(request.id, -32000, "No scene snapshot available yet")
+                    }
                 }
             }
             "scene.text_runs" => {
                 let guard = snapshot.lock().unwrap_or_else(|e| e.into_inner());
                 match guard.as_ref() {
                     Some(snap) => DebugResponse::ok(request.id, snap.text_runs_json()),
-                    None => DebugResponse::err(
-                        request.id,
-                        -32000,
-                        "No scene snapshot available yet",
-                    ),
+                    None => {
+                        DebugResponse::err(request.id, -32000, "No scene snapshot available yet")
+                    }
                 }
             }
             "input.state" => {
                 let guard = input_state.lock().unwrap_or_else(|e| e.into_inner());
                 match guard.as_ref() {
                     Some(snap) => DebugResponse::ok(request.id, snap.to_json()),
-                    None => DebugResponse::err(
-                        request.id,
-                        -32000,
-                        "No input state available yet",
-                    ),
+                    None => DebugResponse::err(request.id, -32000, "No input state available yet"),
                 }
             }
             "input.activate" => Self::handle_input_activate(request, window_position),
@@ -415,10 +406,7 @@ impl DebugServer {
         DebugResponse::ok(request.id, serde_json::json!({ "id": id }))
     }
 
-    fn handle_clear(
-        request: &DebugRequest,
-        overlays: &Arc<Mutex<DebugOverlays>>,
-    ) -> DebugResponse {
+    fn handle_clear(request: &DebugRequest, overlays: &Arc<Mutex<DebugOverlays>>) -> DebugResponse {
         let mut guard = overlays.lock().unwrap_or_else(|e| e.into_inner());
         let count = guard.clear();
         DebugResponse::ok(request.id, serde_json::json!({ "cleared": count }))
@@ -455,10 +443,7 @@ impl DebugServer {
         DebugResponse::ok(request.id, serde_json::json!({ "removed": removed }))
     }
 
-    fn handle_list(
-        request: &DebugRequest,
-        overlays: &Arc<Mutex<DebugOverlays>>,
-    ) -> DebugResponse {
+    fn handle_list(request: &DebugRequest, overlays: &Arc<Mutex<DebugOverlays>>) -> DebugResponse {
         let guard = overlays.lock().unwrap_or_else(|e| e.into_inner());
         let json = serde_json::to_value(&guard.quads).unwrap_or(serde_json::Value::Array(vec![]));
         DebugResponse::ok(request.id, json)
@@ -503,10 +488,7 @@ impl DebugServer {
         };
 
         match screenshot::capture_window_to_png(wid, path) {
-            Ok(()) => DebugResponse::ok(
-                request.id,
-                serde_json::json!({ "path": path }),
-            ),
+            Ok(()) => DebugResponse::ok(request.id, serde_json::json!({ "path": path })),
             Err(e) => DebugResponse::err(
                 request.id,
                 -32000,
@@ -775,7 +757,10 @@ mod tests {
 
         let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
         assert_eq!(resp.id, 1);
-        assert!(resp.error.is_some(), "should error when no snapshot available");
+        assert!(
+            resp.error.is_some(),
+            "should error when no snapshot available"
+        );
         assert_eq!(resp.error.unwrap().code, -32000);
     }
 
@@ -1017,7 +1002,8 @@ mod tests {
             .set_read_timeout(Some(std::time::Duration::from_secs(2)))
             .unwrap();
 
-        let request = r#"{"method":"screenshot","params":{"path":"/tmp/test-invalid.png"},"id":22}"#;
+        let request =
+            r#"{"method":"screenshot","params":{"path":"/tmp/test-invalid.png"},"id":22}"#;
         writeln!(stream, "{request}").unwrap();
 
         let mut reader = BufReader::new(stream);
@@ -1228,7 +1214,10 @@ mod tests {
 
         let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
         assert_eq!(resp.id, 1);
-        assert!(resp.error.is_some(), "should error when no input state available");
+        assert!(
+            resp.error.is_some(),
+            "should error when no input state available"
+        );
         assert_eq!(resp.error.unwrap().code, -32000);
     }
 
@@ -1242,7 +1231,9 @@ mod tests {
         use motif_core::Point;
         let mut input = InputState::new();
         input.cursor_position = Some(Point::new(150.0, 250.0));
-        input.mouse_buttons.insert(motif_core::input::MouseButton::Left);
+        input
+            .mouse_buttons
+            .insert(motif_core::input::MouseButton::Left);
         let snap = InputStateSnapshot::from_input_state(&input);
         server.update_input(snap);
 
@@ -1266,6 +1257,9 @@ mod tests {
         let result = resp.result.unwrap();
         assert_eq!(result["cursor_position"]["x"], 150.0);
         assert_eq!(result["cursor_position"]["y"], 250.0);
-        assert!(result["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
+        assert!(result["mouse_buttons"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("left")));
     }
 }

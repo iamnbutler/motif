@@ -19,12 +19,7 @@ use std::mem;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 /// Unit quad vertices for triangle strip: [0,0], [1,0], [0,1], [1,1]
-const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [
-    [0.0, 0.0],
-    [1.0, 0.0],
-    [0.0, 1.0],
-    [1.0, 1.0],
-];
+const UNIT_QUAD_VERTICES: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]];
 
 const INITIAL_INSTANCE_CAPACITY: usize = 1024;
 
@@ -291,9 +286,7 @@ pub fn window_id(window: &impl HasWindowHandle) -> Option<u32> {
     let RawWindowHandle::AppKit(handle) = handle.as_raw() else {
         return None;
     };
-    let ns_view: &NSView = unsafe {
-        (handle.ns_view.as_ptr() as *const NSView).as_ref()?
-    };
+    let ns_view: &NSView = unsafe { (handle.ns_view.as_ptr() as *const NSView).as_ref()? };
     let ns_window = ns_view.window()?;
     Some(unsafe { ns_window.windowNumber() } as u32)
 }
@@ -315,9 +308,8 @@ impl MetalSurface {
             panic!("Expected AppKit window handle on macOS");
         };
 
-        let ns_view: &NSView = unsafe {
-            (handle.ns_view.as_ptr() as *const NSView).as_ref().unwrap()
-        };
+        let ns_view: &NSView =
+            unsafe { (handle.ns_view.as_ptr() as *const NSView).as_ref().unwrap() };
 
         let layer = MetalLayer::new();
         layer.set_device(device);
@@ -347,7 +339,8 @@ impl MetalSurface {
     /// Update drawable size (call on window resize).
     pub fn resize(&mut self, width: f32, height: f32) {
         self.drawable_size = (width, height);
-        self.layer.set_drawable_size(CGSize::new(width as f64, height as f64));
+        self.layer
+            .set_drawable_size(CGSize::new(width as f64, height as f64));
     }
 
     pub fn drawable_size(&self) -> (f32, f32) {
@@ -639,7 +632,12 @@ impl MetalRenderer {
                 instances.push(GlyphInstance {
                     bounds: [x, y, region.width as f32, region.height as f32],
                     uv,
-                    color: [run.color.red, run.color.green, run.color.blue, run.color.alpha],
+                    color: [
+                        run.color.red,
+                        run.color.green,
+                        run.color.blue,
+                        run.color.alpha,
+                    ],
                 });
             }
         }

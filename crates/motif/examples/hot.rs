@@ -119,8 +119,9 @@ impl ApplicationHandler for App {
                             render(&mut self.scene, &mut self.text_ctx, scale, size);
                         });
                         // The move is important for hotpatching
-                        let mut hot_fn =
-                            cargo_hot::subsecond::HotFn::current(move || render_fn.take().unwrap()());
+                        let mut hot_fn = cargo_hot::subsecond::HotFn::current(move || {
+                            render_fn.take().unwrap()()
+                        });
                         hot_fn.call(());
                     }
 

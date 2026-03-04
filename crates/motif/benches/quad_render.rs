@@ -241,7 +241,7 @@ impl ApplicationHandler for App {
 
                             // Progress indicator
                             let samples = self.stats.frame_times.len();
-                            if samples % 20 == 0 {
+                            if samples.is_multiple_of(20) {
                                 print!("\rSampling: {}/{}", samples, SAMPLE_FRAMES);
                                 use std::io::Write;
                                 std::io::stdout().flush().ok();

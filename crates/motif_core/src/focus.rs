@@ -76,7 +76,9 @@ impl FocusHandle {
         let prev = state.focused;
         if prev != Some(self.inner.id) {
             state.focused = Some(self.inner.id);
-            state.pending_events.push(FocusEvent::Focus { id: self.inner.id });
+            state
+                .pending_events
+                .push(FocusEvent::Focus { id: self.inner.id });
             if let Some(prev_id) = prev {
                 state.pending_events.push(FocusEvent::Blur { id: prev_id });
             }

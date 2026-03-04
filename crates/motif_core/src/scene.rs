@@ -57,7 +57,12 @@ pub struct TextRun {
 }
 
 impl TextRun {
-    pub fn new(origin: DevicePoint, color: impl Into<Srgba>, font_size: f32, font: FontData) -> Self {
+    pub fn new(
+        origin: DevicePoint,
+        color: impl Into<Srgba>,
+        font_size: f32,
+        font: FontData,
+    ) -> Self {
         Self {
             origin,
             color: color.into(),

@@ -4,7 +4,7 @@
 //! - **Views** (`Render`): Stateful components that own data and persist across frames.
 //! - **Elements** (`RenderOnce`): Stateless components consumed on render.
 
-use crate::{ElementId, HitTree, Rect, Scene, ScaleFactor, TextContext};
+use crate::{ElementId, HitTree, Rect, ScaleFactor, Scene, TextContext};
 
 /// Views are stateful components that persist across frames.
 ///

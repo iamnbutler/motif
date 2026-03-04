@@ -4,7 +4,6 @@
 //! pixels — exactly what's on screen, including Metal rendering, text, etc.
 
 use std::io;
-use std::path::Path;
 
 /// Capture a window to a PNG file using macOS screen capture.
 ///
@@ -19,6 +18,7 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
     use core_graphics::display::*;
     use core_graphics::geometry::{CGPoint, CGRect, CGSize};
     use image::RgbaImage;
+    use std::path::Path;
 
     // Capture the specific window
     let cg_image = CGDisplay::screenshot(
@@ -30,7 +30,7 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
         window_id,
         kCGWindowImageBoundsIgnoreFraming,
     )
-    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to capture window"))?;
+    .ok_or_else(|| io::Error::other("Failed to capture window"))?;
 
     let width = cg_image.width() as u32;
     let height = cg_image.height() as u32;
@@ -54,10 +54,9 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
     }
 
     let img = RgbaImage::from_raw(width, height, rgba_data)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to create image buffer"))?;
+        .ok_or_else(|| io::Error::other("Failed to create image buffer"))?;
 
-    img.save(Path::new(path))
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    img.save(Path::new(path)).map_err(io::Error::other)?;
 
     Ok(())
 }
