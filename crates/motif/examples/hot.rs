@@ -4,6 +4,7 @@
 //!
 //! Try changing the background color or text while running!
 
+use motif::hot;
 use motif_core::{
     metal::{MetalRenderer, MetalSurface},
     DrawContext, Point, Rect, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext,
@@ -112,21 +113,7 @@ impl ApplicationHandler for App {
                     let phys = window.inner_size();
                     let size = (phys.width as f32 / scale.0, phys.height as f32 / scale.0);
 
-                    // Use cargo_hot for hot reloading
-                    #[cfg(feature = "hot")]
-                    {
-                        let mut render_fn = Some(|| {
-                            render(&mut self.scene, &mut self.text_ctx, scale, size);
-                        });
-                        // The move is important for hotpatching
-                        let mut hot_fn = cargo_hot::subsecond::HotFn::current(move || {
-                            render_fn.take().unwrap()()
-                        });
-                        hot_fn.call(());
-                    }
-
-                    #[cfg(not(feature = "hot"))]
-                    render(&mut self.scene, &mut self.text_ctx, scale, size);
+                    hot::call(render, &mut self.scene, &mut self.text_ctx, scale, size);
 
                     renderer.render(&self.scene, surface);
                 }
@@ -140,9 +127,7 @@ impl ApplicationHandler for App {
 }
 
 fn main() {
-    // Connect to cargo-hot server for hot reloading
-    #[cfg(feature = "hot")]
-    cargo_hot::connect();
+    hot::connect();
 
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll); // Poll for hot reload responsiveness
