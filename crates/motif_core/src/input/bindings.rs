@@ -109,18 +109,16 @@ impl InputBindings {
     pub fn action_for_key(&self, key: &Key, modifiers: &Modifiers) -> Option<InputAction> {
         let shift = modifiers.state().shift_key();
         let ctrl = modifiers.state().control_key();
-        let alt = modifiers.state().alt_key();
-        let cmd = modifiers.state().super_key();
 
-        // Platform-specific modifier for word operations
+        // Platform-specific modifier for word operations (Alt on macOS, Ctrl elsewhere)
         #[cfg(target_os = "macos")]
-        let word_mod = alt;
+        let word_mod = modifiers.state().alt_key();
         #[cfg(not(target_os = "macos"))]
         let word_mod = ctrl;
 
-        // Platform-specific modifier for command operations (select all, undo, etc.)
+        // Platform-specific modifier for command operations (Cmd on macOS, Ctrl elsewhere)
         #[cfg(target_os = "macos")]
-        let cmd_mod = cmd;
+        let cmd_mod = modifiers.state().super_key();
         #[cfg(not(target_os = "macos"))]
         let cmd_mod = ctrl;
 
