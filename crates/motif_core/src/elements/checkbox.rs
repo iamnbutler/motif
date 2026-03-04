@@ -10,8 +10,7 @@
 
 use crate::{
     element::{Element, IntoElement, PaintContext},
-    Corners, DevicePoint, DeviceRect, DeviceSize, Edges, ElementId, Point, Quad, Rect, Size,
-    Srgba,
+    Corners, DevicePoint, DeviceRect, DeviceSize, Edges, ElementId, Point, Quad, Rect, Size, Srgba,
 };
 
 /// Checkbox element with checked/unchecked visual state.
