@@ -50,7 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/benches.jsonl
+          git add -f docs/benches.jsonl
           if git diff --staged --quiet; then
             echo "No changes to benchmark results"
           else
