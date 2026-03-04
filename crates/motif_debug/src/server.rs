@@ -9,9 +9,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use crate::input_sim::{self, WindowPosition};
 use crate::protocol::{DebugRequest, DebugResponse};
 use crate::screenshot;
-use crate::snapshot::{ColorInfo, OverlayQuad, SceneSnapshot};
+use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
 
 /// Shared state for debug overlays injected via the debug CLI.
 ///
@@ -72,7 +73,9 @@ impl DebugOverlays {
 pub struct DebugServer {
     socket_path: PathBuf,
     snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+    input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
     window_id: Arc<Mutex<Option<u32>>>,
+    window_position: Arc<Mutex<WindowPosition>>,
     overlays: Arc<Mutex<DebugOverlays>>,
     _shutdown: Arc<Mutex<bool>>,
 }
@@ -100,12 +103,17 @@ impl DebugServer {
         listener.set_nonblocking(true)?;
 
         let snapshot: Arc<Mutex<Option<SceneSnapshot>>> = Arc::new(Mutex::new(None));
+        let input_state: Arc<Mutex<Option<InputStateSnapshot>>> = Arc::new(Mutex::new(None));
         let window_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let window_position: Arc<Mutex<WindowPosition>> =
+            Arc::new(Mutex::new(WindowPosition::default()));
         let overlays: Arc<Mutex<DebugOverlays>> = Arc::new(Mutex::new(DebugOverlays::default()));
         let shutdown = Arc::new(Mutex::new(false));
 
         let server_snapshot = Arc::clone(&snapshot);
+        let server_input_state = Arc::clone(&input_state);
         let server_window_id = Arc::clone(&window_id);
+        let server_window_position = Arc::clone(&window_position);
         let server_overlays = Arc::clone(&overlays);
         let server_shutdown = Arc::clone(&shutdown);
 
@@ -113,7 +121,9 @@ impl DebugServer {
             Self::accept_loop(
                 listener,
                 server_snapshot,
+                server_input_state,
                 server_window_id,
+                server_window_position,
                 server_overlays,
                 server_shutdown,
             );
@@ -124,7 +134,9 @@ impl DebugServer {
         Ok(Self {
             socket_path,
             snapshot,
+            input_state,
             window_id,
+            window_position,
             overlays,
             _shutdown: shutdown,
         })
@@ -137,11 +149,26 @@ impl DebugServer {
         }
     }
 
+    /// Update the shared input state snapshot. Called from the event loop.
+    pub fn update_input(&self, snapshot: InputStateSnapshot) {
+        if let Ok(mut guard) = self.input_state.lock() {
+            *guard = Some(snapshot);
+        }
+    }
+
     /// Set the window ID for native screenshot capture.
     /// Call this once after creating the window.
     pub fn set_window_id(&self, id: u32) {
         if let Ok(mut guard) = self.window_id.lock() {
             *guard = Some(id);
+        }
+    }
+
+    /// Set the window position for input coordinate translation.
+    /// Call this each frame or when the window moves.
+    pub fn set_window_position(&self, x: f32, y: f32, scale: f32) {
+        if let Ok(mut guard) = self.window_position.lock() {
+            *guard = WindowPosition { x, y, scale };
         }
     }
 
@@ -164,7 +191,9 @@ impl DebugServer {
     fn accept_loop(
         listener: UnixListener,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
+        window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
         shutdown: Arc<Mutex<bool>>,
     ) {
@@ -181,10 +210,12 @@ impl DebugServer {
                     let _ = stream.set_nonblocking(false);
 
                     let snap = Arc::clone(&snapshot);
+                    let inp = Arc::clone(&input_state);
                     let wid = Arc::clone(&window_id);
+                    let wpos = Arc::clone(&window_position);
                     let ovl = Arc::clone(&overlays);
                     thread::spawn(move || {
-                        Self::handle_connection(stream, snap, wid, ovl);
+                        Self::handle_connection(stream, snap, inp, wid, wpos, ovl);
                     });
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -202,7 +233,9 @@ impl DebugServer {
     fn handle_connection(
         stream: std::os::unix::net::UnixStream,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
+        window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
     ) {
         let reader = BufReader::new(match stream.try_clone() {
@@ -233,7 +266,14 @@ impl DebugServer {
                 }
             };
 
-            let response = Self::dispatch(&request, &snapshot, &window_id, &overlays);
+            let response = Self::dispatch(
+                &request,
+                &snapshot,
+                &input_state,
+                &window_id,
+                &window_position,
+                &overlays,
+            );
             let _ = writeln!(writer, "{}", serde_json::to_string(&response).unwrap());
         }
     }
@@ -241,7 +281,9 @@ impl DebugServer {
     fn dispatch(
         request: &DebugRequest,
         snapshot: &Arc<Mutex<Option<SceneSnapshot>>>,
+        input_state: &Arc<Mutex<Option<InputStateSnapshot>>>,
         window_id: &Arc<Mutex<Option<u32>>>,
+        window_position: &Arc<Mutex<WindowPosition>>,
         overlays: &Arc<Mutex<DebugOverlays>>,
     ) -> DebugResponse {
         match request.method.as_str() {
@@ -278,6 +320,23 @@ impl DebugServer {
                     ),
                 }
             }
+            "input.state" => {
+                let guard = input_state.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(snap) => DebugResponse::ok(request.id, snap.to_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No input state available yet",
+                    ),
+                }
+            }
+            "input.activate" => Self::handle_input_activate(request, window_position),
+            "input.move_to" => Self::handle_input_move(request, window_position),
+            "input.click" => Self::handle_input_click(request, window_position),
+            "input.mouse_down" => Self::handle_input_mouse_down(request, window_position),
+            "input.mouse_up" => Self::handle_input_mouse_up(request, window_position),
+            "input.drag" => Self::handle_input_drag(request, window_position),
             "screenshot" => Self::handle_screenshot(request, window_id),
             "debug.draw_quad" => Self::handle_draw_quad(request, overlays),
             "debug.clear" => Self::handle_clear(request, overlays),
@@ -453,6 +512,204 @@ impl DebugServer {
                 -32000,
                 format!("Failed to capture screenshot: {e}"),
             ),
+        }
+    }
+
+    // --- Input simulation handlers ---
+
+    fn handle_input_activate(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let result = input_sim::activate_window(pos.x, pos.y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({ "activated": true, "message": result.message }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_move(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.move_to requires params: { x, y }",
+                )
+            }
+        };
+
+        let x = params.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let y = params.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let (screen_x, screen_y) = pos.to_screen(x, y);
+
+        let result = input_sim::move_mouse_to(screen_x, screen_y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "moved_to": { "x": x, "y": y },
+                    "screen": { "x": screen_x, "y": screen_y }
+                }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_click(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.click requires params: { x, y }",
+                )
+            }
+        };
+
+        let x = params.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let y = params.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let (screen_x, screen_y) = pos.to_screen(x, y);
+
+        let result = input_sim::click_at(screen_x, screen_y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "clicked_at": { "x": x, "y": y },
+                    "screen": { "x": screen_x, "y": screen_y }
+                }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_mouse_down(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.mouse_down requires params: { x, y }",
+                )
+            }
+        };
+
+        let x = params.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let y = params.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let (screen_x, screen_y) = pos.to_screen(x, y);
+
+        let result = input_sim::mouse_down_at(screen_x, screen_y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "mouse_down_at": { "x": x, "y": y },
+                    "screen": { "x": screen_x, "y": screen_y }
+                }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_mouse_up(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.mouse_up requires params: { x, y }",
+                )
+            }
+        };
+
+        let x = params.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let y = params.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let (screen_x, screen_y) = pos.to_screen(x, y);
+
+        let result = input_sim::mouse_up_at(screen_x, screen_y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "mouse_up_at": { "x": x, "y": y },
+                    "screen": { "x": screen_x, "y": screen_y }
+                }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_drag(
+        request: &DebugRequest,
+        window_position: &Arc<Mutex<WindowPosition>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.drag requires params: { from_x, from_y, to_x, to_y }",
+                )
+            }
+        };
+
+        let from_x = params.get("from_x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let from_y = params.get("from_y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let to_x = params.get("to_x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let to_y = params.get("to_y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+        let pos = window_position.lock().unwrap_or_else(|e| e.into_inner());
+        let (screen_from_x, screen_from_y) = pos.to_screen(from_x, from_y);
+        let (screen_to_x, screen_to_y) = pos.to_screen(to_x, to_y);
+
+        let result = input_sim::drag(screen_from_x, screen_from_y, screen_to_x, screen_to_y);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "dragged": {
+                        "from": { "x": from_x, "y": from_y },
+                        "to": { "x": to_x, "y": to_y }
+                    }
+                }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
         }
     }
 }
@@ -948,5 +1205,67 @@ mod tests {
         assert_eq!(overlays[0].y, 10.0);
         assert_eq!(overlays[0].w, 50.0);
         assert_eq!(overlays[0].h, 25.0);
+    }
+
+    #[test]
+    fn server_responds_to_input_state_without_snapshot() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.state","params":null,"id":1}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 1);
+        assert!(resp.error.is_some(), "should error when no input state available");
+        assert_eq!(resp.error.unwrap().code, -32000);
+    }
+
+    #[test]
+    fn server_responds_to_input_state_with_snapshot() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        // Provide an input state snapshot.
+        use motif_core::input::InputState;
+        use motif_core::Point;
+        let mut input = InputState::new();
+        input.cursor_position = Some(Point::new(150.0, 250.0));
+        input.mouse_buttons.insert(motif_core::input::MouseButton::Left);
+        let snap = InputStateSnapshot::from_input_state(&input);
+        server.update_input(snap);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.state","params":null,"id":42}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 42);
+        assert!(resp.error.is_none());
+        let result = resp.result.unwrap();
+        assert_eq!(result["cursor_position"]["x"], 150.0);
+        assert_eq!(result["cursor_position"]["y"], 250.0);
+        assert!(result["mouse_buttons"].as_array().unwrap().contains(&serde_json::json!("left")));
     }
 }

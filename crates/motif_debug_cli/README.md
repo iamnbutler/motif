@@ -46,6 +46,12 @@ motif-debug --socket /tmp/motif-debug-12345.sock scene.stats
 | `scene.quads` | List all quads with bounds, color, border, corner radii |
 | `scene.text_runs` | List all text runs with origin, font size, glyph count |
 
+### Input inspection
+
+| Command | Description |
+|---------|-------------|
+| `input.state` | Current cursor position, pressed buttons, modifier keys |
+
 ### Screenshots
 
 ```

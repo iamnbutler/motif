@@ -81,6 +81,7 @@ fn print_usage() {
     eprintln!("  scene.stats              Show scene statistics");
     eprintln!("  scene.quads              List all quads in the scene");
     eprintln!("  scene.text_runs          List all text runs in the scene");
+    eprintln!("  input.state              Show current input state (cursor, buttons, modifiers)");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
@@ -88,6 +89,14 @@ fn print_usage() {
     eprintln!("  debug.remove <id>              Remove a specific debug overlay");
     eprintln!("  debug.clear                    Clear all debug overlays");
     eprintln!("  debug.list                     List all debug overlays");
+    eprintln!();
+    eprintln!("INPUT SIMULATION COMMANDS:");
+    eprintln!("  input.activate                 Bring the app window to front");
+    eprintln!("  input.move_to <x> <y>          Move mouse to window-local coordinates");
+    eprintln!("  input.click <x> <y>            Click at window-local coordinates");
+    eprintln!("  input.mouse_down <x> <y>       Press mouse button at coordinates");
+    eprintln!("  input.mouse_up <x> <y>         Release mouse button at coordinates");
+    eprintln!("  input.drag <x1> <y1> <x2> <y2> Drag from one point to another");
     eprintln!();
     eprintln!("If no command is given, starts an interactive REPL.");
 }
@@ -113,6 +122,16 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
         parse_draw_quad(args)
     } else if let Some(args) = trimmed.strip_prefix("debug.remove ") {
         parse_debug_remove(args)
+    } else if let Some(args) = trimmed.strip_prefix("input.move_to ") {
+        parse_input_xy("input.move_to", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.click ") {
+        parse_input_xy("input.click", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.mouse_down ") {
+        parse_input_xy("input.mouse_down", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.mouse_up ") {
+        parse_input_xy("input.mouse_up", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.drag ") {
+        parse_input_drag(args)
     } else {
         (trimmed, None)
     }
@@ -149,6 +168,46 @@ fn parse_debug_remove(args: &str) -> (&'static str, Option<serde_json::Value>) {
             ("debug.remove", None)
         }
     }
+}
+
+/// Parse `input.move_to x y` (and similar) into input simulation requests.
+fn parse_input_xy(method: &'static str, args: &str) -> (&'static str, Option<serde_json::Value>) {
+    let parts: Vec<f64> = args
+        .split_whitespace()
+        .filter_map(|s| s.parse::<f64>().ok())
+        .collect();
+
+    if parts.len() < 2 {
+        eprintln!("usage: {} <x> <y>", method);
+        return (method, None);
+    }
+
+    let params = serde_json::json!({
+        "x": parts[0],
+        "y": parts[1],
+    });
+    (method, Some(params))
+}
+
+/// Parse `input.drag x1 y1 x2 y2` into a drag request.
+fn parse_input_drag(args: &str) -> (&'static str, Option<serde_json::Value>) {
+    let parts: Vec<f64> = args
+        .split_whitespace()
+        .filter_map(|s| s.parse::<f64>().ok())
+        .collect();
+
+    if parts.len() < 4 {
+        eprintln!("usage: input.drag <from_x> <from_y> <to_x> <to_y>");
+        return ("input.drag", None);
+    }
+
+    let params = serde_json::json!({
+        "from_x": parts[0],
+        "from_y": parts[1],
+        "to_x": parts[2],
+        "to_y": parts[3],
+    });
+    ("input.drag", Some(params))
 }
 
 fn default_screenshot_path() -> String {
@@ -189,6 +248,62 @@ fn format_debug_remove(value: &serde_json::Value) -> String {
     } else {
         "Overlay not found.\n".to_string()
     }
+}
+
+fn format_input_activate(value: &serde_json::Value) -> String {
+    let pid = value.get("pid").and_then(|v| v.as_u64()).unwrap_or(0);
+    format!("Activated app (pid: {})\n", pid)
+}
+
+fn format_input_move(value: &serde_json::Value) -> String {
+    let local = value.get("moved_to").unwrap_or(&serde_json::Value::Null);
+    let screen = value.get("screen").unwrap_or(&serde_json::Value::Null);
+    let lx = local.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    format!("Moved to ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+}
+
+fn format_input_click(value: &serde_json::Value) -> String {
+    let local = value.get("clicked_at").unwrap_or(&serde_json::Value::Null);
+    let screen = value.get("screen").unwrap_or(&serde_json::Value::Null);
+    let lx = local.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    format!("Clicked at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+}
+
+fn format_input_mouse_down(value: &serde_json::Value) -> String {
+    let local = value.get("mouse_down_at").unwrap_or(&serde_json::Value::Null);
+    let screen = value.get("screen").unwrap_or(&serde_json::Value::Null);
+    let lx = local.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    format!("Mouse down at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+}
+
+fn format_input_mouse_up(value: &serde_json::Value) -> String {
+    let local = value.get("mouse_up_at").unwrap_or(&serde_json::Value::Null);
+    let screen = value.get("screen").unwrap_or(&serde_json::Value::Null);
+    let lx = local.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ly = local.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sx = screen.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let sy = screen.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    format!("Mouse up at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n", lx, ly, sx, sy)
+}
+
+fn format_input_drag(value: &serde_json::Value) -> String {
+    let dragged = value.get("dragged").unwrap_or(&serde_json::Value::Null);
+    let from = dragged.get("from").unwrap_or(&serde_json::Value::Null);
+    let to = dragged.get("to").unwrap_or(&serde_json::Value::Null);
+    let fx = from.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let fy = from.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let tx = to.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ty = to.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    format!("Dragged from ({:.1}, {:.1}) to ({:.1}, {:.1})\n", fx, fy, tx, ty)
 }
 
 fn format_debug_list(value: &serde_json::Value) -> String {
@@ -308,6 +423,80 @@ fn format_scene_quads(value: &serde_json::Value) -> String {
     out
 }
 
+fn format_input_state(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    out.push_str("Input State\n");
+    out.push_str("───────────────────────\n");
+
+    // Cursor position
+    if let Some(pos) = value.get("cursor_position") {
+        if pos.is_null() {
+            out.push_str("  Cursor:        (outside window)\n");
+        } else {
+            let x = pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let y = pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            out.push_str(&format!("  Cursor:        ({:.1}, {:.1})\n", x, y));
+        }
+    }
+
+    // Mouse buttons
+    if let Some(buttons) = value.get("mouse_buttons").and_then(|v| v.as_array()) {
+        if buttons.is_empty() {
+            out.push_str("  Buttons:       (none)\n");
+        } else {
+            let btn_str: Vec<&str> = buttons
+                .iter()
+                .filter_map(|b| b.as_str())
+                .collect();
+            out.push_str(&format!("  Buttons:       {}\n", btn_str.join(", ")));
+        }
+    }
+
+    // Modifiers
+    if let Some(mods) = value.get("modifiers") {
+        let mut active = Vec::new();
+        if mods.get("shift").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("shift");
+        }
+        if mods.get("control").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("control");
+        }
+        if mods.get("alt").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("alt");
+        }
+        if mods.get("super").and_then(|v| v.as_bool()).unwrap_or(false) {
+            active.push("super");
+        }
+        if active.is_empty() {
+            out.push_str("  Modifiers:     (none)\n");
+        } else {
+            out.push_str(&format!("  Modifiers:     {}\n", active.join(" + ")));
+        }
+    }
+
+    // Interaction state
+    out.push_str("───────────────────────\n");
+    out.push_str("Interaction State\n");
+
+    if let Some(hovered) = value.get("hovered_element") {
+        if hovered.is_null() {
+            out.push_str("  Hovered:       (none)\n");
+        } else if let Some(id) = hovered.as_u64() {
+            out.push_str(&format!("  Hovered:       ElementId({})\n", id));
+        }
+    }
+
+    if let Some(pressed) = value.get("pressed_element") {
+        if pressed.is_null() {
+            out.push_str("  Pressed:       (none)\n");
+        } else if let Some(id) = pressed.as_u64() {
+            out.push_str(&format!("  Pressed:       ElementId({})\n", id));
+        }
+    }
+
+    out
+}
+
 fn format_scene_text_runs(value: &serde_json::Value) -> String {
     let mut out = String::new();
     let arr = match value.as_array() {
@@ -375,11 +564,18 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.stats" => print!("{}", format_scene_stats(result)),
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
+        "input.state" => print!("{}", format_input_state(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),
         "debug.remove" => print!("{}", format_debug_remove(result)),
         "debug.list" => print!("{}", format_debug_list(result)),
+        "input.activate" => print!("{}", format_input_activate(result)),
+        "input.move_to" => print!("{}", format_input_move(result)),
+        "input.click" => print!("{}", format_input_click(result)),
+        "input.mouse_down" => print!("{}", format_input_mouse_down(result)),
+        "input.mouse_up" => print!("{}", format_input_mouse_up(result)),
+        "input.drag" => print!("{}", format_input_drag(result)),
         _ => {
             let pretty = serde_json::to_string_pretty(result).unwrap_or_default();
             println!("{pretty}");

@@ -1,0 +1,13 @@
+[package]
+name = "motif_test"
+version = "0.0.1"
+edition = "2021"
+description = "Integration test harness for motif"
+
+[dependencies]
+motif_core = { version = "0.0.1", path = "../motif_core" }
+motif_debug = { version = "0.0.1", path = "../motif_debug" }
+palette = "0.7"
+winit = "0.30"
+
+[dev-dependencies]

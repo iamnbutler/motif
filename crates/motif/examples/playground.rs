@@ -8,11 +8,12 @@
 use motif_core::{
     div,
     element::{self, Element, PaintContext},
+    input::{InputState, MouseButton, ScrollDelta},
     metal::{MetalRenderer, MetalSurface},
-    text, ArcStr, DrawContext, IntoElement, ParentElement, Point, Rect, Render,
+    text, ArcStr, DrawContext, ElementId, HitTree, IntoElement, ParentElement, Point, Rect, Render,
     RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
 };
-use motif_debug::{DebugServer, SceneSnapshot};
+use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -244,8 +245,12 @@ struct App {
     surface: Option<MetalSurface>,
     scene: Scene,
     text_ctx: TextContext,
+    hit_tree: HitTree,
     element_demo: ElementDemo,
     debug_server: Option<DebugServer>,
+    input_state: InputState,
+    /// Click counter for demo
+    click_count: u32,
 }
 
 impl Default for App {
@@ -257,8 +262,11 @@ impl Default for App {
             surface: None,
             scene: Scene::new(),
             text_ctx: TextContext::new(),
+            hit_tree: HitTree::new(),
             element_demo: ElementDemo { frame: 0 },
             debug_server,
+            input_state: InputState::new(),
+            click_count: 0,
         }
     }
 }
@@ -303,20 +311,29 @@ impl ApplicationHandler for App {
                     (&mut self.renderer, &mut self.surface, &self.window)
                 {
                     self.scene.clear();
+                    self.hit_tree.clear();
 
                     let scale = ScaleFactor(window.scale_factor() as f32);
-                    let mut cx = DrawContext::new(&mut self.scene, scale);
 
                     // --- Section: Typography ---
-                    paint_section_label(&mut cx, &mut self.text_ctx, "TYPOGRAPHY", 30.0, 20.0);
-                    paint_typography_section(&mut cx, &mut self.text_ctx, 30.0, 30.0);
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "TYPOGRAPHY", 30.0, 20.0);
+                        paint_typography_section(&mut cx, &mut self.text_ctx, 30.0, 30.0);
+                    }
 
                     // --- Section: Quad Rendering ---
-                    paint_section_label(&mut cx, &mut self.text_ctx, "QUADS", 30.0, 530.0);
-                    paint_quad_section(&mut cx, 30.0, 545.0);
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "QUADS", 30.0, 530.0);
+                        paint_quad_section(&mut cx, 30.0, 545.0);
+                    }
 
                     // --- Section: Element System ---
-                    paint_section_label(&mut cx, &mut self.text_ctx, "ELEMENTS", 500.0, 20.0);
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "ELEMENTS", 500.0, 20.0);
+                    }
 
                     // Render stateful view
                     {
@@ -325,21 +342,23 @@ impl ApplicationHandler for App {
                             &mut self.text_ctx,
                             scale,
                         );
-                        element::render_view(&mut self.element_demo, &mut wcx);
+                        element::render_view(&mut self.element_demo, &mut wcx, &mut self.hit_tree);
                     }
 
                     // Render stateless cards
                     {
+                        let quad_count = self.scene.quad_count();
+                        let text_count = self.scene.text_run_count();
                         let cards = vec![
                             StatusCard {
                                 label: "Quads".into(),
-                                value: ArcStr::from(format!("{}", self.scene.quad_count())),
+                                value: ArcStr::from(format!("{}", quad_count)),
                                 position: Point::new(500.0, 120.0),
                                 color: Srgba::new(0.4, 0.9, 0.6, 1.0),
                             },
                             StatusCard {
                                 label: "Text runs".into(),
-                                value: ArcStr::from(format!("{}", self.scene.text_run_count())),
+                                value: ArcStr::from(format!("{}", text_count)),
                                 position: Point::new(646.0, 120.0),
                                 color: Srgba::new(0.6, 0.7, 1.0, 1.0),
                             },
@@ -355,10 +374,46 @@ impl ApplicationHandler for App {
                             let mut pcx = PaintContext::new(
                                 &mut self.scene,
                                 &mut self.text_ctx,
+                                &mut self.hit_tree,
                                 scale,
                             );
                             el.paint(&mut pcx);
                         }
+                    }
+
+                    // --- Section: Interactive Button ---
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        paint_section_label(&mut cx, &mut self.text_ctx, "INTERACTIONS", 500.0, 200.0);
+
+                        // Paint an interactive button
+                        let button_id = ElementId(1000); // Fixed ID for the demo button
+                        let button_bounds = Rect::new(Point::new(500.0, 220.0), Size::new(180.0, 50.0));
+
+                        // Determine button visual state
+                        let is_hovered = self.input_state.hovered() == Some(button_id);
+                        let is_pressed = self.input_state.pressed() == Some(button_id);
+
+                        let button_color = if is_pressed {
+                            Srgba::new(0.2, 0.5, 0.9, 1.0) // Pressed: darker blue
+                        } else if is_hovered {
+                            Srgba::new(0.4, 0.7, 1.0, 1.0) // Hover: lighter blue
+                        } else {
+                            Srgba::new(0.3, 0.6, 0.95, 1.0) // Normal: blue
+                        };
+
+                        cx.paint_quad(button_bounds, button_color);
+                        self.hit_tree.push(button_id, button_bounds);
+
+                        // Button label
+                        let label = format!("Clicks: {}", self.click_count);
+                        cx.paint_text(
+                            &label,
+                            Point::new(button_bounds.origin.x + 20.0, button_bounds.origin.y + 16.0),
+                            18.0,
+                            Srgba::new(1.0, 1.0, 1.0, 1.0),
+                            &mut self.text_ctx,
+                        );
                     }
 
                     // --- Debug overlays ---
@@ -410,13 +465,92 @@ impl ApplicationHandler for App {
                             scale.0,
                         );
                         debug_server.update_scene(snapshot);
+
+                        // Update window position for input simulation
+                        // Use inner_position (content area) not outer_position (includes title bar)
+                        // Convert from physical pixels to logical for CGEvent
+                        if let Ok(inner_pos) = window.inner_position() {
+                            debug_server.set_window_position(
+                                inner_pos.x as f32 / scale.0,
+                                inner_pos.y as f32 / scale.0,
+                                scale.0,
+                            );
+                        }
                     }
                 }
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
             }
+            // --- Input events ---
+            WindowEvent::CursorMoved { position, .. } => {
+                let scale = self.window.as_ref()
+                    .map(|w| w.scale_factor() as f32)
+                    .unwrap_or(1.0);
+                self.input_state.handle_cursor_moved(position.x, position.y, scale);
+
+                // Update hover state from hit tree
+                if let Some(pos) = self.input_state.cursor_position {
+                    let hovered = self.hit_tree.hit_test(pos);
+                    self.input_state.set_hovered(hovered);
+                }
+
+                // Request redraw for hover feedback
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::CursorEntered { .. } => {
+                self.input_state.handle_cursor_entered();
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.input_state.handle_cursor_left();
+                self.input_state.set_hovered(None);
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let btn = MouseButton::from_winit(button);
+                if state == winit::event::ElementState::Pressed {
+                    // Raw input tracking
+                    self.input_state.handle_mouse_button(btn, true);
+                    // Interaction tracking: record press target
+                    self.input_state.begin_press();
+                } else {
+                    // Interaction tracking: check for click
+                    if let Some(_clicked_element) = self.input_state.end_press() {
+                        self.click_count += 1;
+                    }
+                    // Raw input tracking
+                    self.input_state.handle_mouse_button(btn, false);
+                }
+
+                // Request redraw for press feedback
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scale = self.window.as_ref()
+                    .map(|w| w.scale_factor() as f32)
+                    .unwrap_or(1.0);
+                self.input_state.handle_scroll(ScrollDelta::from_winit(delta, scale));
+            }
+            WindowEvent::ModifiersChanged(mods) => {
+                self.input_state.handle_modifiers_changed(mods.state());
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.input_state.handle_key(
+                    event.logical_key,
+                    event.physical_key,
+                    event.state,
+                );
+            }
             _ => {}
+        }
+
+        // Update debug server with current input state after any event.
+        if let Some(ref debug_server) = self.debug_server {
+            let snapshot = InputStateSnapshot::from_input_state(&self.input_state);
+            debug_server.update_input(snapshot);
         }
     }
 }
