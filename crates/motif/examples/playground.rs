@@ -773,125 +773,26 @@ impl ApplicationHandler for App {
 
                 // Handle text input when focused
                 if self.text_input_focused && event.state == winit::event::ElementState::Pressed {
-                    use winit::keyboard::{Key, NamedKey};
-                    let mods = self.input_state.modifiers;
-                    let shift = mods.shift_key();
-                    let word_mod = if cfg!(target_os = "macos") {
-                        mods.alt_key()
-                    } else {
-                        mods.control_key()
-                    };
+                    use motif_core::input::HandleKeyResult;
 
-                    // Check for command shortcuts first (Cmd on macOS, Ctrl elsewhere)
-                    let cmd = if cfg!(target_os = "macos") {
-                        mods.super_key()
-                    } else {
-                        mods.control_key()
-                    };
-
-                    // Handle command shortcuts before character input
-                    let handled = if cmd {
-                        if let Key::Character(c) = &event.logical_key {
-                            match c.to_ascii_lowercase().as_str() {
-                                "a" => {
-                                    self.text_edit_state.select_all();
-                                    true
-                                }
-                                "z" => {
-                                    if shift {
-                                        self.text_edit_state.redo();
-                                    } else {
-                                        self.text_edit_state.undo();
-                                    }
-                                    true
-                                }
-                                "x" => {
-                                    self.text_edit_state.cut_selected_text();
-                                    true
-                                }
-                                "c" => {
-                                    // Copy - selected_text() returns the text but we'd need clipboard
-                                    // For now just a no-op since we don't have system clipboard yet
-                                    true
-                                }
-                                "v" => {
-                                    // Paste - would need system clipboard
-                                    // For now just a no-op
-                                    true
-                                }
-                                _ => false,
-                            }
-                        } else {
-                            false
+                    let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);
+                    match self.text_edit_state.handle_key_event(&event.logical_key, &modifiers) {
+                        HandleKeyResult::Handled => {}
+                        HandleKeyResult::NotHandled => {}
+                        HandleKeyResult::Blur => {
+                            self.text_input_focused = false;
                         }
-                    } else {
-                        false
-                    };
-
-                    if !handled {
-                        match &event.logical_key {
-                            Key::Character(c) => {
-                                self.text_edit_state.insert_text(c.as_str());
-                            }
-                            Key::Named(NamedKey::Space) => {
-                                self.text_edit_state.insert_text(" ");
-                            }
-                            Key::Named(NamedKey::Backspace) => {
-                            if word_mod {
-                                self.text_edit_state.delete_word_left();
-                            } else {
-                                self.text_edit_state.delete_backward();
-                            }
+                        HandleKeyResult::Copy(_text) => {
+                            // TODO: Copy to system clipboard
                         }
-                        Key::Named(NamedKey::Delete) => {
-                            if word_mod {
-                                self.text_edit_state.delete_word_right();
-                            } else {
-                                self.text_edit_state.delete_forward();
-                            }
+                        HandleKeyResult::Cut(_text) => {
+                            // TODO: Copy to system clipboard (text already removed)
                         }
-                        Key::Named(NamedKey::ArrowLeft) => {
-                            if shift && word_mod {
-                                self.text_edit_state.select_word_left();
-                            } else if shift {
-                                self.text_edit_state.select_left();
-                            } else if word_mod {
-                                self.text_edit_state.word_left();
-                            } else {
-                                self.text_edit_state.left();
-                            }
-                        }
-                        Key::Named(NamedKey::ArrowRight) => {
-                            if shift && word_mod {
-                                self.text_edit_state.select_word_right();
-                            } else if shift {
-                                self.text_edit_state.select_right();
-                            } else if word_mod {
-                                self.text_edit_state.word_right();
-                            } else {
-                                self.text_edit_state.right();
-                            }
-                        }
-                        Key::Named(NamedKey::Home) => {
-                            if shift {
-                                self.text_edit_state.select_to_beginning();
-                            } else {
-                                self.text_edit_state.home();
-                            }
-                        }
-                        Key::Named(NamedKey::End) => {
-                            if shift {
-                                self.text_edit_state.select_to_end();
-                            } else {
-                                self.text_edit_state.end();
-                            }
-                        }
-                            Key::Named(NamedKey::Escape) => {
-                                self.text_input_focused = false;
-                            }
-                            _ => {}
+                        HandleKeyResult::Paste => {
+                            // TODO: Read from system clipboard and call paste()
                         }
                     }
+
                     if let Some(window) = &self.window {
                         window.request_redraw();
                     }
