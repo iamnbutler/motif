@@ -7,16 +7,6 @@ _Auto-generated from spool. Do not edit manually._
 - [ ] Design hot-reloadable render function boundary (p1)
 - [ ] Optimize hot reload dev profile for faster iteration (p3)
 
-## todomvc
-
-- [ ] TodoMVC: Display list of todos (p1)
-- [ ] TodoMVC: Add new todo via text input (p1)
-- [ ] TodoMVC: Toggle todo complete (p1)
-- [ ] TodoMVC: Delete todo (p2)
-- [ ] TodoMVC: Filter todos (all/active/completed) (p2)
-- [ ] TodoMVC: Items remaining count (p3)
-- [ ] TodoMVC: Clear completed button (p3)
-
 ## devtools
 
 - [ ] Query element tree (p1)
@@ -28,12 +18,50 @@ _Auto-generated from spool. Do not edit manually._
 ## input
 
 - [ ] Focus management (p2)
+- [ ] Action dispatch system for keyboard shortcuts (p2)
 - [ ] Cursor management (p3)
 
-## elements
+## todomvc
 
-- [ ] Text input element (p2)
-- [ ] Checkbox element (p3)
+- [ ] Double-click detection in InputState (p1)
+- [ ] Per-item inline text editing (multiple TextEditState) (p1)
+- [ ] TodoMVC: Filter todos (all/active/completed) (p2)
+- [ ] TodoMVC: Toggle-all checkbox (mark all complete/incomplete) (p2)
+- [ ] Escape key handling in HandleKeyResult (cancel edit) (p2)
+- [ ] Blur event callbacks for text inputs (save on blur) (p2)
+- [ ] TodoMVC: Clear completed button (p3)
+
+## accessibility
+
+- [ ] Complete AccessKit integration (p2)
+
+## text-input-rewrite
+
+- [ ] Implement on_mouse_down with click counting (p2)
+- [ ] Implement double-click word selection (p2)
+- [ ] Implement drag-to-select (p2)
+- [ ] Implement horizontal scrolling for single-line input (p2)
+- [ ] Implement UTF-8/UTF-16 offset conversion (p2)
+- [ ] Implement InputHandler trait (p2)
+- [ ] Implement focus handling (p2)
+- [ ] Implement event emission (p2)
+- [ ] Write comprehensive tests for InputState (p2)
+- [ ] Implement triple-click line selection (p3)
+- [ ] Implement cursor blinking (p3)
+- [ ] Implement marked text (IME composition) visual (p3)
+- [ ] Implement vertical cursor movement (up/down) (p3)
+- [ ] Implement vertical scrolling for multiline (p3)
+- [ ] Implement line layout system for multiline (p3)
+
+## theming
+
+- [ ] Design Theme trait (p2)
+- [ ] Move hardcoded colors to theme (p3)
+
+## cross-platform
+
+- [ ] Research wgpu as rendering backend (p2)
+- [ ] Abstract renderer trait (p2)
 
 ## metal-renderer
 
@@ -43,21 +71,12 @@ _Auto-generated from spool. Do not edit manually._
 
 - [ ] Text metrics debug example (p3)
 
-## text-input-rewrite
+## elements
 
-- [ ] Implement on_mouse_down with click counting (p3)
-- [ ] Implement double-click word selection (p3)
-- [ ] Implement triple-click line selection (p3)
-- [ ] Implement drag-to-select (p3)
-- [ ] Implement cursor blinking (p3)
-- [ ] Implement horizontal scrolling for single-line input (p3)
-- [ ] Implement UTF-8/UTF-16 offset conversion (p3)
-- [ ] Implement InputHandler trait (p3)
-- [ ] Implement marked text (IME composition) visual (p3)
-- [ ] Implement focus handling (p3)
-- [ ] Implement event emission (p3)
-- [ ] Implement vertical cursor movement (up/down) (p3)
-- [ ] Implement vertical scrolling for multiline (p3)
-- [ ] Implement line layout system for multiline (p3)
-- [ ] Write comprehensive tests for InputState (p3)
+- [ ] Checkbox element (p3)
+- [ ] Implement view memoization (p3)
+
+## animation
+
+- [ ] Design animation primitives (p3)
 
