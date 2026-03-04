@@ -149,6 +149,31 @@ impl TextLayout {
         None
     }
 
+    /// Find the byte offset in the source text closest to the given x position.
+    ///
+    /// Returns the byte offset where a cursor should be placed if clicking at `x`.
+    /// For single-line text, pass y=0. The function determines which cluster the
+    /// point is closest to and whether the cursor should be before or after it.
+    pub fn index_for_x(&self, x: f32, source_text: &str) -> usize {
+        use parley::layout::{Cluster, ClusterSide};
+
+        // Use parley's built-in cluster lookup (y=0 for single-line)
+        if let Some((cluster, side)) = Cluster::from_point(&self.layout, x, 0.0) {
+            let text_range = cluster.text_range();
+            match side {
+                ClusterSide::Left => text_range.start,
+                ClusterSide::Right => text_range.end,
+            }
+        } else {
+            // Click was outside all clusters
+            if x <= 0.0 {
+                0
+            } else {
+                source_text.len()
+            }
+        }
+    }
+
     /// Iterate over glyph runs for rendering.
     pub fn glyph_runs(&self) -> impl Iterator<Item = GlyphRun> + '_ {
         self.layout.lines().flat_map(|line| {

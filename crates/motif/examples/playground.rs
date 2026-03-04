@@ -725,7 +725,44 @@ impl ApplicationHandler for App {
                             self.checkbox_states[index] = !self.checkbox_states[index];
                         }
                         // Check if clicked on text input (ID 3100)
-                        self.text_input_focused = id == 3100;
+                        if id == 3100 {
+                            self.text_input_focused = true;
+
+                            // Click-to-cursor: convert click position to byte offset
+                            if let Some(click_pos) = self.input_state.cursor_position {
+                                // Text input bounds (must match rendering)
+                                let input_bounds = Rect::new(
+                                    Point::new(500.0, 620.0),
+                                    Size::new(280.0, 36.0),
+                                );
+                                let padding = 8.0;
+                                let font_size = 14.0;
+
+                                // Calculate x position relative to text start
+                                let text_x = click_pos.x - input_bounds.origin.x - padding;
+
+                                // Get scale factor
+                                let scale = self
+                                    .window
+                                    .as_ref()
+                                    .map(|w| w.scale_factor() as f32)
+                                    .unwrap_or(1.0);
+
+                                // Layout the text to get index for position
+                                let layout = self
+                                    .text_ctx
+                                    .layout_text(self.text_edit_state.content(), font_size * scale);
+
+                                // Convert x to scaled coordinates and find index
+                                let index = layout
+                                    .index_for_x(text_x * scale, self.text_edit_state.content());
+
+                                // Move cursor to clicked position
+                                self.text_edit_state.move_to(index);
+                            }
+                        } else {
+                            self.text_input_focused = false;
+                        }
                     } else {
                         // Clicked outside any element - blur focus
                         self.focus_state.blur();
