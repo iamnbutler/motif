@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T05:30:00Z",
-  "last_run_id": "22655275783",
+  "last_run": "2026-03-04T06:00:00Z",
+  "last_run_id": "22656017116",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -30,6 +30,13 @@
       "pr_number": 13,
       "status": "merged",
       "description": "Added doc = false to [[bin]] in motif_debug_cli/Cargo.toml. Issue #11 closed by maintainer (completed)."
+    },
+    "12": {
+      "date": "2026-03-04",
+      "branch": "repo-assist/fix-issue-12-release-workflow",
+      "pr_number": 23,
+      "status": "open_draft",
+      "description": "Added .github/workflows/release.yml (validate→draft-release→publish pipeline) and extended scripts/release.sh with bump <version> subcommand. Implements #12 release automation."
     }
   },
   "improvement_prs": {
@@ -88,6 +95,14 @@
       "pr_number": 22,
       "status": "open_draft",
       "description": "Added motif::hot module with RenderFn type alias, hot::call(), and hot::connect(). Documents stable boundary contract (what is safe to change between hot patches). Updates hot.rs example to use new API. Resolves p1 spool task 'Design hot-reloadable render function boundary'."
+    },
+    "release_workflow": {
+      "date": "2026-03-04",
+      "run_id": "22656017116",
+      "branch": "repo-assist/fix-issue-12-release-workflow",
+      "pr_number": 23,
+      "status": "open_draft",
+      "description": "Added .github/workflows/release.yml with three jobs: validate (fmt/clippy/test/dry-run publish on macOS), draft-release (auto changelog + GitHub draft release), publish (crates.io on release published event). Extended scripts/release.sh with 'bump <version>' subcommand. Closes #12."
     }
   },
   "labels_applied": {
@@ -106,7 +121,8 @@
     "text_input_element",
     "todomvc_example",
     "element_list_debug",
-    "hot_render_boundary"
+    "hot_render_boundary",
+    "release_workflow"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
@@ -121,8 +137,8 @@
     "2026-03-04": {
       "pr16": "pending (0 checks - macOS CI not yet scheduled)",
       "pr20": "pending (0 checks - macOS CI not yet scheduled)",
-      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#22 all created 2026-03-04."
+      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#23 all created 2026-03-04."
     }
   },
-  "notes": "Run 10 (22655275783): Task 10 — implemented motif::hot module (PR #22). Formalizes the hot reload boundary with RenderFn type alias, hot::call(), hot::connect(). Resolves p1 spool task 'Design hot-reloadable render function boundary'. cargo fmt passes; clippy/test/doc require macOS or libfontconfig and will run in CI. Task 11 — updated Monthly Activity Summary. PRs #16-#22 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) All p1 spool tasks now addressed — p2 items: focus management, inject debug text, simulate keyboard events, screenshot diffing."
+  "notes": "Run 11 (22656017116): Task 2 — implemented release workflow (PR #23). Adds .github/workflows/release.yml (validate→draft-release→publish pipeline) and extends scripts/release.sh with bump <version> subcommand. Closes #12. Also commented on #12 with implementation summary. Task 11 — updated Monthly Activity Summary. PRs #16-#23 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) All p1 spool tasks now addressed; all open issues now have PRs — p2 items: focus management, inject debug text, simulate keyboard events, screenshot diffing. (e) Release notes via Anthropic API is a natural next step once PR #23 pipeline is in use."
 }
