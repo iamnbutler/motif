@@ -574,7 +574,7 @@ impl ApplicationHandler for App {
                         let input_id = ElementId(3100);
                         let is_hovered = self.input_state.hovered() == Some(input_id);
 
-                        let mut input = text_input(self.text_input_value.clone(), input_id)
+                        let mut input = text_input(&self.text_input_value, input_id)
                             .placeholder("Type something...")
                             .bounds(Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0)))
                             .focused(self.text_input_focused)

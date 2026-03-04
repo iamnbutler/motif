@@ -274,8 +274,10 @@ impl IntoElement for TextInput {
 }
 
 /// Create a text input with an initial value and ID.
-pub fn text_input(value: impl Into<ArcStr>, id: ElementId) -> TextInput {
-    TextInput::new(value, id)
+///
+/// Takes `&str` directly since input values are typically dynamic content.
+pub fn text_input(value: &str, id: ElementId) -> TextInput {
+    TextInput::new(ArcStr::new(value), id)
 }
 
 #[cfg(test)]
