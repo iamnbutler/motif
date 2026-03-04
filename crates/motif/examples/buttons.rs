@@ -1,4 +1,7 @@
-//! Grid of clickable buttons for testing input simulation.
+//! Interactive button demo.
+//!
+//! Click button 1 to reveal button 2, and so on across the grid.
+//! Demonstrates Button element, hit testing, and input simulation.
 //!
 //! Run with: cargo run --example buttons
 
@@ -33,8 +36,8 @@ struct App {
     hit_tree: HitTree,
     debug_server: Option<DebugServer>,
     input_state: InputState,
-    /// Click count for each button
-    clicks: [[u32; COLS]; ROWS],
+    /// How many buttons are revealed (1-16)
+    revealed: usize,
 }
 
 impl Default for App {
@@ -48,16 +51,18 @@ impl Default for App {
             hit_tree: HitTree::new(),
             debug_server: DebugServer::new().ok(),
             input_state: InputState::new(),
-            clicks: [[0; COLS]; ROWS],
+            revealed: 1, // Start with just button 1 visible
         }
     }
 }
 
-fn button_id(row: usize, col: usize) -> ElementId {
-    ElementId((row * COLS + col) as u64)
+fn button_id(index: usize) -> ElementId {
+    ElementId(index as u64)
 }
 
-fn button_bounds(row: usize, col: usize) -> Rect {
+fn button_bounds(index: usize) -> Rect {
+    let row = index / COLS;
+    let col = index % COLS;
     Rect::new(
         Point::new(
             MARGIN + col as f32 * (BUTTON_SIZE + GAP),
@@ -74,7 +79,7 @@ impl ApplicationHandler for App {
             let height = MARGIN * 2.0 + ROWS as f32 * BUTTON_SIZE + (ROWS - 1) as f32 * GAP;
 
             let attrs = Window::default_attributes()
-                .with_title("Motif — Button Grid")
+                .with_title("Motif — Button Demo")
                 .with_inner_size(winit::dpi::LogicalSize::new(width, height))
                 .with_resizable(false);
             let window = event_loop.create_window(attrs).unwrap();
@@ -106,62 +111,74 @@ impl ApplicationHandler for App {
                     self.hit_tree.clear();
 
                     let scale = ScaleFactor(window.scale_factor() as f32);
-                    let mut cx = DrawContext::new(&mut self.scene, scale);
 
                     // Background
-                    let phys = window.inner_size();
-                    cx.paint_quad(
-                        Rect::new(
-                            Point::new(0.0, 0.0),
-                            Size::new(phys.width as f32 / scale.0, phys.height as f32 / scale.0),
-                        ),
-                        Srgba::new(0.08, 0.08, 0.1, 1.0),
-                    );
+                    {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        let phys = window.inner_size();
+                        cx.paint_quad(
+                            Rect::new(
+                                Point::new(0.0, 0.0),
+                                Size::new(phys.width as f32 / scale.0, phys.height as f32 / scale.0),
+                            ),
+                            Srgba::new(0.06, 0.06, 0.08, 1.0),
+                        );
+                    }
 
-                    // Paint button grid
-                    for row in 0..ROWS {
-                        for col in 0..COLS {
-                            let id = button_id(row, col);
-                            let bounds = button_bounds(row, col);
-                            let clicks = self.clicks[row][col];
+                    // Paint revealed buttons
+                    for i in 0..self.revealed.min(ROWS * COLS) {
+                        let id = button_id(i);
+                        let bounds = button_bounds(i);
 
-                            let is_hovered = self.input_state.hovered() == Some(id);
-                            let is_pressed = self.input_state.pressed() == Some(id);
+                        let is_hovered = self.input_state.hovered() == Some(id);
+                        let is_pressed = self.input_state.pressed() == Some(id);
 
-                            let color = if is_pressed {
-                                Srgba::new(0.2, 0.4, 0.7, 1.0)
-                            } else if is_hovered {
-                                Srgba::new(0.3, 0.5, 0.8, 1.0)
-                            } else {
-                                Srgba::new(0.15, 0.2, 0.3, 1.0)
-                            };
+                        // Color based on whether this is the "active" button (last revealed)
+                        let is_active = i == self.revealed - 1 && self.revealed < ROWS * COLS;
 
-                            cx.paint_quad(bounds, color);
-                            self.hit_tree.push(id, bounds);
+                        let label = format!("{}", i + 1);
 
-                            // Button label
-                            let label = format!("{}", clicks);
-                            cx.paint_text(
-                                &label,
-                                Point::new(
-                                    bounds.origin.x + BUTTON_SIZE / 2.0 - 10.0,
-                                    bounds.origin.y + BUTTON_SIZE / 2.0 - 12.0,
-                                ),
-                                32.0,
-                                Srgba::new(1.0, 1.0, 1.0, 1.0),
-                                &mut self.text_ctx,
-                            );
+                        let mut btn = button(label, id)
+                            .bounds(bounds)
+                            .font_size(32.0)
+                            .corner_radius(12.0)
+                            .hovered(is_hovered)
+                            .pressed(is_pressed);
 
-                            // Row,col label
-                            let pos_label = format!("{},{}", row, col);
-                            cx.paint_text(
-                                &pos_label,
-                                Point::new(bounds.origin.x + 8.0, bounds.origin.y + 20.0),
-                                12.0,
-                                Srgba::new(0.5, 0.5, 0.6, 1.0),
-                                &mut self.text_ctx,
-                            );
+                        // Active button is highlighted
+                        if is_active {
+                            btn = btn
+                                .background(Srgba::new(0.2, 0.6, 0.3, 1.0))
+                                .hover_background(Srgba::new(0.3, 0.7, 0.4, 1.0))
+                                .press_background(Srgba::new(0.15, 0.5, 0.25, 1.0));
+                        } else {
+                            // Completed buttons are dimmer
+                            btn = btn
+                                .background(Srgba::new(0.15, 0.15, 0.2, 1.0))
+                                .hover_background(Srgba::new(0.2, 0.2, 0.25, 1.0))
+                                .press_background(Srgba::new(0.1, 0.1, 0.15, 1.0))
+                                .text_color(Srgba::new(0.5, 0.5, 0.55, 1.0));
                         }
+
+                        let mut pcx = PaintContext::new(
+                            &mut self.scene,
+                            &mut self.text_ctx,
+                            &mut self.hit_tree,
+                            scale,
+                        );
+                        btn.paint(&mut pcx);
+                    }
+
+                    // Show completion message
+                    if self.revealed > ROWS * COLS {
+                        let mut cx = DrawContext::new(&mut self.scene, scale);
+                        cx.paint_text(
+                            "All buttons revealed!",
+                            Point::new(MARGIN, MARGIN + (ROWS as f32) * (BUTTON_SIZE + GAP) + 20.0),
+                            24.0,
+                            Srgba::new(0.3, 0.8, 0.4, 1.0),
+                            &mut self.text_ctx,
+                        );
                     }
 
                     renderer.render(&self.scene, surface);
@@ -170,12 +187,10 @@ impl ApplicationHandler for App {
                     if let Some(ref debug_server) = self.debug_server {
                         let phys = window.inner_size();
                         let viewport = (phys.width as f32, phys.height as f32);
-                        let snapshot =
-                            SceneSnapshot::from_scene(&self.scene, viewport, scale.0);
+                        let snapshot = SceneSnapshot::from_scene(&self.scene, viewport, scale.0);
                         debug_server.update_scene(snapshot);
 
                         if let Ok(inner_pos) = window.inner_position() {
-                            // inner_position is physical pixels, convert to logical for CGEvent
                             debug_server.set_window_position(
                                 inner_pos.x as f32 / scale.0,
                                 inner_pos.y as f32 / scale.0,
@@ -189,8 +204,13 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let scale = self.window.as_ref().map(|w| w.scale_factor() as f32).unwrap_or(1.0);
-                self.input_state.handle_cursor_moved(position.x, position.y, scale);
+                let scale = self
+                    .window
+                    .as_ref()
+                    .map(|w| w.scale_factor() as f32)
+                    .unwrap_or(1.0);
+                self.input_state
+                    .handle_cursor_moved(position.x, position.y, scale);
 
                 if let Some(pos) = self.input_state.cursor_position {
                     let hovered = self.hit_tree.hit_test(pos);
@@ -212,12 +232,10 @@ impl ApplicationHandler for App {
                     self.input_state.begin_press();
                 } else {
                     if let Some(clicked_id) = self.input_state.end_press() {
-                        // Find which button was clicked
-                        let id = clicked_id.0 as usize;
-                        let row = id / COLS;
-                        let col = id % COLS;
-                        if row < ROWS && col < COLS {
-                            self.clicks[row][col] += 1;
+                        // Check if the clicked button is the active one
+                        let active_index = self.revealed - 1;
+                        if clicked_id == button_id(active_index) && self.revealed <= ROWS * COLS {
+                            self.revealed += 1;
                         }
                     }
                     self.input_state.handle_mouse_button(btn, false);
