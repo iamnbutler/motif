@@ -1,13 +1,18 @@
 [package]
 name = "motif_test"
-version = "0.0.1"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Integration test harness for motif"
 
 [dependencies]
-motif_core = { version = "0.0.1", path = "../motif_core" }
-motif_debug = { version = "0.0.1", path = "../motif_debug" }
-palette = "0.7"
-winit = "0.30"
+motif_core = { workspace = true }
+motif_debug = { workspace = true }
+palette = { workspace = true }
+winit = { workspace = true }
 
 [dev-dependencies]

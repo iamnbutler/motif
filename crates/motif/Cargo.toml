@@ -10,19 +10,19 @@ categories.workspace = true
 description = "An immediate-mode UI framework for Rust with GPU rendering"
 
 [dependencies]
-accesskit = "0.24"
+accesskit = { workspace = true }
 accesskit_winit = "0.32"
-motif_core = { version = "0.0.1", path = "../motif_core" }
-glamour = "0.18"
-winit = "0.30"
+motif_core = { workspace = true }
+glamour = { workspace = true }
+winit = { workspace = true }
 subsecond = { version = "0.7.3", optional = true }
 cargo-hot = { version = "0.1", package = "cargo-hot-protocol", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
-motif_debug = { version = "0.0.1", path = "../motif_debug" }
+motif_debug = { workspace = true }
 rand = { version = "0.8", features = ["small_rng"] }
-serde_json = "1.0"
+serde_json = { workspace = true }
 
 [[bench]]
 name = "scene_build"
