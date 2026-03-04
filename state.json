@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T05:00:00Z",
-  "last_run_id": "22654530783",
+  "last_run": "2026-03-04T05:30:00Z",
+  "last_run_id": "22655275783",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -71,7 +71,7 @@
       "branch": "repo-assist/improve-todomvc-example",
       "pr_number": 20,
       "status": "open_draft",
-      "description": "Implemented TodoMVC example in crates/motif/examples/todomvc.rs (~700 lines). Text input, checkbox toggle, hover-reveal delete, All/Active/Completed filter tabs, items-remaining count, clear-completed button. Resolves p1/p2 TODOs from spool todomvc stream. Uses raw DrawContext/HitTree/InputState API; no dependency on draft Checkbox/TextInput PRs."
+      "description": "Implemented TodoMVC example in crates/motif/examples/todomvc.rs (~700 lines). Text input, checkbox toggle, hover-reveal delete, All/Active/Completed filter tabs, items-remaining count, clear-completed button. Resolves p1/p2 TODOs from spool todomvc stream."
     },
     "element_list_debug": {
       "date": "2026-03-04",
@@ -80,6 +80,14 @@
       "pr_number": 21,
       "status": "open_draft",
       "description": "Added element.list debug command: flat HitTree dump (id, bounds, z_index). Adds update_hit_tree() to DebugServer, HitEntryInfo to snapshot.rs, CLI formatter. Stepping stone toward 'Query element tree (p1)' devtools TODO."
+    },
+    "hot_render_boundary": {
+      "date": "2026-03-04",
+      "run_id": "22655275783",
+      "branch": "repo-assist/improve-hot-render-boundary",
+      "pr_number": 22,
+      "status": "open_draft",
+      "description": "Added motif::hot module with RenderFn type alias, hot::call(), and hot::connect(). Documents stable boundary contract (what is safe to change between hot patches). Updates hot.rs example to use new API. Resolves p1 spool task 'Design hot-reloadable render function boundary'."
     }
   },
   "labels_applied": {
@@ -97,7 +105,8 @@
     "checkbox_element",
     "text_input_element",
     "todomvc_example",
-    "element_list_debug"
+    "element_list_debug",
+    "hot_render_boundary"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
@@ -112,8 +121,8 @@
     "2026-03-04": {
       "pr16": "pending (0 checks - macOS CI not yet scheduled)",
       "pr20": "pending (0 checks - macOS CI not yet scheduled)",
-      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#21 all created 2026-03-04."
+      "notes": "CI requires macOS for clippy/test. fmt and doc run on ubuntu-latest. PRs #16-#22 all created 2026-03-04."
     }
   },
-  "notes": "Run 9 (22654530783): Task 10 — implemented element.list debug command (PR #21). Uses flat HitTree dump as stepping stone toward Query element tree (p1). Task 11 — updated Monthly Activity Summary with new PR. PRs #16-#21 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) Hot reload boundary design (p1) not yet started."
+  "notes": "Run 10 (22655275783): Task 10 — implemented motif::hot module (PR #22). Formalizes the hot reload boundary with RenderFn type alias, hot::call(), hot::connect(). Resolves p1 spool task 'Design hot-reloadable render function boundary'. cargo fmt passes; clippy/test/doc require macOS or libfontconfig and will run in CI. Task 11 — updated Monthly Activity Summary. PRs #16-#22 all open draft. Next: (a) On 2026-03-18 nudge PRs if not reviewed. (b) After element.list merges, consider 'element.inspect <id>' for richer per-element info. (c) Focus management (p2) is good candidate after TextInput/Checkbox PRs merge. (d) All p1 spool tasks now addressed — p2 items: focus management, inject debug text, simulate keyboard events, screenshot diffing."
 }
