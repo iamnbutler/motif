@@ -1,38 +1,45 @@
 # Motif
 
-> Motif is an immediate-mode UI framework for Rust, focusing on 2D rendering with type-safe geometry primitives.
+> Immediate-mode UI framework for Rust with Metal GPU rendering.
 
 Licensed under MIT OR Apache-2.0.
 
-Motif provides a foundation for building high-performance UI applications with idiomatic Rust patterns. It leverages glamour/glam for linear algebra with custom unit types for coordinate space safety.
+## Architecture
 
-## Core Concepts
+### Crates
 
-- **Coordinate Spaces**: Type-safe distinction between LogicalPixels (DPI-independent) and DevicePixels (physical)
-- **Layout Primitives**: Edges, Corners for padding/margin/border/radii
-- **Glamour Integration**: Re-exports glamour's Unit trait for custom coordinate spaces
-- **Painter's Stack**: Closure-scoped transform/clip for hierarchical drawing
-- **Scene**: Typed primitive vectors in device pixels, GPU-ready
+- `motif` - Main crate, re-exports core, examples
+- `motif_core` - Geometry, scene, Metal renderer, text system, elements
+- `motif_debug` - Debug server (Unix socket at `/tmp/motif-debug-{pid}.sock`)
+- `motif_debug_cli` - `motif-debug` CLI for runtime inspection
+- `motif_test` - Test utilities
 
-## Crates
+### Core Concepts
 
-- [motif](crates/motif/) - Main crate, re-exports motif_core
-- [motif_core](crates/motif_core/) - Core types including geometry module
+- **Coordinate Spaces**: LogicalPixels (DPI-independent) vs DevicePixels (physical)
+- **Scene**: Typed primitive vectors (quads, text runs) in device pixels
+- **DrawContext**: Painter's stack with closure-scoped transform/clip
+- **Element System**: `Render` (stateful), `RenderOnce` (stateless), `Div`, `Text`, `Button`
+- **ArcStr**: Cheap-clone string (Static or Arc-backed)
 
-## Documentation
+### Key Files
 
-- [Geometry Design](docs/plans/2026-02-11-geometry-module-design.md) - Architecture decisions for geometry module
-- [Draw Abstraction Design](docs/plans/2026-02-11-draw-abstraction-design.md) - Scene, DrawContext, Renderer trait
-- [Metal Renderer Design](docs/plans/2026-02-11-metal-renderer-design.md) - Metal GPU backend architecture
+- `motif_core/src/geometry.rs` - Point, Size, Rect, Edges, Corners, ScaleFactor
+- `motif_core/src/scene.rs` - Scene, Quad, TextRun
+- `motif_core/src/context.rs` - DrawContext painter's stack
+- `motif_core/src/metal/` - MetalRenderer, MetalSurface, shaders.metal
+- `motif_core/src/elements/` - Div, Text, Button, element traits
+- `motif_debug/src/server.rs` - Debug server, JSON-RPC 2.0 protocol
 
-## Key Files
+## Development
 
-- [geometry.rs](crates/motif_core/src/geometry.rs) - Core geometry primitives (Point, Size, Rect, Vector, Edges, Corners, Axis, ScaleFactor)
-- [scene.rs](crates/motif_core/src/scene.rs) - Scene and Quad primitive
-- [context.rs](crates/motif_core/src/context.rs) - DrawContext painter's stack
-- [renderer.rs](crates/motif_core/src/renderer.rs) - Renderer trait, DebugRenderer
-- [metal/mod.rs](crates/motif_core/src/metal/mod.rs) - Metal renderer (macOS): MetalRenderer, MetalSurface, QuadInstance
-- [metal/shaders.metal](crates/motif_core/src/metal/shaders.metal) - MSL shaders for instanced quad rendering
-- [hello_window.rs](crates/motif/examples/hello_window.rs) - Metal-rendered red quad example
-- [scene_build.rs](crates/motif/benches/scene_build.rs) - criterion CPU benchmarks (DrawContext.paint_quad, scene clear, QuadInstance conversion)
-- [quad_render.rs](crates/motif/benches/quad_render.rs) - GPU frame timing benchmark (10k quads)
+```bash
+cargo run --example playground     # main example
+cargo hot --example hot -F hot     # hot reload
+motif-debug scene.stats            # inspect running app
+motif-debug screenshot             # capture frame
+```
+
+## Known Issues
+
+Metal's `float3` has 16-byte alignment (not 12). Use three `float` fields instead of `float3 _padding` in shaders.

@@ -5,3 +5,8 @@
 - use TDD for all features
   - do not test things that the compiler can validate (Foo is an f32, bar can be initialized...)
   - write the tests, make them fail, then write the logic to make them pass.
+- use `motif-debug` CLI to inspect running apps
+  - `motif-debug scene.stats` - quad/text counts, viewport
+  - `motif-debug scene.quads` - list all quads
+  - `motif-debug screenshot` - capture current frame
+  - `motif-debug` (no args) - REPL mode
