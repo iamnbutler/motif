@@ -3,10 +3,12 @@
 //! Run with: cargo run --example buttons
 
 use motif_core::{
+    button,
+    element::PaintContext,
     input::{InputState, MouseButton},
     metal::{MetalRenderer, MetalSurface},
-    DrawContext, ElementId, HitTree, Point, Rect, Renderer, ScaleFactor, Scene, Size, Srgba,
-    TextContext,
+    DrawContext, Element, ElementId, HitTree, Point, Rect, Renderer, ScaleFactor, Scene, Size,
+    Srgba, TextContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
