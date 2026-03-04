@@ -328,6 +328,9 @@ impl DebugServer {
             "input.mouse_down" => Self::handle_input_mouse_down(request, window_position),
             "input.mouse_up" => Self::handle_input_mouse_up(request, window_position),
             "input.drag" => Self::handle_input_drag(request, window_position),
+            "input.key_down" => Self::handle_input_key_down(request),
+            "input.key_up" => Self::handle_input_key_up(request),
+            "input.key_press" => Self::handle_input_key_press(request),
             "screenshot" => Self::handle_screenshot(request, window_id),
             "debug.draw_quad" => Self::handle_draw_quad(request, overlays),
             "debug.clear" => Self::handle_clear(request, overlays),
@@ -689,6 +692,119 @@ impl DebugServer {
                         "to": { "x": to_x, "y": to_y }
                     }
                 }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+    fn handle_input_key_down(request: &DebugRequest) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_down requires params: { key: <u16 virtual key code> }",
+                )
+            }
+        };
+
+        let key = match params
+            .get("key")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u16::try_from(v).ok())
+        {
+            Some(k) => k,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_down requires a \"key\" parameter (u16 virtual key code)",
+                )
+            }
+        };
+
+        let result = input_sim::key_down(key);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({ "key": key, "action": "down" }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_key_up(request: &DebugRequest) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_up requires params: { key: <u16 virtual key code> }",
+                )
+            }
+        };
+
+        let key = match params
+            .get("key")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u16::try_from(v).ok())
+        {
+            Some(k) => k,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_up requires a \"key\" parameter (u16 virtual key code)",
+                )
+            }
+        };
+
+        let result = input_sim::key_up(key);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({ "key": key, "action": "up" }),
+            )
+        } else {
+            DebugResponse::err(request.id, -32000, result.message)
+        }
+    }
+
+    fn handle_input_key_press(request: &DebugRequest) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_press requires params: { key: <u16 virtual key code> }",
+                )
+            }
+        };
+
+        let key = match params
+            .get("key")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u16::try_from(v).ok())
+        {
+            Some(k) => k,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "input.key_press requires a \"key\" parameter (u16 virtual key code)",
+                )
+            }
+        };
+
+        let result = input_sim::key_press(key);
+        if result.success {
+            DebugResponse::ok(
+                request.id,
+                serde_json::json!({ "key": key, "action": "press" }),
             )
         } else {
             DebugResponse::err(request.id, -32000, result.message)
@@ -1261,5 +1377,81 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&serde_json::json!("left")));
+    }
+
+    #[test]
+    fn server_key_press_requires_params() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.key_press","params":null,"id":50}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 50);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
+    }
+
+    #[test]
+    fn server_key_down_requires_key_param() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        // params present but no "key" field
+        let request = r#"{"method":"input.key_down","params":{},"id":51}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 51);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
+    }
+
+    #[test]
+    fn server_key_up_requires_key_param() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let request = r#"{"method":"input.key_up","params":{},"id":52}"#;
+        writeln!(stream, "{request}").unwrap();
+
+        let mut reader = BufReader::new(stream);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).unwrap();
+
+        let resp: DebugResponse = serde_json::from_str(&response_line).unwrap();
+        assert_eq!(resp.id, 52);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
     }
 }
