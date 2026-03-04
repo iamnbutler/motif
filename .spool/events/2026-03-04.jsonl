@@ -59,3 +59,15 @@
 {"v":1,"op":"complete","id":"mmbvqm56-dmpa","ts":"2026-03-04T10:27:50.477400Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
 {"v":1,"op":"complete","id":"mmbvqmvi-9cwp","ts":"2026-03-04T10:27:51.326693Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
 {"v":1,"op":"complete","id":"mmbvrly4-l1wg","ts":"2026-03-04T10:27:52.244931Z","by":"@iamnbutler","branch":"main","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqcet-89dn","ts":"2026-03-04T10:36:12.102372Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqde2-14ig","ts":"2026-03-04T10:36:12.168489Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqe8i-eh2y","ts":"2026-03-04T10:36:12.210767Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqgy1-3cbv","ts":"2026-03-04T10:36:12.250859Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqhyh-z7dg","ts":"2026-03-04T10:36:12.287624Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqire-fuj7","ts":"2026-03-04T10:36:12.325118Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqpn8-o851","ts":"2026-03-04T10:36:12.376807Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqq1k-bu9i","ts":"2026-03-04T10:36:12.410101Z","by":"@iamnbutler","branch":"feat/text-edit-navigation-selection","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqt1g-z4i6","ts":"2026-03-04T10:41:04.092294Z","by":"@iamnbutler","branch":"feat/text-edit-clipboard-undo","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvqup6-7722","ts":"2026-03-04T10:41:04.136166Z","by":"@iamnbutler","branch":"feat/text-edit-clipboard-undo","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvrth1-jgiq","ts":"2026-03-04T10:41:04.176241Z","by":"@iamnbutler","branch":"feat/text-edit-clipboard-undo","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mmbvru78-i761","ts":"2026-03-04T10:41:04.218346Z","by":"@iamnbutler","branch":"feat/text-edit-clipboard-undo","d":{"resolution":"done"}}
