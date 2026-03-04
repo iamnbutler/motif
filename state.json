@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T02:45:00Z",
-  "last_run_id": "22652475404",
+  "last_run": "2026-03-04T03:00:00Z",
+  "last_run_id": "22652719576",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -9,7 +9,7 @@
     "task_1_triage": "2026-03-04",
     "task_2_fix_prs": "2026-03-04",
     "task_3_improvements": "2026-03-04",
-    "task_4_deps": null,
+    "task_4_deps": "2026-03-04",
     "task_5_maintain_prs": "2026-03-04",
     "task_6_stale_nudges": null,
     "task_7_labels": "2026-03-04",
@@ -36,9 +36,18 @@
     "workspace_deps": {
       "date": "2026-03-04",
       "run_id": "22652475404",
-      "branch": "repo-assist/improve-workspace-deps",
-      "status": "pr_queued",
-      "description": "Populated [workspace.dependencies] with shared external + internal crates; all 5 workspace members migrated to workspace = true; motif_test migrated to workspace package metadata. Retry of failed run 22652081569."
+      "branch": "repo-assist/improve-workspace-deps-8af370b2f1df21f0",
+      "pr_number": 16,
+      "status": "open_draft",
+      "description": "Populated [workspace.dependencies] with shared external + internal crates; all 5 workspace members migrated to workspace = true; motif_test migrated to workspace package metadata."
+    },
+    "contributing_docs": {
+      "date": "2026-03-04",
+      "run_id": "22652719576",
+      "branch": "repo-assist/docs-contributing",
+      "pr_number": 17,
+      "status": "open_draft",
+      "description": "Added CONTRIBUTING.md with prerequisites, project layout, building, testing (TDD philosophy), code style, debug CLI, spool, and PR submission guide."
     }
   },
   "labels_applied": {
@@ -50,6 +59,10 @@
     "month": "2026-03"
   },
   "welcomed_contributors": [],
-  "proposed_improvements": ["workspace_deps_consolidation"],
-  "notes": "Run 3 (22652475404): Retried workspace deps PR (run 22652081569 had failed with 'Failed to apply patch'). Issue #11 closed by maintainer, fix PR #13 merged. Commented on #15 (failure report). Next priorities: Task 4 (deps audit), Task 8 (release check — no tags exist yet), Task 9 (welcome new contributors). Feature branches to investigate next: feature/devtools, feature/focus-system, feature/hot-reload, feature/input-system, feature/quad-borders."
+  "proposed_improvements": ["workspace_deps_consolidation", "contributing_docs"],
+  "dep_audit": {
+    "last_checked": "2026-03-04",
+    "notes": "Ran cargo metadata on Linux. All 5 workspace packages resolve correctly. [workspace.dependencies] is empty (PR #16 addresses). Individual crates use reasonable semver pins. Could not run cargo outdated (macOS required for full Metal build). Feature branches (feature/devtools, feature/focus-system, feature/hot-reload, feature/input-system, feature/quad-borders) exist on GitHub but predate current main — fewer source files present."
+  },
+  "notes": "Run 4 (22652719576): Created PR #17 (CONTRIBUTING.md). Did Task 4 dep audit via cargo metadata. Explored feature branches on GitHub — they exist but have fewer files than main (predate current main). Next priorities: Task 6 (stale nudge on PRs #16/#17 after 14 days), Task 8 (release — still no tags, early dev), Task 9 (new contributors). Consider investigating feature branch status for maintainer."
 }
