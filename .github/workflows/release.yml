@@ -1,0 +1,145 @@
+name: Release
+
+# Triggered by pushing a vX.Y.Z tag or when a draft release is published.
+#
+# Flow:
+#   1. Push tag v0.1.0
+#      → validate job: fmt/clippy/test/dry-run publish
+#      → draft-release job: create GitHub release draft with changelog
+#   2. Maintainer reviews draft and clicks "Publish release"
+#      → publish job: cargo publish motif_core then motif to crates.io
+#
+# Manual workflow_dispatch triggers validate only (dry-run mode).
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Validation only – skip crates.io publish'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  # ── Validate ────────────────────────────────────────────────────────────────
+  # Runs on tag push or manual dispatch. Validates formatting, lint, tests,
+  # and a dry-run publish for the public crates.
+  validate:
+    name: Validate
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Tests
+        run: cargo test --all-features
+
+      - name: Dry-run publish motif_core
+        run: cargo publish --dry-run -p motif_core
+
+      - name: Dry-run publish motif
+        run: cargo publish --dry-run -p motif
+
+  # ── Draft GitHub Release ────────────────────────────────────────────────────
+  # Creates a draft GitHub release with an auto-generated changelog.
+  # Runs only when a tag is pushed, after validate succeeds.
+  draft-release:
+    name: Draft release
+    needs: validate
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build changelog
+        id: changelog
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV=$(git tag --sort=-version:refname \
+                   | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                   | sed -n '2p')
+          {
+            printf 'body<<NOTES_EOF\n'
+            printf "## What's Changed in %s\n\n" "$TAG"
+            if [ -n "$PREV" ]; then
+              git log "${PREV}..${TAG}" \
+                      --pretty=format:'- %s (%h)' --no-merges
+              printf '\n\n**Full Changelog**: '
+              printf 'https://github.com/%s/compare/%s...%s\n' \
+                "$GITHUB_REPOSITORY" "$PREV" "$TAG"
+            else
+              git log --pretty=format:'- %s (%h)' --no-merges
+            fi
+            printf 'NOTES_EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const body = `${{ steps.changelog.outputs.body }}`;
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: tag,
+              body,
+              draft: true,
+              prerelease: false,
+            });
+            console.log(`Draft release created: ${data.html_url}`);
+
+  # ── Publish to crates.io ────────────────────────────────────────────────────
+  # Runs when the maintainer publishes the draft GitHub release.
+  # Requires a 'crates-io' GitHub Actions environment with CARGO_REGISTRY_TOKEN.
+  publish:
+    name: Publish to crates.io
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: macos-latest
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Publish motif_core
+        run: cargo publish -p motif_core
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for crates.io index propagation
+        run: sleep 30
+
+      - name: Publish motif
+        run: cargo publish -p motif
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

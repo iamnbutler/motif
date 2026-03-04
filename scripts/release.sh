@@ -2,7 +2,63 @@
 set -euo pipefail
 
 # Release script for motif crates
+#
+# Usage:
+#   ./scripts/release.sh                   - Publish current version (prompts for confirmation)
+#   ./scripts/release.sh bump <version>    - Bump version in Cargo.toml, commit, and tag
+#
+# The CI release workflow (.github/workflows/release.yml) automates validation
+# and crates.io publishing when you push a tag. Use this script locally to:
+#   1. Bump the workspace version and create a tag (bump subcommand)
+#   2. Run a local publish dry-run (default, no args)
 
+SUBCOMMAND="${1:-publish}"
+
+# ── Bump subcommand ──────────────────────────────────────────────────────────
+if [ "$SUBCOMMAND" = "bump" ]; then
+  NEW_VERSION="${2:-}"
+  if [ -z "$NEW_VERSION" ]; then
+    echo "Usage: $0 bump <version>" >&2
+    echo "Example: $0 bump 0.1.0" >&2
+    exit 1
+  fi
+
+  if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    echo "Error: version must be in semver format (e.g. 0.1.0)" >&2
+    exit 1
+  fi
+
+  # Must be on main with a clean tree
+  BRANCH=$(git branch --show-current)
+  if [ "$BRANCH" != "main" ]; then
+    echo "Error: must be on main branch (currently on $BRANCH)" >&2
+    exit 1
+  fi
+  if ! git diff --quiet || ! git diff --staged --quiet; then
+    echo "Error: uncommitted changes present" >&2
+    exit 1
+  fi
+
+  echo "Bumping version to $NEW_VERSION..."
+
+  # Update [workspace.package] version in root Cargo.toml
+  # Uses BSD/GNU compatible in-place sed (writes .bak then removes it)
+  sed -i.bak "s/^version = \"[^\"]*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+  rm -f Cargo.toml.bak
+
+  # Commit and tag
+  git add Cargo.toml
+  git commit -m "chore: bump version to v$NEW_VERSION"
+  git tag "v$NEW_VERSION"
+
+  echo ""
+  echo "Version bumped to v$NEW_VERSION and tagged."
+  echo "Push the commit and tag to trigger the release workflow:"
+  echo "  git push && git push --tags"
+  exit 0
+fi
+
+# ── Publish subcommand (default) ─────────────────────────────────────────────
 VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "motif") | .version')
 
 echo "=== Motif Release Script ==="
