@@ -165,6 +165,20 @@ impl InputStateSnapshot {
     }
 }
 
+/// Serializable entry from the HitTree: element bounds with z-order.
+///
+/// Produced by [`DebugServer::update_hit_tree`] and returned by the
+/// `element.list` debug command.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct HitEntryInfo {
+    /// The element's numeric ID (from [`motif_core::ElementId`]).
+    pub id: u64,
+    /// Bounding box in logical pixels.
+    pub bounds: BoundsInfo,
+    /// Paint order: higher = painted later = visually on top.
+    pub z_index: u32,
+}
+
 /// A serializable snapshot of the current scene state.
 #[derive(Debug, Clone, Serialize)]
 pub struct SceneSnapshot {
