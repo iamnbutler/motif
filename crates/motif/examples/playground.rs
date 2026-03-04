@@ -782,11 +782,61 @@ impl ApplicationHandler for App {
                         mods.control_key()
                     };
 
-                    match &event.logical_key {
-                        Key::Character(c) => {
-                            self.text_edit_state.insert_text(c.as_str());
+                    // Check for command shortcuts first (Cmd on macOS, Ctrl elsewhere)
+                    let cmd = if cfg!(target_os = "macos") {
+                        mods.super_key()
+                    } else {
+                        mods.control_key()
+                    };
+
+                    // Handle command shortcuts before character input
+                    let handled = if cmd {
+                        if let Key::Character(c) = &event.logical_key {
+                            match c.to_ascii_lowercase().as_str() {
+                                "a" => {
+                                    self.text_edit_state.select_all();
+                                    true
+                                }
+                                "z" => {
+                                    if shift {
+                                        self.text_edit_state.redo();
+                                    } else {
+                                        self.text_edit_state.undo();
+                                    }
+                                    true
+                                }
+                                "x" => {
+                                    self.text_edit_state.cut_selected_text();
+                                    true
+                                }
+                                "c" => {
+                                    // Copy - selected_text() returns the text but we'd need clipboard
+                                    // For now just a no-op since we don't have system clipboard yet
+                                    true
+                                }
+                                "v" => {
+                                    // Paste - would need system clipboard
+                                    // For now just a no-op
+                                    true
+                                }
+                                _ => false,
+                            }
+                        } else {
+                            false
                         }
-                        Key::Named(NamedKey::Backspace) => {
+                    } else {
+                        false
+                    };
+
+                    if !handled {
+                        match &event.logical_key {
+                            Key::Character(c) => {
+                                self.text_edit_state.insert_text(c.as_str());
+                            }
+                            Key::Named(NamedKey::Space) => {
+                                self.text_edit_state.insert_text(" ");
+                            }
+                            Key::Named(NamedKey::Backspace) => {
                             if word_mod {
                                 self.text_edit_state.delete_word_left();
                             } else {
@@ -836,27 +886,10 @@ impl ApplicationHandler for App {
                                 self.text_edit_state.end();
                             }
                         }
-                        Key::Named(NamedKey::Escape) => {
-                            self.text_input_focused = false;
-                        }
-                        _ => {
-                            // Handle Cmd+A (select all) on macOS, Ctrl+A elsewhere
-                            if let Key::Character(c) = &event.logical_key {
-                                let cmd = if cfg!(target_os = "macos") {
-                                    mods.super_key()
-                                } else {
-                                    mods.control_key()
-                                };
-                                if cmd && c.as_str().eq_ignore_ascii_case("a") {
-                                    self.text_edit_state.select_all();
-                                } else if cmd && c.as_str().eq_ignore_ascii_case("z") {
-                                    if shift {
-                                        self.text_edit_state.redo();
-                                    } else {
-                                        self.text_edit_state.undo();
-                                    }
-                                }
+                            Key::Named(NamedKey::Escape) => {
+                                self.text_input_focused = false;
                             }
+                            _ => {}
                         }
                     }
                     if let Some(window) = &self.window {
