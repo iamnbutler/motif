@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-03-04T03:30:00Z",
-  "last_run_id": "22653475124",
+  "last_run": "2026-03-04T04:00:00Z",
+  "last_run_id": "22653577535",
   "backlog_cursor": {
     "issues": 15,
     "prs": null
@@ -13,8 +13,8 @@
     "task_5_maintain_prs": "2026-03-04",
     "task_6_stale_nudges": "2026-03-04",
     "task_7_labels": "2026-03-04",
-    "task_8_release": null,
-    "task_9_welcome": null,
+    "task_8_release": "2026-03-04",
+    "task_9_welcome": "2026-03-04",
     "task_10_forward": "2026-03-04",
     "task_11_monthly_summary": "2026-03-04"
   },
@@ -64,6 +64,14 @@
       "pr_number": 19,
       "status": "open_draft",
       "description": "Implemented TextInput element in motif_core/src/elements/text_input.rs with builder API, placeholder, focused/unfocused border, cursor rendering, UTF-8 cursor snapping, and 10 unit tests. Resolves p2 TODO 'Text input element' from spool elements stream."
+    },
+    "todomvc_example": {
+      "date": "2026-03-04",
+      "run_id": "22653577535",
+      "branch": "repo-assist/improve-todomvc-example",
+      "pr_number": 20,
+      "status": "open_draft",
+      "description": "Implemented TodoMVC example in crates/motif/examples/todomvc.rs (~700 lines). Text input, checkbox toggle, hover-reveal delete, All/Active/Completed filter tabs, items-remaining count, clear-completed button. Resolves p1/p2 TODOs from spool todomvc stream. Uses raw DrawContext/HitTree/InputState API; no dependency on draft Checkbox/TextInput PRs."
     }
   },
   "labels_applied": {
@@ -79,11 +87,12 @@
     "workspace_deps_consolidation",
     "contributing_docs",
     "checkbox_element",
-    "text_input_element"
+    "text_input_element",
+    "todomvc_example"
   ],
   "dep_audit": {
     "last_checked": "2026-03-04",
     "notes": "Ran cargo metadata on Linux. All 5 workspace packages resolve correctly. [workspace.dependencies] is empty (PR #16 addresses). Individual crates use reasonable semver pins. Could not run cargo outdated (macOS required for full Metal build). Feature branches (feature/devtools, feature/focus-system, feature/hot-reload, feature/input-system, feature/quad-borders) exist on GitHub but predate current main."
   },
-  "notes": "Run 6 (22653475124): Created PR #19 (TextInput element, p2 TODO). Task 5: PRs #16/#17/#18 all show 'pending' with 0 CI checks — no failures to fix. Task 6: All open PRs < 14 days old, no stale nudges needed. Next priorities: Task 8 (release — still no tags, early dev), Task 9 (new contributors), TodoMVC example (p1 TODO items: display list, add, toggle, delete, filter) — now unblocked by TextInput and Checkbox elements. Implement TodoMVC in a dedicated PR next run."
+  "notes": "Run 7 (22653577535): Created PR #20 (TodoMVC example, p1/p2 spool TODOs). Task 8: No release — no tags, early dev (0.0.1). Task 9: No new human contributors (all activity from iamnbutler and github-actions). Next priorities: Task 1 (triage backlog beyond issue #15 — cursor is at 15 but only 3 open issues; all have Repo Assist comments), Task 3 (improvements — could implement 'Items remaining count' p3 or 'Clear completed' p3, already included in PR #20 so both done), Task 5 (maintain PRs — check CI on #16-#20). PRs #16-#19 will hit 14 days stale on 2026-03-18. Next impactful work: refactor TodoMVC to use Checkbox+TextInput elements once PRs merged, or explore devtools/focus-management features."
 }
