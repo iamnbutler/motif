@@ -7,17 +7,35 @@
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 
+/// A history entry for undo/redo operations.
+#[derive(Clone, Debug)]
+struct HistoryEntry {
+    /// The byte range that was modified.
+    range: Range<usize>,
+    /// The text that was replaced.
+    old_text: String,
+    /// The length of new text that replaced old_text.
+    new_text_len: usize,
+    /// Cursor position before the edit.
+    cursor_before: usize,
+}
+
 /// Text editing state for input fields.
 ///
 /// Manages:
 /// - Text content storage
 /// - Selection range with cursor direction
 /// - Cursor movement and text manipulation
+/// - Undo/redo history
 pub struct TextEditState {
     content: String,
     selected_range: Range<usize>,
     selection_reversed: bool,
     marked_range: Option<Range<usize>>,
+    /// Stack of previous edits for undo.
+    undo_stack: Vec<HistoryEntry>,
+    /// Stack of undone edits for redo.
+    redo_stack: Vec<HistoryEntry>,
 }
 
 impl TextEditState {
@@ -28,6 +46,8 @@ impl TextEditState {
             selected_range: 0..0,
             selection_reversed: false,
             marked_range: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 
@@ -38,12 +58,14 @@ impl TextEditState {
         &self.content
     }
 
-    /// Sets the text content, resetting selection to the start.
+    /// Sets the text content, resetting selection and clearing history.
     pub fn set_content(&mut self, content: impl Into<String>) {
         self.content = content.into();
         self.selected_range = 0..0;
         self.selection_reversed = false;
         self.marked_range = None;
+        self.undo_stack.clear();
+        self.redo_stack.clear();
     }
 
     // === Selection accessors ===
@@ -346,12 +368,26 @@ impl TextEditState {
     // === Text manipulation ===
 
     /// Inserts text at the cursor position, replacing any selection.
+    /// Records the edit for undo.
     pub fn insert_text(&mut self, text: &str) {
         let range = self
             .marked_range
             .clone()
             .unwrap_or(self.selected_range.clone());
         let range = range.start.min(self.content.len())..range.end.min(self.content.len());
+
+        // Record for undo (skip during IME composition)
+        if self.marked_range.is_none() {
+            let old_text = self.content[range.clone()].to_string();
+            self.undo_stack.push(HistoryEntry {
+                range: range.clone(),
+                old_text,
+                new_text_len: text.len(),
+                cursor_before: self.cursor_offset(),
+            });
+            // New edit clears redo stack
+            self.redo_stack.clear();
+        }
 
         self.content.replace_range(range.clone(), text);
         self.selected_range = range.start + text.len()..range.start + text.len();
@@ -434,6 +470,99 @@ impl TextEditState {
         if !self.selected_range.is_empty() {
             self.insert_text("");
         }
+    }
+
+    // === Clipboard operations ===
+
+    /// Returns the currently selected text.
+    pub fn selected_text(&self) -> &str {
+        &self.content[self.selected_range.clone()]
+    }
+
+    /// Cuts (removes and returns) the currently selected text.
+    pub fn cut_selected_text(&mut self) -> String {
+        if self.selected_range.is_empty() {
+            return String::new();
+        }
+        let text = self.content[self.selected_range.clone()].to_string();
+        self.insert_text("");
+        text
+    }
+
+    /// Pastes text at the cursor position, replacing any selection.
+    pub fn paste(&mut self, text: &str) {
+        self.insert_text(text);
+    }
+
+    // === Undo/Redo ===
+
+    /// Returns whether undo is available.
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Returns whether redo is available.
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Undoes the last edit.
+    pub fn undo(&mut self) {
+        if let Some(entry) = self.undo_stack.pop() {
+            // Calculate the range of text that was inserted (to remove it)
+            let inserted_end = entry.range.start + entry.new_text_len;
+            let inserted_range = entry.range.start..inserted_end.min(self.content.len());
+
+            // Save current state for redo
+            let current_text = self.content[inserted_range.clone()].to_string();
+            self.redo_stack.push(HistoryEntry {
+                range: entry.range.clone(),
+                old_text: current_text,
+                new_text_len: entry.old_text.len(),
+                cursor_before: self.cursor_offset(),
+            });
+
+            // Apply undo: replace inserted text with original text
+            self.content.replace_range(inserted_range, &entry.old_text);
+            self.selected_range = entry.cursor_before..entry.cursor_before;
+            self.selection_reversed = false;
+        }
+    }
+
+    /// Redoes the last undone edit.
+    pub fn redo(&mut self) {
+        if let Some(entry) = self.redo_stack.pop() {
+            // Calculate the range of text that was restored (to remove it)
+            let restored_end = entry.range.start + entry.new_text_len;
+            let restored_range = entry.range.start..restored_end.min(self.content.len());
+
+            // Save current state for undo
+            let current_text = self.content[restored_range.clone()].to_string();
+            self.undo_stack.push(HistoryEntry {
+                range: entry.range.clone(),
+                old_text: current_text,
+                new_text_len: entry.old_text.len(),
+                cursor_before: self.cursor_offset(),
+            });
+
+            // Apply redo: replace restored text with the text that was there
+            self.content.replace_range(restored_range, &entry.old_text);
+            let new_cursor = entry.range.start + entry.old_text.len();
+            self.selected_range = new_cursor..new_cursor;
+            self.selection_reversed = false;
+        }
+    }
+
+    // === Special insertions ===
+
+    /// Inserts a newline at the cursor position.
+    pub fn insert_newline(&mut self) {
+        self.insert_text("\n");
+    }
+
+    /// Inserts a tab at the cursor position.
+    pub fn insert_tab(&mut self) {
+        self.insert_text("\t");
     }
 }
 
@@ -1443,5 +1572,251 @@ mod tests {
         state.set_selected_range(2..8);
         state.delete_to_end_of_line();
         assert_eq!(state.content(), "herld");
+    }
+
+    // ============================================================
+    // Task: Implement clipboard operations
+    // ============================================================
+
+    #[test]
+    fn selected_text_returns_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(0..5);
+        assert_eq!(state.selected_text(), "hello");
+    }
+
+    #[test]
+    fn selected_text_returns_empty_when_no_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5);
+        assert_eq!(state.selected_text(), "");
+    }
+
+    #[test]
+    fn cut_selected_text_returns_and_removes_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(0..6);
+        let cut = state.cut_selected_text();
+        assert_eq!(cut, "hello ");
+        assert_eq!(state.content(), "world");
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn cut_selected_text_with_no_selection_returns_empty() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.move_to(5);
+        let cut = state.cut_selected_text();
+        assert_eq!(cut, "");
+        assert_eq!(state.content(), "hello world");
+    }
+
+    #[test]
+    fn paste_inserts_text_at_cursor() {
+        let mut state = TextEditState::new();
+        state.set_content("helloworld");
+        state.move_to(5);
+        state.paste(" ");
+        assert_eq!(state.content(), "hello world");
+    }
+
+    #[test]
+    fn paste_replaces_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(6..11);
+        state.paste("there");
+        assert_eq!(state.content(), "hello there");
+    }
+
+    // ============================================================
+    // Task: Implement undo/redo with patch-based history
+    // ============================================================
+
+    #[test]
+    fn can_undo_returns_false_initially() {
+        let state = TextEditState::new();
+        assert!(!state.can_undo());
+    }
+
+    #[test]
+    fn can_undo_returns_true_after_edit() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        assert!(state.can_undo());
+    }
+
+    #[test]
+    fn undo_reverses_insert() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        assert_eq!(state.content(), "hello!");
+
+        state.undo();
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn undo_reverses_delete() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.delete_backward();
+        assert_eq!(state.content(), "hell");
+
+        state.undo();
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn undo_restores_cursor_position() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(2);
+        state.insert_text("X");
+        assert_eq!(state.cursor_offset(), 3);
+
+        state.undo();
+        assert_eq!(state.cursor_offset(), 2);
+    }
+
+    #[test]
+    fn multiple_undos() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        state.insert_text("!");
+        assert_eq!(state.content(), "hello!!");
+
+        state.undo();
+        assert_eq!(state.content(), "hello!");
+        state.undo();
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn can_redo_returns_false_initially() {
+        let state = TextEditState::new();
+        assert!(!state.can_redo());
+    }
+
+    #[test]
+    fn can_redo_returns_true_after_undo() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        state.undo();
+        assert!(state.can_redo());
+    }
+
+    #[test]
+    fn redo_reapplies_undone_edit() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        state.undo();
+        assert_eq!(state.content(), "hello");
+
+        state.redo();
+        assert_eq!(state.content(), "hello!");
+    }
+
+    #[test]
+    fn new_edit_clears_redo_stack() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        state.undo();
+        assert!(state.can_redo());
+
+        state.insert_text("?");
+        assert!(!state.can_redo());
+    }
+
+    #[test]
+    fn undo_at_beginning_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.undo(); // no-op
+        assert_eq!(state.content(), "hello");
+    }
+
+    #[test]
+    fn redo_at_end_does_nothing() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        state.redo(); // no-op, nothing to redo
+        assert_eq!(state.content(), "hello!");
+    }
+
+    #[test]
+    fn set_content_clears_history() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(5);
+        state.insert_text("!");
+        assert!(state.can_undo());
+
+        state.set_content("new content");
+        assert!(!state.can_undo());
+        assert!(!state.can_redo());
+    }
+
+    // ============================================================
+    // Task: Implement Enter key for multiline
+    // ============================================================
+
+    #[test]
+    fn insert_newline_inserts_newline_char() {
+        let mut state = TextEditState::new();
+        state.set_content("helloworld");
+        state.move_to(5);
+        state.insert_newline();
+        assert_eq!(state.content(), "hello\nworld");
+    }
+
+    #[test]
+    fn insert_newline_replaces_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(5..6);
+        state.insert_newline();
+        assert_eq!(state.content(), "hello\nworld");
+    }
+
+    // ============================================================
+    // Task: Implement Tab key handling
+    // ============================================================
+
+    #[test]
+    fn insert_tab_inserts_tab_char() {
+        let mut state = TextEditState::new();
+        state.set_content("helloworld");
+        state.move_to(5);
+        state.insert_tab();
+        assert_eq!(state.content(), "hello\tworld");
+    }
+
+    #[test]
+    fn insert_tab_replaces_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_selected_range(5..6);
+        state.insert_tab();
+        assert_eq!(state.content(), "hello\tworld");
     }
 }
