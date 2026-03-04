@@ -329,6 +329,7 @@ impl DebugServer {
             "input.mouse_up" => Self::handle_input_mouse_up(request, window_position),
             "input.drag" => Self::handle_input_drag(request, window_position),
             "screenshot" => Self::handle_screenshot(request, window_id),
+            "screenshot.diff" => Self::handle_screenshot_diff(request),
             "debug.draw_quad" => Self::handle_draw_quad(request, overlays),
             "debug.clear" => Self::handle_clear(request, overlays),
             "debug.remove" => Self::handle_remove(request, overlays),
@@ -494,6 +495,63 @@ impl DebugServer {
                 -32000,
                 format!("Failed to capture screenshot: {e}"),
             ),
+        }
+    }
+
+    fn handle_screenshot_diff(request: &DebugRequest) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    r#"screenshot.diff requires params: {"a": "...", "b": "...", "output": "..." (optional), "threshold": N (optional, 0-255)}"#,
+                )
+            }
+        };
+
+        let path_a = match params.get("a").and_then(|v| v.as_str()) {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    r#"screenshot.diff requires an "a" parameter (path to first PNG)"#,
+                )
+            }
+        };
+
+        let path_b = match params.get("b").and_then(|v| v.as_str()) {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    r#"screenshot.diff requires a "b" parameter (path to second PNG)"#,
+                )
+            }
+        };
+
+        let output_path = params.get("output").and_then(|v| v.as_str());
+        let threshold = params
+            .get("threshold")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            .min(255) as u8;
+
+        match screenshot::diff_screenshots(path_a, path_b, output_path, threshold) {
+            Ok(result) => DebugResponse::ok(
+                request.id,
+                serde_json::json!({
+                    "changed_pixels": result.changed_pixels,
+                    "total_pixels": result.total_pixels,
+                    "diff_ratio": result.diff_ratio,
+                    "max_delta": result.max_delta,
+                    "width": result.width,
+                    "height": result.height,
+                }),
+            ),
+            Err(e) => DebugResponse::err(request.id, -32000, format!("Diff failed: {e}")),
         }
     }
 

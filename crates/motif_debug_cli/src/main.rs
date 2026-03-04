@@ -83,6 +83,8 @@ fn print_usage() {
     eprintln!("  scene.text_runs          List all text runs in the scene");
     eprintln!("  input.state              Show current input state (cursor, buttons, modifiers)");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
+    eprintln!("  screenshot.diff <a.png> <b.png> [diff.png] [--threshold N]");
+    eprintln!("                           Compare two screenshots pixel-by-pixel");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
     eprintln!("  draw.quad x y w h r g b a      Draw a debug overlay quad");
@@ -118,6 +120,8 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
         } else {
             ("screenshot", Some(serde_json::json!({ "path": path })))
         }
+    } else if let Some(args) = trimmed.strip_prefix("screenshot.diff ") {
+        parse_screenshot_diff(args)
     } else if let Some(args) = trimmed.strip_prefix("draw.quad ") {
         parse_draw_quad(args)
     } else if let Some(args) = trimmed.strip_prefix("debug.remove ") {
@@ -135,6 +139,51 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
     } else {
         (trimmed, None)
     }
+}
+
+/// Parse `screenshot.diff <a> <b> [<output>] [--threshold N]` into a screenshot.diff request.
+///
+/// Examples:
+///   screenshot.diff before.png after.png
+///   screenshot.diff before.png after.png diff.png
+///   screenshot.diff before.png after.png diff.png --threshold 10
+fn parse_screenshot_diff(args: &str) -> (&'static str, Option<serde_json::Value>) {
+    let mut parts = args.split_whitespace().collect::<Vec<_>>();
+
+    // Extract --threshold <N> if present.
+    let threshold: u64 = if let Some(pos) = parts.iter().position(|s| *s == "--threshold") {
+        let t = parts
+            .get(pos + 1)
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        // Remove both --threshold and its value.
+        if pos + 1 < parts.len() {
+            parts.remove(pos + 1);
+        }
+        parts.remove(pos);
+        t
+    } else {
+        0
+    };
+
+    if parts.len() < 2 {
+        eprintln!("usage: screenshot.diff <a.png> <b.png> [diff.png] [--threshold N]");
+        return ("screenshot.diff", None);
+    }
+
+    let path_a = parts[0];
+    let path_b = parts[1];
+    let output = parts.get(2).copied();
+
+    let mut params = serde_json::json!({
+        "a": path_a,
+        "b": path_b,
+        "threshold": threshold,
+    });
+    if let Some(out) = output {
+        params["output"] = serde_json::json!(out);
+    }
+    ("screenshot.diff", Some(params))
 }
 
 /// Parse `draw.quad x y w h r g b a` into a debug.draw_quad request.
@@ -226,6 +275,38 @@ fn format_screenshot(value: &serde_json::Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
     format!("Screenshot saved to {path}\n")
+}
+
+fn format_screenshot_diff(value: &serde_json::Value) -> String {
+    let changed = value
+        .get("changed_pixels")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let total = value
+        .get("total_pixels")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let ratio = value
+        .get("diff_ratio")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+    let max_delta = value.get("max_delta").and_then(|v| v.as_u64()).unwrap_or(0);
+    let width = value.get("width").and_then(|v| v.as_u64()).unwrap_or(0);
+    let height = value.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    let status = if changed == 0 {
+        "IDENTICAL"
+    } else {
+        "DIFFERENT"
+    };
+    format!(
+        "Screenshot Diff [{status}]\n\
+         ───────────────────────\n\
+         Dimensions:    {width} x {height}\n\
+         Changed px:    {changed} / {total} ({:.2}%)\n\
+         Max delta:     {max_delta}\n",
+        ratio * 100.0
+    )
 }
 
 fn format_draw_quad(value: &serde_json::Value) -> String {
@@ -584,6 +665,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
         "input.state" => print!("{}", format_input_state(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
+        "screenshot.diff" => print!("{}", format_screenshot_diff(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),
         "debug.remove" => print!("{}", format_debug_remove(result)),
