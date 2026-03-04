@@ -45,16 +45,6 @@ _Auto-generated from spool. Do not edit manually._
 
 ## text-input-rewrite
 
-- [ ] Implement word-level cursor movement (p3)
-- [ ] Implement line-level cursor movement (p3)
-- [ ] Implement document-level cursor movement (p3)
-- [ ] Implement selection extension actions (character level) (p3)
-- [ ] Implement selection extension actions (word level) (p3)
-- [ ] Implement selection extension actions (document level) (p3)
-- [ ] Implement word deletion actions (p3)
-- [ ] Implement line deletion actions (p3)
-- [ ] Implement clipboard operations (p3)
-- [ ] Implement undo/redo with patch-based history (p3)
 - [ ] Implement index_for_position for click-to-cursor (p3)
 - [ ] Implement on_mouse_down with click counting (p3)
 - [ ] Implement double-click word selection (p3)
@@ -73,8 +63,6 @@ _Auto-generated from spool. Do not edit manually._
 - [ ] Implement vertical cursor movement (up/down) (p3)
 - [ ] Implement vertical scrolling for multiline (p3)
 - [ ] Implement line layout system for multiline (p3)
-- [ ] Implement Enter key for multiline (p3)
-- [ ] Implement Tab key handling (p3)
 - [ ] Refactor TextInput element to use InputState (p3)
 - [ ] Update playground TextInput demo (p3)
 - [ ] Write comprehensive tests for InputState (p3)
