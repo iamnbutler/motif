@@ -491,7 +491,7 @@ impl ApplicationHandler for App {
                                 Srgba::new(0.5, 0.5, 0.55, 1.0)
                             };
                             cx.paint_text(
-                                *label,
+                                label,
                                 Point::new(bounds.origin.x + 12.0, bounds.origin.y + 14.0),
                                 14.0,
                                 text_color,
@@ -626,7 +626,7 @@ impl ApplicationHandler for App {
                         }
                         // Check if clicked on focusable inputs (IDs 2000-2002)
                         let id = clicked_element.0;
-                        if id >= 2000 && id < 2003 {
+                        if (2000..2003).contains(&id) {
                             let index = (id - 2000) as usize;
                             self.input_handles[index].focus(&mut self.focus_state);
                         }

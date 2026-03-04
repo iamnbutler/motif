@@ -30,7 +30,7 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
         window_id,
         kCGWindowImageBoundsIgnoreFraming,
     )
-    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to capture window"))?;
+    .ok_or_else(|| io::Error::other("Failed to capture window"))?;
 
     let width = cg_image.width() as u32;
     let height = cg_image.height() as u32;
@@ -54,10 +54,9 @@ fn capture_window_to_png_impl(window_id: u32, path: &str) -> io::Result<()> {
     }
 
     let img = RgbaImage::from_raw(width, height, rgba_data)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to create image buffer"))?;
+        .ok_or_else(|| io::Error::other("Failed to create image buffer"))?;
 
-    img.save(Path::new(path))
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    img.save(Path::new(path)).map_err(io::Error::other)?;
 
     Ok(())
 }

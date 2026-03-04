@@ -25,6 +25,7 @@ pub struct DebugOverlays {
 
 impl DebugOverlays {
     /// Add a new overlay quad. Returns the assigned ID.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_quad(
         &mut self,
         x: f32,

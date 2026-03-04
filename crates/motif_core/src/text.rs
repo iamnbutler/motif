@@ -159,7 +159,7 @@ impl TextLayout {
                         let glyphs: Vec<PositionedGlyph> = run
                             .positioned_glyphs()
                             .map(|g| PositionedGlyph {
-                                id: g.id as u32,
+                                id: g.id,
                                 x: g.x,
                                 y: g.y,
                                 advance: g.advance,
@@ -339,7 +339,7 @@ impl TextLayout {
                         let glyphs: Vec<PositionedGlyph> = run
                             .positioned_glyphs()
                             .map(|g| PositionedGlyph {
-                                id: g.id as u32,
+                                id: g.id,
                                 x: g.x,
                                 y: g.y,
                                 advance: g.advance,

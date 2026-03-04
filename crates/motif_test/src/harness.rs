@@ -157,7 +157,7 @@ impl TestHarness {
             .entries()
             .iter()
             .find(|e| e.id == id)
-            .map(|e| e.bounds.clone())
+            .map(|e| e.bounds)
     }
 }
 
