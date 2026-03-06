@@ -22,12 +22,25 @@ impl TextContext {
 
     /// Layout text with given font size, using system default font.
     pub fn layout_text(&mut self, text: &str, font_size: f32) -> TextLayout {
+        self.layout_text_with_max_width(text, font_size, None)
+    }
+
+    /// Layout text with an optional maximum width for line wrapping.
+    ///
+    /// When `max_width` is `Some(w)`, lines are wrapped to fit within `w` logical pixels.
+    /// When `max_width` is `None`, text is laid out without wrapping (single line).
+    pub fn layout_text_with_max_width(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        max_width: Option<f32>,
+    ) -> TextLayout {
         let mut builder = self
             .layout_cx
             .ranged_builder(&mut self.font_cx, text, 1.0, false);
         builder.push_default(parley::style::StyleProperty::FontSize(font_size));
         let mut layout = builder.build(text);
-        layout.break_all_lines(None);
+        layout.break_all_lines(max_width);
         layout.align(
             None,
             parley::layout::Alignment::Start,
@@ -407,6 +420,56 @@ mod tests {
 
         assert!(layout.width() > 0.0);
         assert!(layout.height() > 0.0);
+    }
+
+    #[test]
+    fn layout_text_with_max_width_wraps_long_text() {
+        let mut ctx = TextContext::new();
+
+        // A long sentence that should be wider than 100 px at 16 pt when unwrapped.
+        let text = "This is a fairly long sentence that should definitely wrap.";
+        let unwrapped = ctx.layout_text(text, 16.0);
+
+        // Verify the unwrapped layout is wider than 100 px.
+        assert!(
+            unwrapped.width() > 100.0,
+            "expected unwrapped width > 100, got {}",
+            unwrapped.width()
+        );
+
+        // Wrap to 100 px — height must increase (more lines) and width must shrink.
+        let wrapped = ctx.layout_text_with_max_width(text, 16.0, Some(100.0));
+        assert!(
+            wrapped.height() > unwrapped.height(),
+            "wrapped text should be taller (more lines): unwrapped_h={} wrapped_h={}",
+            unwrapped.height(),
+            wrapped.height()
+        );
+        assert!(
+            wrapped.width() <= unwrapped.width(),
+            "wrapped width should not exceed unwrapped width"
+        );
+    }
+
+    #[test]
+    fn layout_text_with_no_max_width_matches_layout_text() {
+        let mut ctx = TextContext::new();
+        let text = "Hello, world!";
+
+        let via_layout_text = ctx.layout_text(text, 16.0);
+        let via_explicit_none = ctx.layout_text_with_max_width(text, 16.0, None);
+
+        // Both paths must produce the same dimensions.
+        assert_eq!(
+            via_layout_text.width(),
+            via_explicit_none.width(),
+            "width should match"
+        );
+        assert_eq!(
+            via_layout_text.height(),
+            via_explicit_none.height(),
+            "height should match"
+        );
     }
 
     #[test]

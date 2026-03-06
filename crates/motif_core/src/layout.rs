@@ -157,10 +157,8 @@ fn measure_text(
         AvailableSpace::MinContent => Some(0.0), // Force minimum width
     });
 
-    // Layout the text
-    // TODO: Support max_width for wrapping (parley's break_all_lines takes Option<f32>)
-    let _ = max_width; // Suppress unused warning for now
-    let layout = text_context.layout_text(content, font_size);
+    // Layout the text, passing max_width so parley can wrap lines at word boundaries.
+    let layout = text_context.layout_text_with_max_width(content, font_size, max_width);
 
     taffy::Size {
         width: known_dimensions.width.unwrap_or(layout.width()),
@@ -314,6 +312,60 @@ mod tests {
         // Text should have non-zero size
         assert!(bounds.size.width > 0.0, "text should have width");
         assert!(bounds.size.height > 0.0, "text should have height");
+    }
+
+    #[test]
+    fn text_wraps_when_constrained_by_parent() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        let long_text =
+            "This is a long sentence that should wrap when placed in a narrow container.";
+
+        // Unconstrained: text node inside a wide container.
+        let text_unconstrained = engine.new_leaf_with_context(
+            Style::default(),
+            MeasureContext::Text {
+                content: long_text.to_string(),
+                font_size: 16.0,
+            },
+        );
+        engine.compute_layout(text_unconstrained, 800.0, 600.0, &mut text_ctx);
+        let wide_bounds = engine.layout_bounds(text_unconstrained);
+
+        // Constrained: same text inside a 150 px-wide container.
+        let mut engine2 = LayoutEngine::new();
+        let text_constrained = engine2.new_leaf_with_context(
+            Style {
+                size: taffy::Size {
+                    width: taffy::style::Dimension::Auto,
+                    height: taffy::style::Dimension::Auto,
+                },
+                max_size: taffy::Size {
+                    width: taffy::style::Dimension::Length(150.0),
+                    height: taffy::style::Dimension::Auto,
+                },
+                ..Default::default()
+            },
+            MeasureContext::Text {
+                content: long_text.to_string(),
+                font_size: 16.0,
+            },
+        );
+        engine2.compute_layout(text_constrained, 150.0, 600.0, &mut text_ctx);
+        let narrow_bounds = engine2.layout_bounds(text_constrained);
+
+        // Constrained layout should be taller (more lines) and narrower.
+        assert!(
+            narrow_bounds.size.height > wide_bounds.size.height,
+            "constrained text should be taller: wide_h={} narrow_h={}",
+            wide_bounds.size.height,
+            narrow_bounds.size.height
+        );
+        assert!(
+            narrow_bounds.size.width <= wide_bounds.size.width,
+            "constrained text should not be wider"
+        );
     }
 
     #[test]
