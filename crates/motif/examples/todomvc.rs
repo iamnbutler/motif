@@ -29,6 +29,17 @@ struct Todo {
 }
 
 // ============================================================================
+// Filter Mode
+// ============================================================================
+
+#[derive(Clone, Copy, PartialEq)]
+enum FilterMode {
+    All,
+    Active,
+    Completed,
+}
+
+// ============================================================================
 // App State
 // ============================================================================
 
@@ -49,6 +60,7 @@ struct TodoApp {
     // Todo data
     todos: Vec<Todo>,
     next_id: usize,
+    filter: FilterMode,
 }
 
 impl TodoApp {
@@ -84,6 +96,7 @@ impl TodoApp {
                 },
             ],
             next_id: 4,
+            filter: FilterMode::All,
         }
     }
 
@@ -112,6 +125,19 @@ impl TodoApp {
 
     fn items_left(&self) -> usize {
         self.todos.iter().filter(|t| !t.completed).count()
+    }
+
+    fn filtered_todos(&self) -> Vec<Todo> {
+        match self.filter {
+            FilterMode::All => self.todos.clone(),
+            FilterMode::Active => self
+                .todos
+                .iter()
+                .filter(|t| !t.completed)
+                .cloned()
+                .collect(),
+            FilterMode::Completed => self.todos.iter().filter(|t| t.completed).cloned().collect(),
+        }
     }
 }
 
@@ -220,7 +246,7 @@ impl TodoApp {
         y += 60.0;
 
         // Todo list
-        let todos_snapshot = self.todos.to_vec();
+        let todos_snapshot = self.filtered_todos();
         for todo in &todos_snapshot {
             // Todo item background
             {
@@ -312,20 +338,86 @@ impl TodoApp {
         // Footer
         if !self.todos.is_empty() {
             y += 10.0;
+            let footer_height = 42.0;
+
+            // Footer background
+            {
+                let mut cx = DrawContext::new(&mut self.scene, scale);
+                cx.paint_quad(
+                    Rect::new(
+                        Point::new(container_x, y),
+                        Size::new(container_width, footer_height),
+                    ),
+                    Srgba::new(0.94, 0.94, 0.94, 1.0),
+                );
+            }
+
+            // Items left text
             let items_left = self.items_left();
             let footer_text = if items_left == 1 {
                 "1 item left".to_string()
             } else {
                 format!("{} items left", items_left)
             };
-            let mut cx = DrawContext::new(&mut self.scene, scale);
-            cx.paint_text(
-                &footer_text,
-                Point::new(container_x + 16.0, y + 20.0),
-                14.0,
-                Srgba::new(0.6, 0.6, 0.6, 1.0),
-                &mut self.text_ctx,
-            );
+            {
+                let mut cx = DrawContext::new(&mut self.scene, scale);
+                cx.paint_text(
+                    &footer_text,
+                    Point::new(container_x + 16.0, y + 27.0),
+                    14.0,
+                    Srgba::new(0.6, 0.6, 0.6, 1.0),
+                    &mut self.text_ctx,
+                );
+            }
+
+            // Filter tabs: All | Active | Completed (centered)
+            let current_filter = self.filter;
+            let tab_labels = ["All", "Active", "Completed"];
+            let tab_width = 76.0;
+            let tabs_total = tab_width * tab_labels.len() as f32;
+            let tabs_x = container_x + (container_width - tabs_total) / 2.0;
+
+            for i in 0..tab_labels.len() {
+                let tab_x = tabs_x + i as f32 * tab_width;
+                let tab_bounds = Rect::new(
+                    Point::new(tab_x + 2.0, y + 10.0),
+                    Size::new(tab_width - 4.0, 22.0),
+                );
+                let is_active = match i {
+                    0 => current_filter == FilterMode::All,
+                    1 => current_filter == FilterMode::Active,
+                    _ => current_filter == FilterMode::Completed,
+                };
+                {
+                    let mut cx = DrawContext::new(&mut self.scene, scale);
+                    if is_active {
+                        // Border
+                        cx.paint_quad(
+                            Rect::new(
+                                Point::new(tab_x + 1.0, y + 9.0),
+                                Size::new(tab_width - 2.0, 24.0),
+                            ),
+                            Srgba::new(0.75, 0.75, 0.75, 1.0),
+                        );
+                        // Fill
+                        cx.paint_quad(tab_bounds, Srgba::new(1.0, 1.0, 1.0, 1.0));
+                    }
+                    let text_color = if is_active {
+                        Srgba::new(0.3, 0.3, 0.3, 1.0)
+                    } else {
+                        Srgba::new(0.6, 0.6, 0.6, 1.0)
+                    };
+                    cx.paint_text(
+                        tab_labels[i],
+                        Point::new(tab_x + 10.0, y + 27.0),
+                        14.0,
+                        text_color,
+                        &mut self.text_ctx,
+                    );
+                }
+                let tab_id = ElementId(4001 + i as u64);
+                self.hit_tree.push(tab_id, tab_bounds);
+            }
         }
 
         // Update hit testing
@@ -439,6 +531,15 @@ impl ApplicationHandler for TodoApp {
                         if (3000..4000).contains(&id) {
                             let todo_id = (id - 3000) as usize;
                             self.delete_todo(todo_id);
+                        }
+
+                        // Filter tab clicked (4001=All, 4002=Active, 4003=Completed)
+                        if id == 4001 {
+                            self.filter = FilterMode::All;
+                        } else if id == 4002 {
+                            self.filter = FilterMode::Active;
+                        } else if id == 4003 {
+                            self.filter = FilterMode::Completed;
                         }
                     } else {
                         self.new_todo_focused = false;
