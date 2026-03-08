@@ -28,3 +28,10 @@ winit = "0.30"
 objc2 = "0.5"
 objc2-app-kit = "0.2"
 objc2-foundation = "0.2"
+
+# Optimize dependency compilation in dev builds: dependencies get full optimizations
+# while your own code stays at opt-level 0 for fast incremental recompilation.
+# This noticeably improves hot-reload iteration speed by reducing framework overhead.
+# Resolves spool task: Optimize hot reload dev profile for faster iteration (p3)
+[profile.dev.package."*"]
+opt-level = 3
