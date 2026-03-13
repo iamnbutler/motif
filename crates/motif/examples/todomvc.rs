@@ -110,6 +110,14 @@ impl TodoApp {
         self.todos.retain(|t| t.id != id);
     }
 
+    fn toggle_all(&mut self) {
+        let all_completed = self.todos.iter().all(|t| t.completed);
+        let new_state = !all_completed;
+        for todo in &mut self.todos {
+            todo.completed = new_state;
+        }
+    }
+
     fn items_left(&self) -> usize {
         self.todos.iter().filter(|t| !t.completed).count()
     }
@@ -215,6 +223,28 @@ impl TodoApp {
             );
             pcx.set_offset(offset);
             input.paint(input_bounds, &mut pcx);
+        }
+
+        // Toggle-all chevron (only shown when there are todos)
+        if !self.todos.is_empty() {
+            let toggle_id = ElementId(998);
+            let all_done = self.todos.iter().all(|t| t.completed);
+            let chevron = if all_done { "▾" } else { "▸" };
+            let toggle_bounds = Rect::new(
+                Point::new(container_x + 8.0, y + 16.0),
+                Size::new(28.0, 28.0),
+            );
+            {
+                let mut cx = DrawContext::new(&mut self.scene, scale);
+                cx.paint_text(
+                    chevron,
+                    Point::new(container_x + 12.0, y + 38.0),
+                    18.0,
+                    Srgba::new(0.7, 0.7, 0.7, 1.0),
+                    &mut self.text_ctx,
+                );
+            }
+            self.hit_tree.push(toggle_id, toggle_bounds);
         }
 
         y += 60.0;
@@ -427,6 +457,11 @@ impl ApplicationHandler for TodoApp {
                             }
                         } else {
                             self.new_todo_focused = false;
+                        }
+
+                        // Toggle-all chevron clicked (id 998)
+                        if id == 998 {
+                            self.toggle_all();
                         }
 
                         // Checkbox clicked (2000 + todo_id)
