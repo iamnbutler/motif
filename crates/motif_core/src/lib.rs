@@ -12,6 +12,7 @@ pub mod layout;
 pub mod renderer;
 pub mod scene;
 pub mod text;
+pub mod theme;
 
 #[cfg(target_os = "macos")]
 pub mod metal;
@@ -30,6 +31,7 @@ pub use layout::*;
 pub use renderer::*;
 pub use scene::*;
 pub use text::*;
+pub use theme::{DefaultTheme, Theme};
 
 // Re-export commonly used palette types
 pub use palette::{Hsla, LinSrgba, Srgba};
