@@ -110,6 +110,10 @@ impl TodoApp {
         self.todos.retain(|t| t.id != id);
     }
 
+    fn clear_completed(&mut self) {
+        self.todos.retain(|t| !t.completed);
+    }
+
     fn items_left(&self) -> usize {
         self.todos.iter().filter(|t| !t.completed).count()
     }
@@ -313,6 +317,7 @@ impl TodoApp {
         if !self.todos.is_empty() {
             y += 10.0;
             let items_left = self.items_left();
+            let completed_count = self.todos.iter().filter(|t| t.completed).count();
             let footer_text = if items_left == 1 {
                 "1 item left".to_string()
             } else {
@@ -326,6 +331,30 @@ impl TodoApp {
                 Srgba::new(0.6, 0.6, 0.6, 1.0),
                 &mut self.text_ctx,
             );
+
+            // "Clear completed" button — right side of footer, only shown when items exist
+            if completed_count > 0 {
+                let clear_id = ElementId(4000);
+                let hovered = self.input_state.hovered() == Some(clear_id);
+                let color = if hovered {
+                    Srgba::new(0.3, 0.3, 0.3, 1.0)
+                } else {
+                    Srgba::new(0.6, 0.6, 0.6, 1.0)
+                };
+                let button_x = container_x + container_width - 115.0;
+                let mut cx = DrawContext::new(&mut self.scene, scale);
+                cx.paint_text(
+                    "Clear completed",
+                    Point::new(button_x, y + 20.0),
+                    14.0,
+                    color,
+                    &mut self.text_ctx,
+                );
+                self.hit_tree.push(
+                    clear_id,
+                    Rect::new(Point::new(button_x - 4.0, y + 4.0), Size::new(115.0, 20.0)),
+                );
+            }
         }
 
         // Update hit testing
@@ -439,6 +468,11 @@ impl ApplicationHandler for TodoApp {
                         if (3000..4000).contains(&id) {
                             let todo_id = (id - 3000) as usize;
                             self.delete_todo(todo_id);
+                        }
+
+                        // Clear completed clicked
+                        if id == 4000 {
+                            self.clear_completed();
                         }
                     } else {
                         self.new_todo_focused = false;
