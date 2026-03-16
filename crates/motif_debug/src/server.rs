@@ -9,10 +9,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use motif_core::HitTree;
+
 use crate::input_sim::{self, WindowPosition};
 use crate::protocol::{DebugRequest, DebugResponse};
 use crate::screenshot;
-use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
+use crate::snapshot::{BoundsInfo, ColorInfo, HitEntryInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
 
 /// Shared state for debug overlays injected via the debug CLI.
 ///
@@ -78,6 +80,7 @@ pub struct DebugServer {
     window_id: Arc<Mutex<Option<u32>>>,
     window_position: Arc<Mutex<WindowPosition>>,
     overlays: Arc<Mutex<DebugOverlays>>,
+    hit_tree: Arc<Mutex<Option<Vec<HitEntryInfo>>>>,
     _shutdown: Arc<Mutex<bool>>,
 }
 
@@ -109,6 +112,7 @@ impl DebugServer {
         let window_position: Arc<Mutex<WindowPosition>> =
             Arc::new(Mutex::new(WindowPosition::default()));
         let overlays: Arc<Mutex<DebugOverlays>> = Arc::new(Mutex::new(DebugOverlays::default()));
+        let hit_tree: Arc<Mutex<Option<Vec<HitEntryInfo>>>> = Arc::new(Mutex::new(None));
         let shutdown = Arc::new(Mutex::new(false));
 
         let server_snapshot = Arc::clone(&snapshot);
@@ -116,6 +120,7 @@ impl DebugServer {
         let server_window_id = Arc::clone(&window_id);
         let server_window_position = Arc::clone(&window_position);
         let server_overlays = Arc::clone(&overlays);
+        let server_hit_tree = Arc::clone(&hit_tree);
         let server_shutdown = Arc::clone(&shutdown);
 
         thread::spawn(move || {
@@ -126,6 +131,7 @@ impl DebugServer {
                 server_window_id,
                 server_window_position,
                 server_overlays,
+                server_hit_tree,
                 server_shutdown,
             );
         });
@@ -139,6 +145,7 @@ impl DebugServer {
             window_id,
             window_position,
             overlays,
+            hit_tree,
             _shutdown: shutdown,
         })
     }
@@ -173,6 +180,30 @@ impl DebugServer {
         }
     }
 
+    /// Update the shared hit tree snapshot. Called from the render loop each frame.
+    ///
+    /// Stores a flat list of every element registered in `hit_tree` this frame.
+    /// Used by the `element.list` debug command.
+    pub fn update_hit_tree(&self, hit_tree: &HitTree) {
+        let entries: Vec<HitEntryInfo> = hit_tree
+            .entries()
+            .iter()
+            .map(|e| HitEntryInfo {
+                id: e.id.0,
+                bounds: BoundsInfo {
+                    x: e.bounds.origin.x,
+                    y: e.bounds.origin.y,
+                    w: e.bounds.size.width,
+                    h: e.bounds.size.height,
+                },
+                z_index: e.z_index,
+            })
+            .collect();
+        if let Ok(mut guard) = self.hit_tree.lock() {
+            *guard = Some(entries);
+        }
+    }
+
     /// Return the socket path for this server.
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
@@ -196,6 +227,7 @@ impl DebugServer {
         window_id: Arc<Mutex<Option<u32>>>,
         window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
+        hit_tree: Arc<Mutex<Option<Vec<HitEntryInfo>>>>,
         shutdown: Arc<Mutex<bool>>,
     ) {
         loop {
@@ -215,8 +247,9 @@ impl DebugServer {
                     let wid = Arc::clone(&window_id);
                     let wpos = Arc::clone(&window_position);
                     let ovl = Arc::clone(&overlays);
+                    let ht = Arc::clone(&hit_tree);
                     thread::spawn(move || {
-                        Self::handle_connection(stream, snap, inp, wid, wpos, ovl);
+                        Self::handle_connection(stream, snap, inp, wid, wpos, ovl, ht);
                     });
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -238,6 +271,7 @@ impl DebugServer {
         window_id: Arc<Mutex<Option<u32>>>,
         window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
+        hit_tree: Arc<Mutex<Option<Vec<HitEntryInfo>>>>,
     ) {
         let reader = BufReader::new(match stream.try_clone() {
             Ok(s) => s,
@@ -274,6 +308,7 @@ impl DebugServer {
                 &window_id,
                 &window_position,
                 &overlays,
+                &hit_tree,
             );
             let _ = writeln!(writer, "{}", serde_json::to_string(&response).unwrap());
         }
@@ -286,6 +321,7 @@ impl DebugServer {
         window_id: &Arc<Mutex<Option<u32>>>,
         window_position: &Arc<Mutex<WindowPosition>>,
         overlays: &Arc<Mutex<DebugOverlays>>,
+        hit_tree: &Arc<Mutex<Option<Vec<HitEntryInfo>>>>,
     ) -> DebugResponse {
         match request.method.as_str() {
             "scene.stats" => {
@@ -333,11 +369,27 @@ impl DebugServer {
             "debug.clear" => Self::handle_clear(request, overlays),
             "debug.remove" => Self::handle_remove(request, overlays),
             "debug.list" => Self::handle_list(request, overlays),
+            "element.list" => Self::handle_element_list(request, hit_tree),
             _ => DebugResponse::err(
                 request.id,
                 -32601,
                 format!("Method not found: {}", request.method),
             ),
+        }
+    }
+
+    fn handle_element_list(
+        request: &DebugRequest,
+        hit_tree: &Arc<Mutex<Option<Vec<HitEntryInfo>>>>,
+    ) -> DebugResponse {
+        let guard = hit_tree.lock().unwrap_or_else(|e| e.into_inner());
+        match guard.as_ref() {
+            Some(entries) => {
+                let json =
+                    serde_json::to_value(entries).unwrap_or(serde_json::Value::Array(vec![]));
+                DebugResponse::ok(request.id, json)
+            }
+            None => DebugResponse::err(request.id, -32000, "No hit tree available yet"),
         }
     }
 
