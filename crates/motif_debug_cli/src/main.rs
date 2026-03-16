@@ -97,6 +97,13 @@ fn print_usage() {
     eprintln!("  input.mouse_down <x> <y>       Press mouse button at coordinates");
     eprintln!("  input.mouse_up <x> <y>         Release mouse button at coordinates");
     eprintln!("  input.drag <x1> <y1> <x2> <y2> Drag from one point to another");
+    eprintln!("  input.key_press <key>          Press and release a key (name or keycode)");
+    eprintln!("  input.key_down <key>           Press a key (name or virtual key code)");
+    eprintln!("  input.key_up <key>             Release a key (name or virtual key code)");
+    eprintln!();
+    eprintln!("KEY NAMES (for keyboard commands):");
+    eprintln!("  Named: return, tab, space, escape, delete, up, down, left, right");
+    eprintln!("  Letters: a-z  |  Digits: 0-9  |  Or use numeric virtual key code");
     eprintln!();
     eprintln!("If no command is given, starts an interactive REPL.");
 }
@@ -132,6 +139,12 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
         parse_input_xy("input.mouse_up", args)
     } else if let Some(args) = trimmed.strip_prefix("input.drag ") {
         parse_input_drag(args)
+    } else if let Some(args) = trimmed.strip_prefix("input.key_press ") {
+        parse_input_key("input.key_press", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.key_down ") {
+        parse_input_key("input.key_down", args)
+    } else if let Some(args) = trimmed.strip_prefix("input.key_up ") {
+        parse_input_key("input.key_up", args)
     } else {
         (trimmed, None)
     }
@@ -187,6 +200,118 @@ fn parse_input_xy(method: &'static str, args: &str) -> (&'static str, Option<ser
         "y": parts[1],
     });
     (method, Some(params))
+}
+
+/// Resolve a key name or numeric string to a macOS virtual key code.
+///
+/// Accepts either a numeric virtual key code (e.g. `36`) or a named key
+/// (e.g. `return`, `escape`, `a`, `space`).  Names are case-insensitive.
+fn key_name_to_code(s: &str) -> Option<u16> {
+    // Numeric key code takes priority.
+    if let Ok(n) = s.parse::<u16>() {
+        return Some(n);
+    }
+
+    // Named keys — macOS virtual key codes (kVK_*) from Carbon/Events.h.
+    match s.to_lowercase().as_str() {
+        // Letters (ANSI layout)
+        "a" => Some(0),
+        "s" => Some(1),
+        "d" => Some(2),
+        "f" => Some(3),
+        "h" => Some(4),
+        "g" => Some(5),
+        "z" => Some(6),
+        "x" => Some(7),
+        "c" => Some(8),
+        "v" => Some(9),
+        "b" => Some(11),
+        "q" => Some(12),
+        "w" => Some(13),
+        "e" => Some(14),
+        "r" => Some(15),
+        "y" => Some(16),
+        "t" => Some(17),
+        "o" => Some(31),
+        "u" => Some(32),
+        "i" => Some(34),
+        "p" => Some(35),
+        "l" => Some(37),
+        "j" => Some(38),
+        "k" => Some(40),
+        "n" => Some(45),
+        "m" => Some(46),
+        // Digits
+        "1" => Some(18),
+        "2" => Some(19),
+        "3" => Some(20),
+        "4" => Some(21),
+        "5" => Some(23),
+        "6" => Some(22),
+        "7" => Some(26),
+        "8" => Some(28),
+        "9" => Some(25),
+        "0" => Some(29),
+        // Special keys
+        "return" | "enter" => Some(36),
+        "tab" => Some(48),
+        "space" => Some(49),
+        "delete" | "backspace" => Some(51),
+        "escape" | "esc" => Some(53),
+        "forwarddelete" | "del" => Some(117),
+        // Arrow keys
+        "left" | "leftarrow" => Some(123),
+        "right" | "rightarrow" => Some(124),
+        "down" | "downarrow" => Some(125),
+        "up" | "uparrow" => Some(126),
+        // Navigation
+        "home" => Some(115),
+        "end" => Some(119),
+        "pageup" => Some(116),
+        "pagedown" => Some(121),
+        // Modifier keys
+        "shift" | "leftshift" => Some(56),
+        "rightshift" => Some(60),
+        "control" | "ctrl" | "leftcontrol" => Some(59),
+        "rightcontrol" => Some(62),
+        "option" | "alt" | "leftoption" => Some(58),
+        "rightoption" => Some(61),
+        "command" | "cmd" | "leftcommand" => Some(55),
+        "capslock" => Some(57),
+        "fn" => Some(63),
+        // Function keys
+        "f1" => Some(122),
+        "f2" => Some(120),
+        "f3" => Some(99),
+        "f4" => Some(118),
+        "f5" => Some(96),
+        "f6" => Some(97),
+        "f7" => Some(98),
+        "f8" => Some(100),
+        "f9" => Some(101),
+        "f10" => Some(109),
+        "f11" => Some(103),
+        "f12" => Some(111),
+        _ => None,
+    }
+}
+
+/// Parse `input.key_press <key>`, `input.key_down <key>`, `input.key_up <key>`.
+///
+/// `<key>` is a key name (e.g. `return`, `a`, `space`) or a numeric virtual
+/// key code.
+fn parse_input_key(method: &'static str, args: &str) -> (&'static str, Option<serde_json::Value>) {
+    let key_str = args.trim();
+    match key_name_to_code(key_str) {
+        Some(code) => (method, Some(serde_json::json!({ "key": code }))),
+        None => {
+            eprintln!(
+                "error: unknown key {:?} — use a key name (e.g. return, space, a) or numeric virtual key code",
+                key_str
+            );
+            (method, None)
+        }
+    }
 }
 
 /// Parse `input.drag x1 y1 x2 y2` into a drag request.
@@ -307,6 +432,15 @@ fn format_input_mouse_up(value: &serde_json::Value) -> String {
         "Mouse up at ({:.1}, {:.1}) [screen: ({:.1}, {:.1})]\n",
         lx, ly, sx, sy
     )
+}
+
+fn format_input_key(value: &serde_json::Value) -> String {
+    let key = value.get("key").and_then(|v| v.as_u64()).unwrap_or(0);
+    let action = value
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    format!("Key {} {}.\n", key, action)
 }
 
 fn format_input_drag(value: &serde_json::Value) -> String {
@@ -594,6 +728,9 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "input.mouse_down" => print!("{}", format_input_mouse_down(result)),
         "input.mouse_up" => print!("{}", format_input_mouse_up(result)),
         "input.drag" => print!("{}", format_input_drag(result)),
+        "input.key_press" | "input.key_down" | "input.key_up" => {
+            print!("{}", format_input_key(result))
+        }
         _ => {
             let pretty = serde_json::to_string_pretty(result).unwrap_or_default();
             println!("{pretty}");
@@ -668,5 +805,125 @@ fn main() {
             // REPL mode.
             run_repl(client, args.json);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_name_to_code_named_keys() {
+        assert_eq!(key_name_to_code("return"), Some(36));
+        assert_eq!(key_name_to_code("enter"), Some(36));
+        assert_eq!(key_name_to_code("tab"), Some(48));
+        assert_eq!(key_name_to_code("space"), Some(49));
+        assert_eq!(key_name_to_code("escape"), Some(53));
+        assert_eq!(key_name_to_code("esc"), Some(53));
+        assert_eq!(key_name_to_code("delete"), Some(51));
+        assert_eq!(key_name_to_code("backspace"), Some(51));
+    }
+
+    #[test]
+    fn key_name_to_code_arrow_keys() {
+        assert_eq!(key_name_to_code("left"), Some(123));
+        assert_eq!(key_name_to_code("leftarrow"), Some(123));
+        assert_eq!(key_name_to_code("right"), Some(124));
+        assert_eq!(key_name_to_code("down"), Some(125));
+        assert_eq!(key_name_to_code("up"), Some(126));
+    }
+
+    #[test]
+    fn key_name_to_code_letters() {
+        assert_eq!(key_name_to_code("a"), Some(0));
+        assert_eq!(key_name_to_code("z"), Some(6));
+        assert_eq!(key_name_to_code("c"), Some(8));
+        assert_eq!(key_name_to_code("v"), Some(9));
+    }
+
+    #[test]
+    fn key_name_to_code_digits() {
+        assert_eq!(key_name_to_code("0"), Some(29));
+        assert_eq!(key_name_to_code("1"), Some(18));
+        assert_eq!(key_name_to_code("9"), Some(25));
+    }
+
+    #[test]
+    fn key_name_to_code_numeric_passthrough() {
+        assert_eq!(key_name_to_code("36"), Some(36));
+        assert_eq!(key_name_to_code("126"), Some(126));
+        assert_eq!(key_name_to_code("0"), Some(29)); // "0" resolves as digit name first
+    }
+
+    #[test]
+    fn key_name_to_code_unknown_returns_none() {
+        assert_eq!(key_name_to_code(""), None);
+        assert_eq!(key_name_to_code("notakey"), None);
+    }
+
+    #[test]
+    fn key_name_to_code_case_insensitive() {
+        assert_eq!(key_name_to_code("RETURN"), Some(36));
+        assert_eq!(key_name_to_code("Space"), Some(49));
+        assert_eq!(key_name_to_code("ESC"), Some(53));
+    }
+
+    #[test]
+    fn parse_input_key_named() {
+        let (method, params) = parse_input_key("input.key_press", "return");
+        assert_eq!(method, "input.key_press");
+        let p = params.expect("should produce params");
+        assert_eq!(p["key"], 36);
+    }
+
+    #[test]
+    fn parse_input_key_numeric() {
+        let (method, params) = parse_input_key("input.key_down", "53");
+        assert_eq!(method, "input.key_down");
+        let p = params.expect("should produce params");
+        assert_eq!(p["key"], 53);
+    }
+
+    #[test]
+    fn parse_input_key_unknown_returns_none_params() {
+        let (_method, params) = parse_input_key("input.key_press", "notakey");
+        assert!(params.is_none());
+    }
+
+    #[test]
+    fn parse_command_dispatches_key_press() {
+        let (method, params) = parse_command("input.key_press return");
+        assert_eq!(method, "input.key_press");
+        assert_eq!(params.as_ref().and_then(|p| p["key"].as_u64()), Some(36));
+    }
+
+    #[test]
+    fn parse_command_dispatches_key_down() {
+        let (method, params) = parse_command("input.key_down space");
+        assert_eq!(method, "input.key_down");
+        assert_eq!(params.as_ref().and_then(|p| p["key"].as_u64()), Some(49));
+    }
+
+    #[test]
+    fn parse_command_dispatches_key_up() {
+        let (method, params) = parse_command("input.key_up 36");
+        assert_eq!(method, "input.key_up");
+        assert_eq!(params.as_ref().and_then(|p| p["key"].as_u64()), Some(36));
+    }
+
+    #[test]
+    fn format_input_key_down() {
+        let val = serde_json::json!({ "key": 36, "action": "down" });
+        let out = format_input_key(&val);
+        assert!(out.contains("36"));
+        assert!(out.contains("down"));
+    }
+
+    #[test]
+    fn format_input_key_press() {
+        let val = serde_json::json!({ "key": 49, "action": "press" });
+        let out = format_input_key(&val);
+        assert!(out.contains("49"));
+        assert!(out.contains("press"));
     }
 }
