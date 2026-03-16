@@ -12,14 +12,17 @@ use std::thread;
 use crate::input_sim::{self, WindowPosition};
 use crate::protocol::{DebugRequest, DebugResponse};
 use crate::screenshot;
-use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
+use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, OverlayText, SceneSnapshot};
 
 /// Shared state for debug overlays injected via the debug CLI.
 ///
 /// Overlays persist across frames until explicitly cleared.
+/// Quad and text overlays share a single auto-incrementing `next_id` counter
+/// so every overlay has a globally unique ID regardless of kind.
 #[derive(Debug, Default)]
 pub struct DebugOverlays {
     pub quads: Vec<OverlayQuad>,
+    pub texts: Vec<OverlayText>,
     next_id: u64,
 }
 
@@ -53,17 +56,41 @@ impl DebugOverlays {
         id
     }
 
-    /// Remove a specific overlay by ID. Returns true if it was found and removed.
-    pub fn remove(&mut self, id: u64) -> bool {
-        let len_before = self.quads.len();
-        self.quads.retain(|q| q.id != id);
-        self.quads.len() < len_before
+    /// Add a new overlay text label. Returns the assigned ID.
+    pub fn add_text(
+        &mut self,
+        x: f32,
+        y: f32,
+        font_size: f32,
+        content: String,
+        color: ColorInfo,
+    ) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.texts.push(OverlayText {
+            id,
+            x,
+            y,
+            font_size,
+            content,
+            color,
+        });
+        id
     }
 
-    /// Clear all overlays. Returns the number removed.
+    /// Remove a specific overlay (quad or text) by ID. Returns true if found and removed.
+    pub fn remove(&mut self, id: u64) -> bool {
+        let before = self.quads.len() + self.texts.len();
+        self.quads.retain(|q| q.id != id);
+        self.texts.retain(|t| t.id != id);
+        (self.quads.len() + self.texts.len()) < before
+    }
+
+    /// Clear all overlays (quads and texts). Returns the total number removed.
     pub fn clear(&mut self) -> usize {
-        let count = self.quads.len();
+        let count = self.quads.len() + self.texts.len();
         self.quads.clear();
+        self.texts.clear();
         count
     }
 }
@@ -178,7 +205,7 @@ impl DebugServer {
         &self.socket_path
     }
 
-    /// Return a clone of the current debug overlays.
+    /// Return a clone of the current debug overlay quads.
     ///
     /// Call this each frame to paint overlay quads on top of the scene.
     pub fn overlays(&self) -> Vec<OverlayQuad> {
@@ -186,6 +213,18 @@ impl DebugServer {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .quads
+            .clone()
+    }
+
+    /// Return a clone of the current debug overlay text labels.
+    ///
+    /// Call this each frame to render overlay text on top of the scene using
+    /// the application's own font stack.
+    pub fn overlay_texts(&self) -> Vec<OverlayText> {
+        self.overlays
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .texts
             .clone()
     }
 
@@ -330,6 +369,7 @@ impl DebugServer {
             "input.drag" => Self::handle_input_drag(request, window_position),
             "screenshot" => Self::handle_screenshot(request, window_id),
             "debug.draw_quad" => Self::handle_draw_quad(request, overlays),
+            "debug.draw_text" => Self::handle_draw_text(request, overlays),
             "debug.clear" => Self::handle_clear(request, overlays),
             "debug.remove" => Self::handle_remove(request, overlays),
             "debug.list" => Self::handle_list(request, overlays),
@@ -443,10 +483,86 @@ impl DebugServer {
         DebugResponse::ok(request.id, serde_json::json!({ "removed": removed }))
     }
 
+    fn handle_draw_text(
+        request: &DebugRequest,
+        overlays: &Arc<Mutex<DebugOverlays>>,
+    ) -> DebugResponse {
+        let params = match &request.params {
+            Some(p) => p,
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "debug.draw_text requires params: { x, y, font_size, content }",
+                )
+            }
+        };
+
+        let x = params.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let y = params.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+        let font_size = params
+            .get("font_size")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(14.0) as f32;
+
+        let content = match params.get("content").and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => {
+                return DebugResponse::err(
+                    request.id,
+                    -32602,
+                    "debug.draw_text requires a \"content\" parameter",
+                )
+            }
+        };
+
+        let color = match params.get("color").and_then(|v| v.as_array()) {
+            Some(arr) if arr.len() >= 4 => ColorInfo {
+                r: arr[0].as_f64().unwrap_or(1.0) as f32,
+                g: arr[1].as_f64().unwrap_or(1.0) as f32,
+                b: arr[2].as_f64().unwrap_or(1.0) as f32,
+                a: arr[3].as_f64().unwrap_or(1.0) as f32,
+            },
+            _ => ColorInfo {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 1.0,
+            },
+        };
+
+        let mut guard = overlays.lock().unwrap_or_else(|e| e.into_inner());
+        let id = guard.add_text(x, y, font_size, content, color);
+
+        DebugResponse::ok(request.id, serde_json::json!({ "id": id }))
+    }
+
     fn handle_list(request: &DebugRequest, overlays: &Arc<Mutex<DebugOverlays>>) -> DebugResponse {
         let guard = overlays.lock().unwrap_or_else(|e| e.into_inner());
-        let json = serde_json::to_value(&guard.quads).unwrap_or(serde_json::Value::Array(vec![]));
-        DebugResponse::ok(request.id, json)
+
+        // Return a unified list; each entry includes a "kind" discriminator so
+        // the CLI (and any tooling) can distinguish quads from text labels.
+        let mut items = Vec::new();
+
+        for q in &guard.quads {
+            if let Ok(mut v) = serde_json::to_value(q) {
+                if let serde_json::Value::Object(ref mut m) = v {
+                    m.insert("kind".to_string(), serde_json::json!("quad"));
+                }
+                items.push(v);
+            }
+        }
+
+        for t in &guard.texts {
+            if let Ok(mut v) = serde_json::to_value(t) {
+                if let serde_json::Value::Object(ref mut m) = v {
+                    m.insert("kind".to_string(), serde_json::json!("text"));
+                }
+                items.push(v);
+            }
+        }
+
+        DebugResponse::ok(request.id, serde_json::Value::Array(items))
     }
 
     fn handle_screenshot(
@@ -1261,5 +1377,221 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&serde_json::json!("left")));
+    }
+
+    // --- Text overlay tests ---
+
+    #[test]
+    fn draw_text_returns_id() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let req = r#"{"method":"debug.draw_text","params":{"x":10,"y":20,"font_size":14,"content":"Hello"},"id":1}"#;
+        let resp = send_request(&mut stream, req);
+        assert_eq!(resp.id, 1);
+        assert!(resp.error.is_none());
+        let result = resp.result.unwrap();
+        assert_eq!(result["id"], 0, "first overlay should get id 0");
+    }
+
+    #[test]
+    fn draw_text_missing_content_returns_error() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let req = r#"{"method":"debug.draw_text","params":{"x":10,"y":20,"font_size":14},"id":1}"#;
+        let resp = send_request(&mut stream, req);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
+    }
+
+    #[test]
+    fn draw_text_missing_params_returns_error() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let req = r#"{"method":"debug.draw_text","params":null,"id":1}"#;
+        let resp = send_request(&mut stream, req);
+        assert!(resp.error.is_some());
+        assert_eq!(resp.error.unwrap().code, -32602);
+    }
+
+    #[test]
+    fn text_and_quad_share_id_counter() {
+        // A quad assigned id 0, then a text should get id 1.
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let quad = r#"{"method":"debug.draw_quad","params":{"x":0,"y":0,"w":10,"h":10,"color":[1,0,0,1]},"id":1}"#;
+        let resp_q = send_request(&mut stream, quad);
+        assert_eq!(resp_q.result.unwrap()["id"], 0);
+
+        let text = r#"{"method":"debug.draw_text","params":{"x":0,"y":0,"font_size":12,"content":"hi"},"id":2}"#;
+        let resp_t = send_request(&mut stream, text);
+        assert_eq!(resp_t.result.unwrap()["id"], 1);
+    }
+
+    #[test]
+    fn list_includes_quads_and_texts_with_kind() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let quad = r#"{"method":"debug.draw_quad","params":{"x":5,"y":5,"w":50,"h":50,"color":[1,0,0,1]},"id":1}"#;
+        send_request(&mut stream, quad);
+
+        let text = r#"{"method":"debug.draw_text","params":{"x":10,"y":20,"font_size":14,"content":"Debug"},"id":2}"#;
+        send_request(&mut stream, text);
+
+        let list = r#"{"method":"debug.list","params":null,"id":3}"#;
+        let resp = send_request(&mut stream, list);
+        assert!(resp.error.is_none());
+        let arr = resp.result.unwrap();
+        let arr = arr.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+
+        // Quads come first.
+        assert_eq!(arr[0]["kind"], "quad");
+        assert_eq!(arr[0]["x"], 5.0);
+
+        // Then texts.
+        assert_eq!(arr[1]["kind"], "text");
+        assert_eq!(arr[1]["x"], 10.0);
+        assert_eq!(arr[1]["content"], "Debug");
+        assert_eq!(arr[1]["font_size"], 14.0);
+    }
+
+    #[test]
+    fn clear_removes_both_quads_and_texts() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let quad = r#"{"method":"debug.draw_quad","params":{"x":0,"y":0,"w":10,"h":10,"color":[1,0,0,1]},"id":1}"#;
+        send_request(&mut stream, quad);
+
+        let text = r#"{"method":"debug.draw_text","params":{"x":0,"y":0,"font_size":12,"content":"hi"},"id":2}"#;
+        send_request(&mut stream, text);
+
+        let clear = r#"{"method":"debug.clear","params":null,"id":3}"#;
+        let resp = send_request(&mut stream, clear);
+        // 1 quad + 1 text = 2 cleared
+        assert_eq!(resp.result.unwrap()["cleared"], 2);
+    }
+
+    #[test]
+    fn remove_text_by_id() {
+        let path = test_socket_path();
+        let _server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let text = r#"{"method":"debug.draw_text","params":{"x":5,"y":5,"font_size":12,"content":"label"},"id":1}"#;
+        let resp_t = send_request(&mut stream, text);
+        let text_id = resp_t.result.unwrap()["id"].as_u64().unwrap();
+
+        let remove = format!(
+            r#"{{"method":"debug.remove","params":{{"id":{}}},"id":2}}"#,
+            text_id
+        );
+        let resp = send_request(&mut stream, &remove);
+        assert!(resp.error.is_none());
+        assert_eq!(resp.result.unwrap()["removed"], true);
+
+        // List should now be empty.
+        let list = r#"{"method":"debug.list","params":null,"id":3}"#;
+        let resp3 = send_request(&mut stream, list);
+        let arr = resp3.result.unwrap();
+        assert_eq!(arr.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn overlay_texts_accessor_returns_current_state() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Initially empty.
+        assert!(server.overlay_texts().is_empty());
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let text = r#"{"method":"debug.draw_text","params":{"x":30,"y":40,"font_size":16,"content":"FPS: 60"},"id":1}"#;
+        send_request(&mut stream, text);
+
+        let texts = server.overlay_texts();
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].x, 30.0);
+        assert_eq!(texts[0].y, 40.0);
+        assert_eq!(texts[0].font_size, 16.0);
+        assert_eq!(texts[0].content, "FPS: 60");
+        // Default colour is white.
+        assert_eq!(texts[0].color.r, 1.0);
+        assert_eq!(texts[0].color.g, 1.0);
+        assert_eq!(texts[0].color.b, 1.0);
+        assert_eq!(texts[0].color.a, 1.0);
+    }
+
+    #[test]
+    fn draw_text_with_custom_color() {
+        let path = test_socket_path();
+        let server = DebugServer::with_path(path.clone()).expect("server should start");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut stream = UnixStream::connect(&path).expect("should connect");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+
+        let req = r#"{"method":"debug.draw_text","params":{"x":0,"y":0,"font_size":12,"content":"red","color":[1,0,0,0.8]},"id":1}"#;
+        send_request(&mut stream, req);
+
+        let texts = server.overlay_texts();
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].color.r, 1.0);
+        assert_eq!(texts[0].color.g, 0.0);
+        assert_eq!(texts[0].color.b, 0.0);
+        assert!((texts[0].color.a - 0.8).abs() < 0.001);
     }
 }

@@ -20,6 +20,27 @@ pub struct OverlayQuad {
     pub corner_radius: f32,
 }
 
+/// A debug overlay text label injected via the debug CLI.
+///
+/// These persist across frames until explicitly cleared.  The host
+/// application reads `DebugServer::overlay_texts()` each frame and renders
+/// the labels using its own font stack, giving full control over font
+/// selection and glyph shaping.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct OverlayText {
+    pub id: u64,
+    /// X position in logical pixels (window-local coordinates).
+    pub x: f32,
+    /// Y position in logical pixels (window-local coordinates, top-left origin).
+    pub y: f32,
+    /// Desired font size in logical pixels.
+    pub font_size: f32,
+    /// Text content to render.
+    pub content: String,
+    /// Text colour (RGBA, each component 0.0–1.0).
+    pub color: ColorInfo,
+}
+
 /// Serializable info about a single quad.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct QuadInfo {

@@ -85,10 +85,11 @@ fn print_usage() {
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
-    eprintln!("  draw.quad x y w h r g b a      Draw a debug overlay quad");
-    eprintln!("  debug.remove <id>              Remove a specific debug overlay");
-    eprintln!("  debug.clear                    Clear all debug overlays");
-    eprintln!("  debug.list                     List all debug overlays");
+    eprintln!("  draw.quad x y w h r g b a        Draw a debug overlay quad");
+    eprintln!("  draw.text x y font_size <text>   Draw a debug text label overlay");
+    eprintln!("  debug.remove <id>                Remove a specific debug overlay");
+    eprintln!("  debug.clear                      Clear all debug overlays");
+    eprintln!("  debug.list                       List all debug overlays");
     eprintln!();
     eprintln!("INPUT SIMULATION COMMANDS:");
     eprintln!("  input.activate                 Bring the app window to front");
@@ -120,6 +121,8 @@ fn parse_command(input: &str) -> (&str, Option<serde_json::Value>) {
         }
     } else if let Some(args) = trimmed.strip_prefix("draw.quad ") {
         parse_draw_quad(args)
+    } else if let Some(args) = trimmed.strip_prefix("draw.text ") {
+        parse_draw_text(args)
     } else if let Some(args) = trimmed.strip_prefix("debug.remove ") {
         parse_debug_remove(args)
     } else if let Some(args) = trimmed.strip_prefix("input.move_to ") {
@@ -157,6 +160,37 @@ fn parse_draw_quad(args: &str) -> (&'static str, Option<serde_json::Value>) {
         "color": [parts[4], parts[5], parts[6], parts[7]],
     });
     ("debug.draw_quad", Some(params))
+}
+
+/// Parse `draw.text x y font_size <content...>` into a debug.draw_text request.
+///
+/// The content may contain spaces; everything after the first three numeric
+/// tokens is treated as the label text.
+fn parse_draw_text(args: &str) -> (&'static str, Option<serde_json::Value>) {
+    // Split into at most 4 parts: x, y, font_size, and the rest as content.
+    let trimmed = args.trim();
+    let mut iter = trimmed.splitn(4, char::is_whitespace);
+
+    let x = iter.next().and_then(|s| s.parse::<f64>().ok());
+    let y = iter.next().and_then(|s| s.parse::<f64>().ok());
+    let font_size = iter.next().and_then(|s| s.parse::<f64>().ok());
+    let content = iter.next().map(str::trim).filter(|s| !s.is_empty());
+
+    match (x, y, font_size, content) {
+        (Some(x), Some(y), Some(fs), Some(c)) => {
+            let params = serde_json::json!({
+                "x": x,
+                "y": y,
+                "font_size": fs,
+                "content": c,
+            });
+            ("debug.draw_text", Some(params))
+        }
+        _ => {
+            eprintln!("usage: draw.text <x> <y> <font_size> <content>");
+            ("debug.draw_text", None)
+        }
+    }
 }
 
 /// Parse `debug.remove <id>` into a debug.remove request.
@@ -231,6 +265,11 @@ fn format_screenshot(value: &serde_json::Value) -> String {
 fn format_draw_quad(value: &serde_json::Value) -> String {
     let id = value.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
     format!("Created overlay quad #{id}\n")
+}
+
+fn format_draw_text(value: &serde_json::Value) -> String {
+    let id = value.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+    format!("Created overlay text #{id}\n")
 }
 
 fn format_debug_clear(value: &serde_json::Value) -> String {
@@ -334,29 +373,74 @@ fn format_debug_list(value: &serde_json::Value) -> String {
         return "No debug overlays.\n".to_string();
     }
 
-    out.push_str("Debug Overlays\n");
-    out.push_str("───────────────────────────────────────────────────────────────\n");
-    out.push_str(&format!(
-        "  {:<5}  {:<20}  {:<14}  {:}\n",
-        "ID", "POSITION", "SIZE", "COLOR"
-    ));
-    out.push_str("  ─────  ────────────────────  ──────────────  ───────────────\n");
+    let quads: Vec<&serde_json::Value> = arr
+        .iter()
+        .filter(|item| item["kind"].as_str().unwrap_or("quad") == "quad")
+        .collect();
+    let texts: Vec<&serde_json::Value> = arr
+        .iter()
+        .filter(|item| item["kind"].as_str() == Some("text"))
+        .collect();
 
-    for q in arr.iter() {
-        let id = q["id"].as_u64().unwrap_or(0);
-        let x = q["x"].as_f64().unwrap_or(0.0);
-        let y = q["y"].as_f64().unwrap_or(0.0);
-        let w = q["w"].as_f64().unwrap_or(0.0);
-        let h = q["h"].as_f64().unwrap_or(0.0);
-        let r = q["color"]["r"].as_f64().unwrap_or(0.0);
-        let g = q["color"]["g"].as_f64().unwrap_or(0.0);
-        let b = q["color"]["b"].as_f64().unwrap_or(0.0);
-        let a = q["color"]["a"].as_f64().unwrap_or(0.0);
-
+    if !quads.is_empty() {
+        out.push_str("Debug Quads\n");
+        out.push_str("───────────────────────────────────────────────────────────────\n");
         out.push_str(&format!(
-            "  {:<5}  ({:>7.1}, {:>7.1})    {:>5.0} x {:<5.0}  rgba({:.2},{:.2},{:.2},{:.2})\n",
-            id, x, y, w, h, r, g, b, a
+            "  {:<5}  {:<20}  {:<14}  {:}\n",
+            "ID", "POSITION", "SIZE", "COLOR"
         ));
+        out.push_str("  ─────  ────────────────────  ──────────────  ───────────────\n");
+
+        for q in &quads {
+            let id = q["id"].as_u64().unwrap_or(0);
+            let x = q["x"].as_f64().unwrap_or(0.0);
+            let y = q["y"].as_f64().unwrap_or(0.0);
+            let w = q["w"].as_f64().unwrap_or(0.0);
+            let h = q["h"].as_f64().unwrap_or(0.0);
+            let r = q["color"]["r"].as_f64().unwrap_or(0.0);
+            let g = q["color"]["g"].as_f64().unwrap_or(0.0);
+            let b = q["color"]["b"].as_f64().unwrap_or(0.0);
+            let a = q["color"]["a"].as_f64().unwrap_or(0.0);
+
+            out.push_str(&format!(
+                "  {:<5}  ({:>7.1}, {:>7.1})    {:>5.0} x {:<5.0}  rgba({:.2},{:.2},{:.2},{:.2})\n",
+                id, x, y, w, h, r, g, b, a
+            ));
+        }
+        out.push_str(&format!("\n  Quads: {}\n", quads.len()));
+    }
+
+    if !texts.is_empty() {
+        if !quads.is_empty() {
+            out.push('\n');
+        }
+        out.push_str("Debug Texts\n");
+        out.push_str("───────────────────────────────────────────────────────────────\n");
+        out.push_str(&format!(
+            "  {:<5}  {:<20}  {:<8}  {:}\n",
+            "ID", "POSITION", "FONT SZ", "CONTENT"
+        ));
+        out.push_str("  ─────  ────────────────────  ────────  ──────────────────────\n");
+
+        for t in &texts {
+            let id = t["id"].as_u64().unwrap_or(0);
+            let x = t["x"].as_f64().unwrap_or(0.0);
+            let y = t["y"].as_f64().unwrap_or(0.0);
+            let font_size = t["font_size"].as_f64().unwrap_or(0.0);
+            let content = t["content"].as_str().unwrap_or("");
+            // Truncate long content so the table stays readable.
+            let display = if content.len() > 28 {
+                format!("{}…", &content[..27])
+            } else {
+                content.to_string()
+            };
+
+            out.push_str(&format!(
+                "  {:<5}  ({:>7.1}, {:>7.1})    {:>5.0}px  {}\n",
+                id, x, y, font_size, display
+            ));
+        }
+        out.push_str(&format!("\n  Texts: {}\n", texts.len()));
     }
 
     out.push_str(&format!("\n  Total: {} overlays\n", arr.len()));
@@ -585,6 +669,7 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "input.state" => print!("{}", format_input_state(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
+        "debug.draw_text" => print!("{}", format_draw_text(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),
         "debug.remove" => print!("{}", format_debug_remove(result)),
         "debug.list" => print!("{}", format_debug_list(result)),
