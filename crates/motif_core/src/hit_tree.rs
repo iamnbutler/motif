@@ -2,7 +2,7 @@
 //!
 //! Collects element bounds during paint and provides hit testing queries.
 
-use crate::{Point, Rect};
+use crate::{input::CursorStyle, Point, Rect};
 
 /// Unique identifier for an element within a frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -17,12 +17,14 @@ impl ElementId {
     }
 }
 
-/// Entry in the hit tree: element bounds with z-order.
+/// Entry in the hit tree: element bounds with z-order and cursor style.
 #[derive(Debug, Clone)]
 pub struct HitEntry {
     pub id: ElementId,
     pub bounds: Rect,
     pub z_index: u32,
+    /// Cursor to display when this element is hovered.
+    pub cursor_style: CursorStyle,
 }
 
 /// Collects hit-testable regions during paint.
@@ -42,13 +44,39 @@ impl HitTree {
     }
 
     /// Register an element's bounds. Called during paint.
+    ///
+    /// Uses the default cursor style ([`CursorStyle::Default`]). For interactive
+    /// elements, prefer [`push_with_cursor`](Self::push_with_cursor).
     pub fn push(&mut self, id: ElementId, bounds: Rect) {
+        self.push_with_cursor(id, bounds, CursorStyle::Default);
+    }
+
+    /// Register an element's bounds with a specific cursor style.
+    ///
+    /// Use this for interactive elements that should show a non-default cursor:
+    /// - Buttons and links → [`CursorStyle::Pointer`]
+    /// - Text inputs → [`CursorStyle::Text`]
+    /// - Draggable panels → [`CursorStyle::Grab`]
+    pub fn push_with_cursor(&mut self, id: ElementId, bounds: Rect, cursor_style: CursorStyle) {
         self.entries.push(HitEntry {
             id,
             bounds,
             z_index: self.next_z,
+            cursor_style,
         });
         self.next_z += 1;
+    }
+
+    /// Returns the cursor style for the topmost element at `point`.
+    ///
+    /// Returns `None` when no element is at that position; callers should
+    /// fall back to [`CursorStyle::Default`] in that case.
+    pub fn cursor_at(&self, point: Point) -> Option<CursorStyle> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|e| rect_contains(&e.bounds, point))
+            .map(|e| e.cursor_style)
     }
 
     /// Hit test: returns topmost element containing point.
@@ -292,5 +320,63 @@ mod tests {
 
         let entries = tree.entries();
         assert_eq!(entries[0].z_index, 0); // reset
+    }
+
+    // --- cursor_at tests ---
+
+    #[test]
+    fn cursor_at_returns_none_outside_all_elements() {
+        let mut tree = HitTree::new();
+        tree.push_with_cursor(ElementId(1), rect(0.0, 0.0, 100.0, 100.0), CursorStyle::Pointer);
+
+        assert_eq!(tree.cursor_at(pt(200.0, 200.0)), None);
+    }
+
+    #[test]
+    fn cursor_at_returns_cursor_for_hovered_element() {
+        let mut tree = HitTree::new();
+        tree.push_with_cursor(ElementId(1), rect(0.0, 0.0, 100.0, 100.0), CursorStyle::Pointer);
+
+        assert_eq!(tree.cursor_at(pt(50.0, 50.0)), Some(CursorStyle::Pointer));
+    }
+
+    #[test]
+    fn cursor_at_default_cursor_from_push() {
+        let mut tree = HitTree::new();
+        // push() should set Default cursor
+        tree.push(ElementId(1), rect(0.0, 0.0, 100.0, 100.0));
+
+        assert_eq!(tree.cursor_at(pt(50.0, 50.0)), Some(CursorStyle::Default));
+    }
+
+    #[test]
+    fn cursor_at_returns_topmost_cursor_when_overlapping() {
+        let mut tree = HitTree::new();
+        // Background with default cursor
+        tree.push_with_cursor(ElementId(1), rect(0.0, 0.0, 200.0, 200.0), CursorStyle::Default);
+        // Foreground button with pointer cursor
+        tree.push_with_cursor(ElementId(2), rect(50.0, 50.0, 100.0, 100.0), CursorStyle::Pointer);
+
+        // Inside button: pointer cursor wins
+        assert_eq!(tree.cursor_at(pt(75.0, 75.0)), Some(CursorStyle::Pointer));
+        // Outside button, inside background: default cursor
+        assert_eq!(tree.cursor_at(pt(10.0, 10.0)), Some(CursorStyle::Default));
+    }
+
+    #[test]
+    fn cursor_at_text_cursor_for_text_input() {
+        let mut tree = HitTree::new();
+        tree.push_with_cursor(ElementId(1), rect(0.0, 0.0, 200.0, 32.0), CursorStyle::Text);
+
+        assert_eq!(tree.cursor_at(pt(100.0, 16.0)), Some(CursorStyle::Text));
+    }
+
+    #[test]
+    fn push_with_cursor_records_cursor_in_entry() {
+        let mut tree = HitTree::new();
+        tree.push_with_cursor(ElementId(1), rect(0.0, 0.0, 10.0, 10.0), CursorStyle::Grab);
+
+        let entries = tree.entries();
+        assert_eq!(entries[0].cursor_style, CursorStyle::Grab);
     }
 }

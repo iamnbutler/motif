@@ -8,7 +8,7 @@
 use motif_core::{
     button,
     element::{LayoutContext, PaintContext},
-    input::{InputState, MouseButton},
+    input::{CursorStyle, InputState, MouseButton},
     metal::{MetalRenderer, MetalSurface},
     DrawContext, Element, ElementId, HitTree, LayoutEngine, Point, Rect, Renderer, ScaleFactor,
     Scene, Size, Srgba, TextContext,
@@ -235,6 +235,15 @@ impl ApplicationHandler for App {
                 if let Some(pos) = self.input_state.cursor_position {
                     let hovered = self.hit_tree.hit_test(pos);
                     self.input_state.set_hovered(hovered);
+
+                    // Update the system cursor to reflect what element is under the pointer.
+                    let cursor_style = self
+                        .hit_tree
+                        .cursor_at(pos)
+                        .unwrap_or(CursorStyle::Default);
+                    if let Some(window) = &self.window {
+                        window.set_cursor(cursor_style.to_winit());
+                    }
                 }
 
                 if let Some(window) = &self.window {
@@ -244,6 +253,10 @@ impl ApplicationHandler for App {
             WindowEvent::CursorLeft { .. } => {
                 self.input_state.handle_cursor_left();
                 self.input_state.set_hovered(None);
+                // Restore default cursor when leaving the window.
+                if let Some(window) = &self.window {
+                    window.set_cursor(CursorStyle::Default.to_winit());
+                }
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let btn = MouseButton::from_winit(button);
