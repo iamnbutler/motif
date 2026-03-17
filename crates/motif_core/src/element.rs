@@ -10,7 +10,8 @@
 //! 3. `paint()` - draw at computed bounds
 
 use crate::{
-    ElementId, HitTree, LayoutEngine, NodeId, Point, Rect, ScaleFactor, Scene, TextContext,
+    input::CursorStyle, ElementId, HitTree, LayoutEngine, NodeId, Point, Rect, ScaleFactor, Scene,
+    TextContext,
 };
 
 /// Views are stateful components that persist across frames.
@@ -296,9 +297,22 @@ impl<'a> PaintContext<'a> {
         self.offset
     }
 
-    /// Register an element for hit testing.
+    /// Register an element for hit testing with the default cursor.
     pub fn register_hit(&mut self, id: ElementId, bounds: Rect) {
         self.hit_tree.push(id, bounds);
+    }
+
+    /// Register an element for hit testing with a specific cursor style.
+    ///
+    /// Use this for interactive elements that should show a non-default cursor:
+    /// buttons and links → [`CursorStyle::Pointer`], text fields → [`CursorStyle::Text`].
+    pub fn register_hit_with_cursor(
+        &mut self,
+        id: ElementId,
+        bounds: Rect,
+        cursor: CursorStyle,
+    ) {
+        self.hit_tree.push_with_cursor(id, bounds, cursor);
     }
 
     /// Paint a child element.

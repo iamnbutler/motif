@@ -9,6 +9,7 @@
 
 use crate::{
     element::{Element, IntoElement, LayoutContext, PaintContext},
+    input::CursorStyle,
     layout::NodeId,
     Corners, DevicePoint, DeviceRect, DeviceSize, Edges, ElementId, Quad, Rect, Srgba,
 };
@@ -159,8 +160,8 @@ impl Element for Checkbox {
             cx.scene().push_quad(check_quad);
         }
 
-        // Register the full box for hit testing.
-        cx.register_hit(self.id, bounds);
+        // Register the full box for hit testing with a pointer cursor (checkbox is clickable).
+        cx.register_hit_with_cursor(self.id, bounds, CursorStyle::Pointer);
     }
 }
 

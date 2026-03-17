@@ -12,6 +12,7 @@
 
 use crate::{
     element::{Element, IntoElement, LayoutContext, PaintContext},
+    input::CursorStyle,
     layout::NodeId,
     ArcStr, ElementId, Point, Rect, Size, Srgba, TextRun,
 };
@@ -332,8 +333,8 @@ impl Element for TextInput {
             cx.scene().push_quad(cursor_quad);
         }
 
-        // 5. Hit-test registration
-        cx.register_hit(self.id, bounds);
+        // 5. Hit-test registration — text I-beam cursor signals editability
+        cx.register_hit_with_cursor(self.id, bounds, CursorStyle::Text);
     }
 }
 

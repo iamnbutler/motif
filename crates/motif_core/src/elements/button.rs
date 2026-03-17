@@ -9,6 +9,7 @@
 
 use crate::{
     element::{Element, IntoElement, LayoutContext, PaintContext},
+    input::CursorStyle,
     layout::{MeasureContext, NodeId},
     ArcStr, ElementId, Rect, Srgba, TextRun,
 };
@@ -178,8 +179,8 @@ impl Element for Button {
             }
         }
 
-        // Register for hit testing
-        cx.register_hit(self.id, bounds);
+        // Register for hit testing with a pointer cursor (button is clickable)
+        cx.register_hit_with_cursor(self.id, bounds, CursorStyle::Pointer);
     }
 }
 
