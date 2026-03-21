@@ -1,18 +1,18 @@
 {
-  "last_run": "2026-03-20T00:00:00Z",
-  "last_run_id": "23359055755",
+  "last_run": "2026-03-21T00:00:00Z",
+  "last_run_id": "23386751829",
   "monthly_summary_issue": 14,
   "monthly_summary_month": "2026-03",
   "tasks_run_last": {
     "task_10_forward": "2026-03-20",
-    "task_11_monthly_summary": "2026-03-20",
+    "task_11_monthly_summary": "2026-03-21",
     "task_1_triage": "2026-03-04",
     "task_2_fix_prs": "2026-03-18",
     "task_3_improvements": null,
-    "task_4_deps": null,
-    "task_5_maintain_prs": null,
+    "task_4_deps": "2026-03-21",
+    "task_5_maintain_prs": "2026-03-21",
     "task_6_stale_nudges": "2026-03-19",
-    "task_7_labels": "2026-03-04",
+    "task_7_labels": "2026-03-21",
     "task_8_release": null,
     "task_9_welcome": null
   },
@@ -79,13 +79,37 @@
   "issues_created": {
     "13": "fix doc name clash",
     "14": "monthly summary march 2026",
-    "48": "pr backlog merge order guide (aw_mergord - actual number TBD)"
+    "48": "PR backlog merge order guide"
   },
   "backlog_cursor": null,
-  "notes": "17 open Repo Assist draft PRs as of 2026-03-20. No merges since 2026-03-04. Created issue #aw_mergord with PR dependency graph and recommended merge order. Issue #15 (failure notice) still open - maintainer should close it. Issue #23 (release workflow) was commented on - maintainer should close it. Next runs: consider Task 3 (codebase improvements), Task 4 (deps check), Task 7 (more labeling), Task 8 (release prep). Do NOT create more code PRs until maintainer starts reviewing existing ones.",
-  "pr_merge_order_issue": "aw_mergord",
+  "notes": "17 open Repo Assist draft PRs as of 2026-03-21. No merges since 2026-03-04. All PRs verified clean (mergeable_state: clean, 2026-03-21). Issue #23 is CLOSED (confirmed — not in open issues list). Issue #15 (failure notice) still open — maintainer should close it. PR #41 now has 'performance' label added 2026-03-21. Task 4 dep audit done 2026-03-21 — workspace deps (accesskit 0.24, glamour 0.18, palette 0.7, winit 0.30, objc2 0.5) and core deps (glam 0.32, parley 0.7, taffy 0.9, smallvec 1.11, swash 0.2) reviewed; cannot verify exact latest without internet; defer dep update PR until maintainer reviews existing backlog. Do NOT create more code PRs until maintainer starts reviewing existing ones. Next runs: consider Task 1 (triage — though only 3 open issues all Repo Assist), Task 9 (welcome — check for new contributors), Task 8 (release — no tags exist yet, v0.0.1 in Cargo.toml), Task 10 (forward work — study codebase, plan next features for when backlog clears).",
+  "pr_merge_order_issue": "48",
   "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
   "prs_to_close": [20],
   "priority_pr": 36,
-  "checked_off_by_maintainer": []
+  "checked_off_by_maintainer": [],
+  "dep_audit_2026_03_21": {
+    "workspace": {
+      "accesskit": "0.24",
+      "glamour": "0.18",
+      "palette": "0.7",
+      "serde_json": "1",
+      "winit": "0.30",
+      "objc2": "0.5",
+      "objc2-app-kit": "0.2",
+      "objc2-foundation": "0.2"
+    },
+    "motif_core": {
+      "glam": "0.32",
+      "parley": "0.7",
+      "smallvec": "1.11",
+      "swash": "0.2",
+      "taffy": "0.9",
+      "unicode-segmentation": "1.10",
+      "metal": "0.29",
+      "core-graphics-types": "0.1",
+      "foreign-types": "0.5"
+    },
+    "notes": "Cannot verify latest versions without internet access. smallvec 1.11 and unicode-segmentation 1.10 likely have newer patch versions. Consider a dep update PR after backlog clears."
+  }
 }
