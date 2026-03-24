@@ -1,16 +1,16 @@
 {
-  "last_run": "2026-03-23T00:00:00Z",
-  "last_run_id": "23456051053",
+  "last_run": "2026-03-24T00:00:00Z",
+  "last_run_id": "23508481065",
   "monthly_summary_issue": 14,
   "monthly_summary_month": "2026-03",
   "tasks_run_last": {
-    "task_10_forward": "2026-03-23",
-    "task_11_monthly_summary": "2026-03-23",
+    "task_10_forward": "2026-03-24",
+    "task_11_monthly_summary": "2026-03-24",
     "task_1_triage": "2026-03-04",
     "task_2_fix_prs": "2026-03-18",
-    "task_3_improvements": null,
+    "task_3_improvements": "2026-03-24",
     "task_4_deps": "2026-03-21",
-    "task_5_maintain_prs": "2026-03-21",
+    "task_5_maintain_prs": "2026-03-24",
     "task_6_stale_nudges": "2026-03-19",
     "task_7_labels": "2026-03-21",
     "task_8_release": "2026-03-22",
@@ -74,15 +74,17 @@
     "clear-completed-todomvc",
     "cursor-management",
     "text-input-callbacks",
-    "pr-merge-order-guide"
+    "pr-merge-order-guide",
+    "wgpu-backend-research"
   ],
   "issues_created": {
     "13": "fix doc name clash",
     "14": "monthly summary march 2026",
-    "48": "PR backlog merge order guide"
+    "48": "PR backlog merge order guide",
+    "wgpu_research": "wgpu backend architecture and implementation plan (aw_wgpu1)"
   },
   "backlog_cursor": null,
-  "notes": "17 open Repo Assist draft PRs as of 2026-03-23. No merges since 2026-03-04. All PRs verified clean (mergeable_state: clean, 2026-03-21). Issue #23 is CLOSED. Issue #15 (failure notice) still open — maintainer should close it. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 8 (release): v0.0.1, no CHANGELOG, no tags, project too early for a release — deferred. Task 9 (welcome): no new contributors in last 24h on 2026-03-22. Task 10 (forward 2026-03-22): Investigated AccessTree/FocusManager in accessibility.rs — data structures are mature with full tests. Gap for 'Complete AccessKit integration' is in event loop: AccessTree is built during draw() but never fed to winit's accesskit adapter. Task 10 (forward 2026-03-23): CONFIRMED accesskit_winit = '0.32' is ALREADY a declared dep in crates/motif/Cargo.toml — it's just unused. Integration needs ~30 lines of wiring only (no new deps). Also confirmed Renderer trait in renderer.rs is FULLY IMPLEMENTED with associated Surface type — 'Abstract renderer trait' cross-platform TODO is DONE. Remaining cross-platform work is wgpu backend research only. Next run: consider task_3_improvements (file issue for wgpu backend research) or task_5_maintain_prs check.",
+  "notes": "17 open Repo Assist draft PRs as of 2026-03-24. No merges since 2026-03-04. All PRs confirmed still clean (main unchanged since 2026-03-21 verification). Issue #23 is CLOSED. Issue #15 (failure notice) still open — maintainer should close it. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 3/10 (2026-03-24): Created wgpu backend research issue (aw_wgpu1). Confirmed GlyphCache/RasterizedGlyph are in motif_core (backend-agnostic, use swash). QuadInstance (112-byte repr(C) struct) is in metal/mod.rs and is the main thing to extract for wgpu reuse. Renderer trait is clean: fn render(&mut self, scene: &Scene, surface: &mut Self::Surface). WGSL shaders needed to replace shaders.metal. wgpu dep would be the only new addition. Task 5 (2026-03-24): All 17 PRs still clean (no main branch changes). Next run priorities: task_1_triage (oldest overdue — 2026-03-04), task_6_stale_nudges (second nudge for longest-open PRs if 30+ days), task_9_welcome (check new contributors).",
   "pr_merge_order_issue": "48",
   "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
   "prs_to_close": [20],
