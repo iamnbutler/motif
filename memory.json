@@ -1,18 +1,18 @@
 {
-  "last_run": "2026-03-24T00:00:00Z",
-  "last_run_id": "23508481065",
+  "last_run": "2026-03-25T00:00:00Z",
+  "last_run_id": "23559924723",
   "monthly_summary_issue": 14,
   "monthly_summary_month": "2026-03",
   "tasks_run_last": {
-    "task_10_forward": "2026-03-24",
-    "task_11_monthly_summary": "2026-03-24",
-    "task_1_triage": "2026-03-04",
+    "task_10_forward": "2026-03-25",
+    "task_11_monthly_summary": "2026-03-25",
+    "task_1_triage": "2026-03-25",
     "task_2_fix_prs": "2026-03-18",
     "task_3_improvements": "2026-03-24",
     "task_4_deps": "2026-03-21",
     "task_5_maintain_prs": "2026-03-24",
     "task_6_stale_nudges": "2026-03-19",
-    "task_7_labels": "2026-03-21",
+    "task_7_labels": "2026-03-25",
     "task_8_release": "2026-03-22",
     "task_9_welcome": "2026-03-22"
   },
@@ -81,10 +81,10 @@
     "13": "fix doc name clash",
     "14": "monthly summary march 2026",
     "48": "PR backlog merge order guide",
-    "wgpu_research": "wgpu backend architecture and implementation plan (aw_wgpu1)"
+    "49": "wgpu backend architecture and implementation plan"
   },
   "backlog_cursor": null,
-  "notes": "17 open Repo Assist draft PRs as of 2026-03-24. No merges since 2026-03-04. All PRs confirmed still clean (main unchanged since 2026-03-21 verification). Issue #23 is CLOSED. Issue #15 (failure notice) still open — maintainer should close it. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 3/10 (2026-03-24): Created wgpu backend research issue (aw_wgpu1). Confirmed GlyphCache/RasterizedGlyph are in motif_core (backend-agnostic, use swash). QuadInstance (112-byte repr(C) struct) is in metal/mod.rs and is the main thing to extract for wgpu reuse. Renderer trait is clean: fn render(&mut self, scene: &Scene, surface: &mut Self::Surface). WGSL shaders needed to replace shaders.metal. wgpu dep would be the only new addition. Task 5 (2026-03-24): All 17 PRs still clean (no main branch changes). Next run priorities: task_1_triage (oldest overdue — 2026-03-04), task_6_stale_nudges (second nudge for longest-open PRs if 30+ days), task_9_welcome (check new contributors).",
+  "notes": "17 open Repo Assist draft PRs as of 2026-03-25. No merges since 2026-03-04. All PRs confirmed still clean (main unchanged since 2026-03-21 verification). Issue #23 is CLOSED. Issues #11, #12 are CLOSED. Issue #15 (failure notice) still open — maintainer should close it. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 10 (2026-03-25): Studied spool for uncovered tasks. Newly identified future work (not covered by existing PRs): (1) TodoMVC items-remaining count ('X items left' footer label), (2) text-input-rewrite stream: cursor blinking, IME composition, multi-line layout/scrolling, (3) animation primitives. These are deferred until PR backlog clears. Next run priorities: task_2_fix_prs (check if any PRs need updating), task_6_stale_nudges (consider second nudge for PRs open 30+ days if still no activity), task_9_welcome (check new contributors).",
   "pr_merge_order_issue": "48",
   "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
   "prs_to_close": [20],
@@ -132,5 +132,8 @@
   },
   "renderer_trait_investigation_2026_03_23": {
     "status": "DONE — Renderer trait in crates/motif_core/src/renderer.rs is fully implemented. Has 'type Surface' associated type and 'fn render(&mut self, scene: &Scene, surface: &mut Self::Surface)'. MetalRenderer implements it with Surface = MetalSurface. DebugRenderer implements it with Surface = (). 'Abstract renderer trait' TODO in cross-platform section is COMPLETE. Remaining cross-platform work is wgpu backend: research wgpu surface/device API to see how it fits the Renderer trait interface."
+  },
+  "spool_uncovered_tasks_2026_03_25": {
+    "status": "Studied spool on 2026-03-25. Confirmed these tasks are NOT covered by any existing PR: (1) TodoMVC items-remaining count (footer '(X items left)' label), (2) text-input-rewrite stream: cursor blinking, IME/marked text visual, vertical cursor movement, multiline layout, vertical scrolling, triple-click line selection, (3) animation primitives design (no existing PR). All deferred until PR backlog clears."
   }
 }
