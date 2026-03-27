@@ -1,17 +1,17 @@
 {
-  "last_run": "2026-03-26T00:00:00Z",
-  "last_run_id": "23614113404",
+  "last_run": "2026-03-27T00:00:00Z",
+  "last_run_id": "23663679272",
   "monthly_summary_issue": 14,
   "monthly_summary_month": "2026-03",
   "tasks_run_last": {
     "task_10_forward": "2026-03-26",
-    "task_11_monthly_summary": "2026-03-26",
-    "task_1_triage": "2026-03-25",
+    "task_11_monthly_summary": "2026-03-27",
+    "task_1_triage": "2026-03-27",
     "task_2_fix_prs": "2026-03-18",
     "task_3_improvements": "2026-03-24",
     "task_4_deps": "2026-03-21",
-    "task_5_maintain_prs": "2026-03-26",
-    "task_6_stale_nudges": "2026-03-19",
+    "task_5_maintain_prs": "2026-03-27",
+    "task_6_stale_nudges": "2026-03-27",
     "task_7_labels": "2026-03-25",
     "task_8_release": "2026-03-22",
     "task_9_welcome": "2026-03-26"
@@ -84,7 +84,7 @@
     "49": "wgpu backend architecture and implementation plan"
   },
   "backlog_cursor": null,
-  "notes": "17 open Repo Assist draft PRs as of 2026-03-26. No merges since 2026-03-04. Main branch still at 57a5ad8 (unchanged). All PRs confirmed still clean. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 9 (2026-03-26): No new contributors or issues in last 24h. Task 10 (2026-03-26): Deep AccessKit integration study complete — App struct needs: access_tree: AccessTree, focus_mgr: FocusManager, access_context: Option<accesskit_winit::AccessKitWinitContext>. resumed() needs context init after window creation. window_event() needs periodic adapter.update_if_active(). Animation primitives design: std::time::Instant-based struct Animation { start, duration } with .progress() -> f32; palette crate handles color lerp; easing as pure functions — no new deps needed. Next run priorities: task_1_triage (check any new issues), task_6_stale_nudges (but all Repo Assist PRs wait on maintainer so no nudges applicable), task_4_deps (deferred), task_2_fix_prs (deferred — backlog).",
+  "notes": "17 open Repo Assist draft PRs as of 2026-03-27. No merges since 2026-03-04. Main branch still at 57a5ad8 (confirmed 2026-03-27). All PRs confirmed still clean. Do NOT create more code PRs until maintainer starts reviewing existing ones. PR #35 (maintainer TodoMVC) confirmed merged 2026-03-04 — PR #20 close is now confirmed overdue. Task 6 (2026-03-27): All open PRs are Repo Assist PRs awaiting maintainer review — no author nudges applicable. Task 1 (2026-03-27): No new issues — 4 open issues (#14, #15, #48, #49), all previously addressed. Next run priorities: task_4_deps (check dep versions), task_8_release (still not warranted), task_10_forward (continue codebase study), task_9_welcome.",
   "pr_merge_order_issue": "48",
   "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
   "prs_to_close": [20],
@@ -139,5 +139,6 @@
   },
   "spool_uncovered_tasks_2026_03_25": {
     "status": "Studied spool on 2026-03-25. Confirmed these tasks are NOT covered by any existing PR: (1) TodoMVC items-remaining count (footer '(X items left)' label), (2) text-input-rewrite stream: cursor blinking, IME/marked text visual, vertical cursor movement, multiline layout, vertical scrolling, triple-click line selection, (3) animation primitives design (no existing PR). All deferred until PR backlog clears."
-  }
+  },
+  "pr_35_status": "merged by iamnbutler on 2026-03-04 — confirms PR #20 (Repo Assist TodoMVC) is definitively superseded and should be closed"
 }
