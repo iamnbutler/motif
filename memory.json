@@ -1,20 +1,22 @@
 {
-  "last_run": "2026-03-31T00:00:00Z",
-  "last_run_id": "23815643977",
-  "monthly_summary_issue": 14,
-  "monthly_summary_month": "2026-03",
+  "last_run": "2026-04-01T00:00:00Z",
+  "last_run_id": "23867021508",
+  "monthly_summary_issue": null,
+  "monthly_summary_month": "2026-04",
+  "monthly_summary_march_closed": true,
+  "monthly_summary_april_pending": true,
   "tasks_run_last": {
     "task_10_forward": "2026-03-31",
-    "task_11_monthly_summary": "2026-03-31",
-    "task_1_triage": "2026-03-31",
+    "task_11_monthly_summary": "2026-04-01",
+    "task_1_triage": "2026-04-01",
     "task_2_fix_prs": "2026-03-18",
     "task_3_improvements": "2026-03-24",
     "task_4_deps": "2026-03-29",
-    "task_5_maintain_prs": "2026-03-31",
+    "task_5_maintain_prs": "2026-04-01",
     "task_6_stale_nudges": "2026-03-27",
     "task_7_labels": "2026-03-29",
     "task_8_release": "2026-03-22",
-    "task_9_welcome": "2026-03-28"
+    "task_9_welcome": "2026-04-01"
   },
   "issues_commented": {
     "11": "2026-03-04",
@@ -79,12 +81,12 @@
   ],
   "issues_created": {
     "13": "fix doc name clash",
-    "14": "monthly summary march 2026",
+    "14": "monthly summary march 2026 - CLOSED",
     "48": "PR backlog merge order guide",
     "49": "wgpu backend architecture and implementation plan"
   },
   "backlog_cursor": null,
-  "notes": "17 open Repo Assist draft PRs as of 2026-03-31. No merges since 2026-03-04. Main branch still at 57a5ad8 (confirmed 2026-03-31). Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 6 (2026-03-27): All open PRs are Repo Assist PRs awaiting maintainer review — no author nudges applicable. Task 4 (2026-03-29): Cargo.lock reviewed — all deps at current patch versions (smallvec 1.15.1, unicode-seg 1.12.0, winit 0.30.12, glam 0.32.0, parley 0.7.0, taffy 0.9.2, swash 0.2.6). Task 10 (2026-03-31): Investigated two uncovered spool items: 'Text metrics debug example' (FontMetrics/LineLayoutMetrics structs already rich with ascent/descent/advance/line_height — example would draw visual indicators) and 'view memoization' (no infrastructure exists; would need dirty-flag or key-based invalidation system). Both documented as future PRs after backlog clears. Next run priorities: task_9_welcome, task_6_stale_nudges, task_8_release (still not warranted).",
+  "notes": "2026-04-01: New month rollover. Closed March 2026 Monthly Activity Summary (#14) and created new April 2026 summary. New April issue number unknown (pending workflow apply) — verify next run and update monthly_summary_issue. Still 17 open Repo Assist draft PRs as of 2026-04-01. No merges since 2026-03-04. Main branch still at 57a5ad8. Do NOT create more code PRs until maintainer starts reviewing existing ones. Task 9: No new contributors or issues in last 24h. Prev run notes: Task 4 (2026-03-29): Cargo.lock reviewed — all deps at current patch versions (smallvec 1.15.1, unicode-seg 1.12.0, winit 0.30.12, glam 0.32.0, parley 0.7.0, taffy 0.9.2, swash 0.2.6). Task 10 (2026-03-31): Investigated two uncovered spool items: 'Text metrics debug example' (FontMetrics/LineLayoutMetrics structs already rich with ascent/descent/advance/line_height — example would draw visual indicators) and 'view memoization' (no infrastructure exists; would need dirty-flag or key-based invalidation system). Both documented as future PRs after backlog clears. Next run priorities: verify April issue number, task_10_forward, task_6_stale_nudges.",
   "pr_merge_order_issue": "48",
   "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
   "prs_to_close": [20],
