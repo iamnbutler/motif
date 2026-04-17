@@ -663,4 +663,254 @@ mod tests {
 
         assert!(click.is_none());
     }
+
+    // --- Additional InputState coverage ---
+
+    #[test]
+    fn handle_cursor_entered_queues_enter_event() {
+        let mut state = InputState::new();
+        state.cursor_position = Some(Point::new(50.0, 50.0));
+
+        state.handle_cursor_entered();
+
+        assert_eq!(state.event_count(), 1);
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Enter,
+                position,
+                ..
+            }) => {
+                assert_eq!(*position, Some(Point::new(50.0, 50.0)));
+            }
+            _ => panic!("expected cursor enter event"),
+        }
+    }
+
+    #[test]
+    fn handle_cursor_entered_with_no_prior_position() {
+        let mut state = InputState::new();
+        // No cursor_position set yet
+
+        state.handle_cursor_entered();
+
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Enter,
+                position: None,
+                ..
+            }) => {}
+            _ => panic!("expected enter event with no position"),
+        }
+    }
+
+    #[test]
+    fn mouse_down_includes_current_cursor_position() {
+        let mut state = InputState::new();
+        state.handle_cursor_moved(100.0, 200.0, 1.0);
+        state.take_events(); // discard move event
+
+        state.handle_mouse_button(MouseButton::Left, true);
+
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Down,
+                position,
+                ..
+            }) => {
+                assert_eq!(*position, Some(Point::new(100.0, 200.0)));
+            }
+            _ => panic!("expected mouse down event"),
+        }
+    }
+
+    #[test]
+    fn scroll_includes_current_cursor_position() {
+        let mut state = InputState::new();
+        state.handle_cursor_moved(100.0, 200.0, 1.0);
+        state.take_events(); // discard move event
+
+        state.handle_scroll(ScrollDelta::Lines { x: 0.0, y: -1.0 });
+
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Scroll { .. },
+                position,
+                ..
+            }) => {
+                assert_eq!(*position, Some(Point::new(100.0, 200.0)));
+            }
+            _ => panic!("expected scroll event"),
+        }
+    }
+
+    #[test]
+    fn multiple_buttons_pressed_simultaneously() {
+        let mut state = InputState::new();
+
+        state.handle_mouse_button(MouseButton::Left, true);
+        state.handle_mouse_button(MouseButton::Right, true);
+
+        assert!(state.mouse_buttons.contains(&MouseButton::Left));
+        assert!(state.mouse_buttons.contains(&MouseButton::Right));
+        assert_eq!(state.mouse_buttons.len(), 2);
+    }
+
+    #[test]
+    fn releasing_one_button_keeps_others_pressed() {
+        let mut state = InputState::new();
+
+        state.handle_mouse_button(MouseButton::Left, true);
+        state.handle_mouse_button(MouseButton::Right, true);
+        state.handle_mouse_button(MouseButton::Left, false);
+
+        assert!(!state.mouse_buttons.contains(&MouseButton::Left));
+        assert!(state.mouse_buttons.contains(&MouseButton::Right));
+    }
+
+    #[test]
+    fn take_events_returns_empty_on_second_call() {
+        let mut state = InputState::new();
+        state.handle_scroll(ScrollDelta::Lines { x: 0.0, y: -1.0 });
+
+        let first = state.take_events();
+        let second = state.take_events();
+
+        assert_eq!(first.len(), 1);
+        assert_eq!(second.len(), 0);
+    }
+
+    #[test]
+    fn multiple_events_accumulate_in_order() {
+        let mut state = InputState::new();
+
+        state.handle_cursor_moved(10.0, 20.0, 1.0);
+        state.handle_mouse_button(MouseButton::Left, true);
+        state.handle_mouse_button(MouseButton::Left, false);
+
+        assert_eq!(state.event_count(), 3);
+        let events = state.take_events();
+        assert_eq!(events.len(), 3);
+
+        assert!(matches!(
+            events[0],
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Move,
+                ..
+            })
+        ));
+        assert!(matches!(
+            events[1],
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Down,
+                ..
+            })
+        ));
+        assert!(matches!(
+            events[2],
+            InputEvent::Mouse(MouseEvent {
+                kind: MouseEventKind::Up,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn modifier_at_event_time_captured_in_mouse_event() {
+        let mut state = InputState::new();
+
+        state.handle_modifiers_changed(ModifiersState::SHIFT);
+        state.take_events(); // discard modifier event
+
+        state.handle_scroll(ScrollDelta::Lines { x: 0.0, y: -1.0 });
+
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Mouse(MouseEvent { modifiers, .. }) => {
+                assert_eq!(*modifiers, ModifiersState::SHIFT);
+            }
+            _ => panic!("expected scroll event"),
+        }
+    }
+
+    #[test]
+    fn modifier_at_event_time_captured_in_key_event() {
+        let mut state = InputState::new();
+
+        state.handle_modifiers_changed(ModifiersState::ALT);
+        state.take_events(); // discard modifier event
+
+        state.handle_key(
+            Key::Named(NamedKey::ArrowLeft),
+            PhysicalKey::Code(KeyCode::ArrowLeft),
+            ElementState::Pressed,
+        );
+
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Key(KeyEvent { modifiers, .. }) => {
+                assert_eq!(*modifiers, ModifiersState::ALT);
+            }
+            _ => panic!("expected key event"),
+        }
+    }
+
+    #[test]
+    fn begin_press_with_no_hover_records_none() {
+        let mut state = InputState::new();
+        // No hover set
+
+        state.begin_press();
+
+        assert!(state.pressed().is_none());
+    }
+
+    #[test]
+    fn end_press_without_begin_returns_none() {
+        use crate::ElementId;
+
+        let mut state = InputState::new();
+        let elem = ElementId(1);
+
+        // Hovering but never began a press
+        state.set_hovered(Some(elem));
+        let click = state.end_press();
+
+        assert!(click.is_none());
+    }
+
+    #[test]
+    fn handle_key_release_queues_event() {
+        let mut state = InputState::new();
+
+        state.handle_key(
+            Key::Character("a".into()),
+            PhysicalKey::Code(KeyCode::KeyA),
+            ElementState::Released,
+        );
+
+        assert_eq!(state.event_count(), 1);
+        let events = state.take_events();
+        match &events[0] {
+            InputEvent::Key(KeyEvent {
+                state: key_state, ..
+            }) => {
+                assert_eq!(*key_state, ElementState::Released);
+            }
+            _ => panic!("expected key released event"),
+        }
+    }
+
+    #[test]
+    fn cursor_position_scales_from_physical_to_logical() {
+        let mut state = InputState::new();
+
+        // Physical (400, 600) at 2× = logical (200, 300)
+        state.handle_cursor_moved(400.0, 600.0, 2.0);
+
+        assert_eq!(state.cursor_position, Some(Point::new(200.0, 300.0)));
+    }
 }
