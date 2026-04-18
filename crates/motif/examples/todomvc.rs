@@ -3,7 +3,7 @@
 //! Run with: cargo run --example todomvc
 
 use motif_core::{
-    checkbox,
+    checkbox, clipboard,
     element::{Element, LayoutContext, PaintContext},
     input::{HandleKeyResult, InputState, MouseButton, TextEditState},
     metal::{MetalRenderer, MetalSurface},
@@ -477,10 +477,13 @@ impl ApplicationHandler for TodoApp {
                             let text = self.new_todo_state.content().to_string();
                             self.add_todo(text);
                         }
-                        HandleKeyResult::Copy(_)
-                        | HandleKeyResult::Cut(_)
-                        | HandleKeyResult::Paste => {
-                            // TODO: Clipboard
+                        HandleKeyResult::Copy(text) | HandleKeyResult::Cut(text) => {
+                            clipboard::write(&text);
+                        }
+                        HandleKeyResult::Paste => {
+                            if let Some(text) = clipboard::read() {
+                                self.new_todo_state.paste(&text);
+                            }
                         }
                     }
 
