@@ -25,7 +25,7 @@ winit = { workspace = true }
 metal = "0.29"
 objc2 = { workspace = true }
 objc2-foundation = { workspace = true }
-objc2-app-kit = { workspace = true, features = ["NSView", "NSWindow"] }
+objc2-app-kit = { workspace = true, features = ["NSView", "NSWindow", "NSPasteboard"] }
 core-graphics-types = "0.1"
 foreign-types = "0.5"
 

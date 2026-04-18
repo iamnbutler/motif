@@ -1,6 +1,7 @@
 pub mod accessibility;
 pub mod arc_str;
 pub mod callbacks;
+pub mod clipboard;
 pub mod context;
 pub mod element;
 pub mod elements;

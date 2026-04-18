@@ -6,7 +6,7 @@
 //! Run with: cargo run --example playground
 
 use motif_core::{
-    checkbox, div,
+    checkbox, clipboard, div,
     element::{Element, LayoutContext, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
     input::{InputState, MouseButton, ScrollDelta, TextEditState},
@@ -914,14 +914,16 @@ impl ApplicationHandler for App {
                         HandleKeyResult::Blur => {
                             self.text_input_focused = false;
                         }
-                        HandleKeyResult::Copy(_text) => {
-                            // TODO: Copy to system clipboard
+                        HandleKeyResult::Copy(text) => {
+                            clipboard::write(&text);
                         }
-                        HandleKeyResult::Cut(_text) => {
-                            // TODO: Copy to system clipboard (text already removed)
+                        HandleKeyResult::Cut(text) => {
+                            clipboard::write(&text);
                         }
                         HandleKeyResult::Paste => {
-                            // TODO: Read from system clipboard and call paste()
+                            if let Some(text) = clipboard::read() {
+                                self.text_edit_state.paste(&text);
+                            }
                         }
                         HandleKeyResult::Submit => {
                             // In a real app: submit form, add todo item, etc.
