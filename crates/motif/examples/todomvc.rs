@@ -382,6 +382,32 @@ impl ApplicationHandler for TodoApp {
                     .unwrap_or(1.0);
                 self.input_state
                     .handle_cursor_moved(position.x, position.y, scale);
+
+                // Drag-to-select: extend new-todo text selection while left button is held
+                if self.new_todo_focused
+                    && self.input_state.mouse_buttons.contains(&MouseButton::Left)
+                {
+                    if let Some(pos) = self.input_state.cursor_position {
+                        let container_x = self
+                            .window
+                            .as_ref()
+                            .map(|w| {
+                                let size = w.inner_size();
+                                let window_scale = w.scale_factor() as f32;
+                                (size.width as f32 / window_scale - 500.0) / 2.0
+                            })
+                            .unwrap_or(50.0);
+                        let input_x = container_x + 16.0;
+                        let text_x = pos.x - input_x - 8.0;
+                        let layout = self
+                            .text_ctx
+                            .layout_text(self.new_todo_state.content(), 18.0 * scale);
+                        let index =
+                            layout.index_for_x(text_x * scale, self.new_todo_state.content());
+                        self.new_todo_state.select_to(index);
+                    }
+                }
+
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
