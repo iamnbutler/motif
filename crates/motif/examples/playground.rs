@@ -780,6 +780,25 @@ impl ApplicationHandler for App {
                     self.input_state.set_hovered(hovered);
                 }
 
+                // Drag-to-select: extend text selection while left button is held
+                if self.text_input_focused
+                    && self.input_state.mouse_buttons.contains(&MouseButton::Left)
+                {
+                    if let Some(pos) = self.input_state.cursor_position {
+                        let input_bounds =
+                            Rect::new(Point::new(500.0, 620.0), Size::new(280.0, 36.0));
+                        let padding = 8.0;
+                        let font_size = 14.0;
+                        let text_x = pos.x - input_bounds.origin.x - padding;
+                        let layout = self
+                            .text_ctx
+                            .layout_text(self.text_edit_state.content(), font_size * scale);
+                        let index =
+                            layout.index_for_x(text_x * scale, self.text_edit_state.content());
+                        self.text_edit_state.select_to(index);
+                    }
+                }
+
                 // Request redraw for hover feedback
                 if let Some(window) = &self.window {
                     window.request_redraw();
