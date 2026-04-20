@@ -10,9 +10,10 @@ use motif_core::{
     text_input, DrawContext, ElementId, HitTree, LayoutEngine, Point, Rect, Renderer, ScaleFactor,
     Scene, Size, Srgba, TextContext,
 };
+use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{StartCause, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowId},
 };
@@ -45,6 +46,10 @@ struct TodoApp {
     input_state: InputState,
     new_todo_state: TextEditState,
     new_todo_focused: bool,
+    /// Whether the cursor is in the visible phase of its blink cycle.
+    cursor_visible: bool,
+    /// Timestamp of the last blink toggle (used to schedule the next one).
+    cursor_blink_epoch: Instant,
 
     // Todo data
     todos: Vec<Todo>,
@@ -65,6 +70,8 @@ impl TodoApp {
             input_state: InputState::new(),
             new_todo_state: TextEditState::new(),
             new_todo_focused: true, // Start focused
+            cursor_visible: true,
+            cursor_blink_epoch: Instant::now(),
 
             todos: vec![
                 Todo {
@@ -188,6 +195,7 @@ impl TodoApp {
             let mut input = text_input(self.new_todo_state.content(), input_id)
                 .placeholder("What needs to be done?")
                 .focused(self.new_todo_focused)
+                .cursor_visible(self.cursor_visible)
                 .cursor_pos(self.new_todo_state.cursor_offset())
                 .selection(self.new_todo_state.selected_range().clone())
                 .font_size(18.0);
@@ -353,6 +361,28 @@ impl ApplicationHandler for TodoApp {
         self.surface = Some(surface);
     }
 
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+        // When the blink timer fires, toggle the cursor and redraw.
+        if let StartCause::ResumeTimeReached { .. } = cause {
+            self.cursor_visible = !self.cursor_visible;
+            self.cursor_blink_epoch = Instant::now();
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.new_todo_focused {
+            const BLINK_INTERVAL: Duration = Duration::from_millis(530);
+            event_loop.set_control_flow(ControlFlow::WaitUntil(
+                self.cursor_blink_epoch + BLINK_INTERVAL,
+            ));
+        } else {
+            event_loop.set_control_flow(ControlFlow::Wait);
+        }
+    }
+
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
@@ -398,6 +428,9 @@ impl ApplicationHandler for TodoApp {
                         // New todo input clicked
                         if id == 1000 {
                             self.new_todo_focused = true;
+                            // Reset blink so cursor is immediately visible after click
+                            self.cursor_visible = true;
+                            self.cursor_blink_epoch = Instant::now();
 
                             // Click-to-cursor
                             if let Some(click_pos) = self.input_state.cursor_position {
@@ -461,6 +494,10 @@ impl ApplicationHandler for TodoApp {
                 );
 
                 if self.new_todo_focused && event.state == winit::event::ElementState::Pressed {
+                    // Keep cursor visible during active typing
+                    self.cursor_visible = true;
+                    self.cursor_blink_epoch = Instant::now();
+
                     let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);
                     match self
                         .new_todo_state
