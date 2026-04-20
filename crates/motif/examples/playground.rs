@@ -16,9 +16,10 @@ use motif_core::{
     TextContext, ViewContext, WindowContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
+use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{StartCause, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowId},
 };
@@ -260,6 +261,10 @@ struct App {
     checkbox_states: [bool; 3],
     text_edit_state: TextEditState,
     text_input_focused: bool,
+    /// Whether the cursor is in the visible phase of its blink cycle.
+    cursor_visible: bool,
+    /// Timestamp of the last blink toggle (used to schedule the next one).
+    cursor_blink_epoch: Instant,
 }
 
 impl Default for App {
@@ -287,6 +292,8 @@ impl Default for App {
                 state
             },
             text_input_focused: false,
+            cursor_visible: true,
+            cursor_blink_epoch: Instant::now(),
         }
     }
 }
@@ -313,6 +320,28 @@ impl ApplicationHandler for App {
             self.window = Some(window);
             self.renderer = Some(renderer);
             self.surface = Some(surface);
+        }
+    }
+
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+        // When the blink timer fires, toggle the cursor and redraw.
+        if let StartCause::ResumeTimeReached { .. } = cause {
+            self.cursor_visible = !self.cursor_visible;
+            self.cursor_blink_epoch = Instant::now();
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.text_input_focused {
+            const BLINK_INTERVAL: Duration = Duration::from_millis(530);
+            event_loop.set_control_flow(ControlFlow::WaitUntil(
+                self.cursor_blink_epoch + BLINK_INTERVAL,
+            ));
+        } else {
+            event_loop.set_control_flow(ControlFlow::Wait);
         }
     }
 
@@ -662,6 +691,7 @@ impl ApplicationHandler for App {
                             .placeholder("Type something...")
                             .bounds(input_bounds)
                             .focused(self.text_input_focused)
+                            .cursor_visible(self.cursor_visible)
                             .cursor_pos(self.text_edit_state.cursor_offset())
                             .selection(self.text_edit_state.selected_range().clone());
 
@@ -821,6 +851,9 @@ impl ApplicationHandler for App {
                         // Check if clicked on text input (ID 3100)
                         if id == 3100 {
                             self.text_input_focused = true;
+                            // Reset blink so cursor is immediately visible after click
+                            self.cursor_visible = true;
+                            self.cursor_blink_epoch = Instant::now();
 
                             // Click-to-cursor: convert click position to byte offset
                             if let Some(click_pos) = self.input_state.cursor_position {
@@ -902,6 +935,10 @@ impl ApplicationHandler for App {
 
                 // Handle text input when focused
                 if self.text_input_focused && event.state == winit::event::ElementState::Pressed {
+                    // Keep cursor visible during active typing
+                    self.cursor_visible = true;
+                    self.cursor_blink_epoch = Instant::now();
+
                     use motif_core::input::HandleKeyResult;
 
                     let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);

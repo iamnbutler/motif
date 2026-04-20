@@ -38,6 +38,8 @@ pub struct TextInput {
     border_width: f32,
     // State (set externally before paint)
     is_focused: bool,
+    /// Whether the cursor is in the visible phase of its blink cycle.
+    cursor_visible: bool,
     /// Byte offset into `value` at which to draw the cursor.
     cursor_pos: usize,
     /// Selection range (start..end byte offsets). Empty range = no selection.
@@ -62,6 +64,7 @@ impl TextInput {
             corner_radius: 4.0,
             border_width: 1.5,
             is_focused: false,
+            cursor_visible: true,
             cursor_pos: 0,
             selection: 0..0,
         }
@@ -94,6 +97,16 @@ impl TextInput {
     /// Set whether the input currently has keyboard focus.
     pub fn focused(mut self, focused: bool) -> Self {
         self.is_focused = focused;
+        self
+    }
+
+    /// Set whether the cursor is in the visible phase of its blink cycle.
+    ///
+    /// When `false`, the cursor quad is not rendered even if the input is focused.
+    /// Callers can drive a 530 ms blink by toggling this and requesting a redraw.
+    /// Defaults to `true` (cursor always visible when focused).
+    pub fn cursor_visible(mut self, visible: bool) -> Self {
+        self.cursor_visible = visible;
         self
     }
 
@@ -298,8 +311,8 @@ impl Element for TextInput {
             }
         }
 
-        // 4. Cursor — only drawn when focused
-        if self.is_focused {
+        // 4. Cursor — only drawn when focused and in the visible blink phase
+        if self.is_focused && self.cursor_visible {
             // Determine cursor x by laying out the text before the cursor position.
             // We append a visible character to ensure trailing whitespace is measured,
             // then subtract that character's width.
