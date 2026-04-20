@@ -1,22 +1,22 @@
 {
-  "last_run": "2026-04-18T00:00:00Z",
-  "last_run_id": "24612106746",
+  "last_run": "2026-04-20T00:00:00Z",
+  "last_run_id": "24686289262",
   "monthly_summary_issue": 50,
   "monthly_summary_month": "2026-04",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_pending": false,
   "tasks_run_last": {
-    "task_10_forward": "2026-04-18",
-    "task_11_monthly_summary": "2026-04-18",
+    "task_10_forward": "2026-04-20",
+    "task_11_monthly_summary": "2026-04-20",
+    "task_8_release": "2026-04-20",
     "task_5_maintain_prs": "2026-04-18",
     "task_1_triage": "2026-04-16",
     "task_9_welcome": "2026-04-13",
     "task_2_fix_prs": "2026-04-13",
     "task_6_stale_nudges": "2026-04-13",
     "task_7_labels": "2026-04-17",
-    "task_4_deps": "2026-04-12",
-    "task_3_improvements": "2026-04-17",
-    "task_8_release": "2026-04-05"
+    "task_4_deps": "2026-04-19",
+    "task_3_improvements": "2026-04-17"
   },
   "issues_commented": {
     "11": "2026-03-04",
@@ -54,7 +54,9 @@
     "cursor-mgmt": "pr-46-open",
     "text-callbacks": "pr-47-open",
     "inputstate-tests": "pr-52-open",
-    "clipboard": "pr-TBD-open-branch-improve-clipboard-support-17765406"
+    "clipboard": "pr-53-open",
+    "drag-to-select": "pr-54-open",
+    "cursor-blink": "pr-55-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -83,7 +85,9 @@
     "clipboard-support-investigated",
     "inputhandler-ime-utf16-investigated",
     "inputstate-comprehensive-tests",
-    "clipboard-support-implemented"
+    "clipboard-support-implemented",
+    "drag-to-select-implemented",
+    "cursor-blink-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -94,10 +98,10 @@
     "51": "text metrics debug example plan"
   },
   "backlog_cursor": null,
-  "notes": "2026-04-18: Task 10 — Implemented motif_core::clipboard with NSPasteboard on macOS + no-op stubs on other platforms. Added NSPasteboard feature to objc2-app-kit dep. Wired up HandleKeyResult::Copy/Cut/Paste in playground.rs and todomvc.rs, resolving all // TODO: Clipboard stubs. Branch: repo-assist/improve-clipboard-support-17765406. Task 5 — Verified all PRs still open, main unchanged at 57a5ad8. Task 11 — Updated Monthly Activity Summary. Next priorities: task_1_triage (2026-04-16), task_2_fix_prs/task_6/task_9 (2026-04-13), task_4_deps (2026-04-12).",
+  "notes": "2026-04-20: Task 10 — Implemented cursor blinking. TextInput::cursor_visible(bool) builder method added (crates/motif_core/src/elements/text_input.rs). App/TodoApp get cursor_visible: bool + cursor_blink_epoch: Instant. ApplicationHandler::new_events toggles on ResumeTimeReached. ApplicationHandler::about_to_wait schedules WaitUntil(epoch+530ms) when focused. Blink resets to visible on click-to-focus and keystroke. Branch: repo-assist/improve-cursor-blink. PR #55 submitted. Task 8 — Verified no release needed (v0.0.1, no tags). Task 11 — Updated Monthly Activity Summary. Next priorities: task_5_maintain_prs (2026-04-18), task_1_triage (2026-04-16), task_9_welcome/task_2_fix/task_6 (2026-04-13).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52],
-  "open_repo_assist_prs_pending": ["improve-clipboard-support-17765406"],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55],
+  "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
   "checked_off_by_maintainer": [],
@@ -114,7 +118,7 @@
       "glamour": "0.18.0",
       "subsecond": "0.7.3"
     },
-    "notes": "All deps resolving to current patch versions. No urgent updates needed. accesskit_winit 0.32.0 declared but still unused — needs wiring. No wgpu in lockfile (not yet a dep)."
+    "notes": "All deps resolving to current patch versions. No urgent updates needed. Last verified 2026-04-19 — no changes. accesskit_winit 0.32.0 declared but still unused — needs wiring. No wgpu in lockfile (not yet a dep)."
   },
   "inputstate_tests_pr_2026_04_17": {
     "status": "SUBMITTED — PR #52 (branch repo-assist/test-input-state-comprehensive)",
@@ -140,8 +144,18 @@
       "Cross-module integration tests (InputState + TextEditState)"
     ]
   },
+  "cursor_blink_pr_2026_04_20": {
+    "status": "SUBMITTED — PR #55 (branch repo-assist/improve-cursor-blink)",
+    "files_changed": [
+      "crates/motif_core/src/elements/text_input.rs (cursor_visible field + builder method)",
+      "crates/motif/examples/playground.rs (new_events + about_to_wait + blink state)",
+      "crates/motif/examples/todomvc.rs (new_events + about_to_wait + blink state)"
+    ],
+    "approach": "530 ms WaitUntil via about_to_wait; toggles in new_events on ResumeTimeReached; resets to visible on click/keypress. Zero new deps.",
+    "notes": "cursor_visible defaults to true so existing TextInput users are unaffected"
+  },
   "clipboard_pr_2026_04_18": {
-    "status": "SUBMITTED — branch repo-assist/improve-clipboard-support-17765406",
+    "status": "SUBMITTED — PR #53 (branch repo-assist/improve-clipboard-support-17765406)",
     "files_changed": [
       "crates/motif_core/src/clipboard.rs (new)",
       "crates/motif_core/Cargo.toml (NSPasteboard feature added)",
@@ -149,13 +163,7 @@
       "crates/motif/examples/playground.rs (wired up Copy/Cut/Paste)",
       "crates/motif/examples/todomvc.rs (wired up Copy/Cut/Paste)"
     ],
-    "approach": "NSPasteboard via objc2-app-kit 0.2 on macOS; no-op stubs on other platforms. Zero new deps — only added NSPasteboard feature to existing objc2-app-kit dep.",
-    "resolves_todos": [
-      "playground.rs:918 // TODO: Copy to system clipboard",
-      "playground.rs:921 // TODO: Copy to system clipboard (text already removed)",
-      "playground.rs:924 // TODO: Read from system clipboard and call paste()",
-      "todomvc.rs:483 // TODO: Clipboard"
-    ]
+    "approach": "NSPasteboard via objc2-app-kit 0.2 on macOS; no-op stubs on other platforms. Zero new deps — only added NSPasteboard feature to existing objc2-app-kit dep."
   },
   "escape_key_cancel_edit_investigation_2026_04_16": {
     "status": "COMPLETE PICTURE",
@@ -176,33 +184,13 @@
     "blocked_on": "PR #36 for double-click entry (can use alt entry without it)"
   },
   "inputhandler_ime_investigation_2026_04_04": {
-    "status": "COMPLETE PICTURE — zero new dependencies needed. TextEditState already has marked_range: Option<Range<usize>> field and undo/redo skip during composition. Missing: public setter, InputHandler trait, UTF-16 conversion utils (~60-100 lines), WindowEvent::Ime handler in playground.rs (winit 0.30 provides ImeEvent::Preedit/Commit but playground.rs has no Ime match arm). ~600-750 lines total for complete implementation. Deferred until PR backlog clears.",
-    "files_reviewed": [
-      "crates/motif_core/src/input/text_state.rs",
-      "crates/motif_core/src/input/bindings.rs",
-      "crates/motif/examples/playground.rs"
-    ],
-    "key_gaps": [
-      "No public set_marked_range() method on TextEditState",
-      "No InputHandler trait defined anywhere",
-      "No WindowEvent::Ime arm in playground.rs window_event match",
-      "No UTF-16 offset conversion utilities"
-    ]
-  },
-  "clipboard_investigation_2026_04_02": {
-    "status": "COMPLETE — implemented 2026-04-18 in branch repo-assist/improve-clipboard-support-17765406"
+    "status": "COMPLETE PICTURE — zero new dependencies needed. TextEditState already has marked_range: Option<Range<usize>> field and undo/redo skip during composition. Missing: public setter, InputHandler trait, UTF-16 conversion utils (~60-100 lines), WindowEvent::Ime handler in playground.rs (winit 0.30 provides ImeEvent::Preedit/Commit but playground.rs has no Ime match arm). ~600-750 lines total for complete implementation. Deferred until PR backlog clears."
   },
   "accesskit_integration_2026_03_26": {
     "status": "COMPLETE PICTURE — all data structures implemented, wiring plan finalized. App struct needs 3 fields: access_tree: AccessTree, focus_mgr: FocusManager, access_context: Option<accesskit_winit::AccessKitWinitContext>. resumed(): init context after window creation with initial TreeUpdate from access_tree.build_initial_update(). window_event(): on each frame, call adapter.update_if_active(|| build_update()); on focus changes call adapter directly. Elements push AccessNode during draw with bounds set. ~30 lines total across examples. accesskit_winit = '0.32' already in Cargo.toml — zero new deps needed."
   },
-  "animation_primitives_2026_03_26": {
-    "status": "DESIGN COMPLETE — no animation code exists. Simplest: struct Animation { start: Instant, duration: Duration } with .progress() -> f32 { (elapsed / duration).clamp(0,1) }. Color lerp via palette (already in workspace). Easing as pure functions (cubic, quad, sine — no deps). No new deps needed. Deferred until PR backlog clears."
-  },
   "renderer_trait_investigation_2026_03_23": {
     "status": "DONE — Renderer trait in crates/motif_core/src/renderer.rs is fully implemented."
-  },
-  "todomvc_investigation_2026_03_29": {
-    "status": "DONE — items_left() already implemented. Clipboard now implemented in PR (branch: improve-clipboard-support-17765406)."
   },
   "pr_35_status": "merged by iamnbutler on 2026-03-04 — confirms PR #20 (Repo Assist TodoMVC) is definitively superseded and should be closed"
 }
