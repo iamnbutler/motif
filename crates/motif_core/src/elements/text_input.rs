@@ -42,6 +42,10 @@ pub struct TextInput {
     cursor_pos: usize,
     /// Selection range (start..end byte offsets). Empty range = no selection.
     selection: std::ops::Range<usize>,
+    /// Horizontal scroll offset in logical pixels. Positive values scroll the
+    /// text viewport to the right, hiding text on the left. Managed by the
+    /// caller to keep the cursor visible when text overflows the input width.
+    scroll_offset: f32,
 }
 
 impl TextInput {
@@ -64,6 +68,7 @@ impl TextInput {
             is_focused: false,
             cursor_pos: 0,
             selection: 0..0,
+            scroll_offset: 0.0,
         }
     }
 
@@ -109,6 +114,24 @@ impl TextInput {
             adjusted -= 1;
         }
         self.cursor_pos = adjusted;
+        self
+    }
+
+    /// Set the horizontal scroll offset in logical pixels.
+    ///
+    /// A positive offset scrolls the text viewport to the right, hiding leading
+    /// characters. Callers should compute this to keep the cursor in view:
+    ///
+    /// ```text
+    /// let visible_width = input_width - 2.0 * padding;
+    /// if cursor_x > scroll_offset + visible_width {
+    ///     scroll_offset = cursor_x - visible_width;
+    /// } else if cursor_x < scroll_offset {
+    ///     scroll_offset = cursor_x;
+    /// }
+    /// ```
+    pub fn scroll_offset(mut self, offset: f32) -> Self {
+        self.scroll_offset = offset.max(0.0);
         self
     }
 
@@ -228,6 +251,21 @@ impl Element for TextInput {
         quad.border_widths = crate::Edges::all(self.border_width * scale);
         cx.scene().push_quad(quad);
 
+        // Clip rect for text content: inner area within horizontal padding.
+        // Applied to selection and cursor quads to prevent them overflowing the
+        // input boundary when text is scrolled. The full input height is used so
+        // vertically the clips are non-restrictive.
+        let content_clip = crate::DeviceRect::new(
+            crate::DevicePoint::new(
+                (bounds.origin.x + self.padding) * scale,
+                bounds.origin.y * scale,
+            ),
+            crate::DeviceSize::new(
+                (bounds.size.width - 2.0 * self.padding) * scale,
+                bounds.size.height * scale,
+            ),
+        );
+
         // 2. Selection highlight (painted before text so it appears behind)
         if !self.selection.is_empty() && !self.value.is_empty() {
             let scaled_font_size = self.font_size * scale;
@@ -248,18 +286,20 @@ impl Element for TextInput {
                 layout.width() / scale
             };
 
-            let sel_x = bounds.origin.x + self.padding + sel_start_x;
+            // Shift selection by scroll offset so it tracks with the text viewport.
+            let sel_x = bounds.origin.x + self.padding + sel_start_x - self.scroll_offset;
             let sel_width = sel_end_x - sel_start_x;
             let sel_top = bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
 
             if sel_width > 0.0 {
-                let sel_quad = crate::Quad::new(
+                let mut sel_quad = crate::Quad::new(
                     crate::DeviceRect::new(
                         crate::DevicePoint::new(sel_x * scale, sel_top * scale),
                         crate::DeviceSize::new(sel_width * scale, self.font_size * scale),
                     ),
                     self.selection_color,
                 );
+                sel_quad.clip_bounds = Some(content_clip);
                 cx.scene().push_quad(sel_quad);
             }
         }
@@ -275,7 +315,8 @@ impl Element for TextInput {
             let scaled_font_size = self.font_size * scale;
             let layout = cx.text_ctx().layout_text(&display_text, scaled_font_size);
 
-            let text_x = bounds.origin.x + self.padding;
+            // Shift text left by the scroll offset to reveal the scrolled-to portion.
+            let text_x = bounds.origin.x + self.padding - self.scroll_offset;
             let line_metrics = layout.line_metrics();
             let baseline_offset = line_metrics.first().map(|m| m.baseline).unwrap_or(0.0);
             // Vertically center the text within the bounds
@@ -284,16 +325,32 @@ impl Element for TextInput {
             let device_origin =
                 crate::DevicePoint::new(text_x * scale, text_y * scale - baseline_offset);
 
+            // Visible x range in device pixels — used to skip glyphs that are
+            // fully outside the content area, preventing text overflow.
+            let vis_left_dev = (bounds.origin.x + self.padding) * scale;
+            let vis_right_dev = (bounds.origin.x + bounds.size.width - self.padding) * scale;
+
             for run in layout.glyph_runs_with_font() {
                 if let Some(font) = run.font_data {
                     let mut text_run = TextRun::new(device_origin, text_color, run.font_size, font);
                     text_run.normalized_coords = run.normalized_coords;
 
                     for glyph in run.glyphs {
-                        text_run.push_glyph(glyph.id, glyph.x, glyph.y);
+                        // Absolute device-x of this glyph.
+                        let glyph_dev_x = device_origin.x + glyph.x;
+                        // Use font_size (device pixels) as a conservative glyph-width
+                        // estimate to keep partially-visible edge glyphs.
+                        let approx_width = run.font_size;
+                        if glyph_dev_x + approx_width >= vis_left_dev
+                            && glyph_dev_x <= vis_right_dev
+                        {
+                            text_run.push_glyph(glyph.id, glyph.x, glyph.y);
+                        }
                     }
 
-                    cx.scene().push_text_run(text_run);
+                    if !text_run.glyphs.is_empty() {
+                        cx.scene().push_text_run(text_run);
+                    }
                 }
             }
         }
@@ -318,10 +375,11 @@ impl Element for TextInput {
                 (layout_with_marker.width() - marker_layout.width()) / scale
             };
 
-            let cursor_x = bounds.origin.x + self.padding + cursor_x_logical;
+            // Shift cursor by scroll offset to track with the text viewport.
+            let cursor_x = bounds.origin.x + self.padding + cursor_x_logical - self.scroll_offset;
             let cursor_top = bounds.origin.y + (bounds.size.height - self.font_size) / 2.0;
 
-            let cursor_quad = crate::Quad::new(
+            let mut cursor_quad = crate::Quad::new(
                 crate::DeviceRect::new(
                     crate::DevicePoint::new(cursor_x * scale, cursor_top * scale),
                     // 1 logical pixel wide, font-size tall
@@ -329,6 +387,7 @@ impl Element for TextInput {
                 ),
                 self.text_color,
             );
+            cursor_quad.clip_bounds = Some(content_clip);
             cx.scene().push_quad(cursor_quad);
         }
 
@@ -367,6 +426,7 @@ mod tests {
         assert!(!input.is_focused);
         assert_eq!(input.cursor_pos, 0);
         assert_eq!(input.font_size, 14.0);
+        assert_eq!(input.scroll_offset, 0.0);
     }
 
     #[test]
@@ -577,6 +637,86 @@ mod tests {
         input.paint(bounds, &mut cx);
 
         assert!(scene.text_run_count() > 0);
+    }
+
+    #[test]
+    fn text_input_scroll_offset_builder() {
+        let input = text_input("hello", ElementId(1)).scroll_offset(20.0);
+        assert_eq!(input.scroll_offset, 20.0);
+    }
+
+    #[test]
+    fn text_input_scroll_offset_clamped_to_zero() {
+        // Negative scroll offsets are clamped to 0.
+        let input = text_input("hello", ElementId(1)).scroll_offset(-5.0);
+        assert_eq!(input.scroll_offset, 0.0);
+    }
+
+    #[test]
+    fn text_input_scroll_offset_paints_background_and_text() {
+        // With a scroll offset the element should still paint at minimum the
+        // background quad and a text run (text starts scrolled past position 0).
+        let mut scene = Scene::new();
+        let mut text_ctx = TextContext::new();
+        let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
+
+        let mut input = text_input("Hello, world!", ElementId(1))
+            .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(60.0, 32.0)))
+            .scroll_offset(10.0);
+
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
+
+        assert!(scene.quad_count() >= 1, "background quad should be painted");
+        assert!(scene.text_run_count() > 0, "text run should be painted");
+    }
+
+    #[test]
+    fn text_input_scroll_offset_zero_matches_no_scroll() {
+        // scroll_offset(0) should produce the same scene as not calling it.
+        let make_scene = |scroll: f32| {
+            let mut scene = Scene::new();
+            let mut text_ctx = TextContext::new();
+            let mut hit_tree = HitTree::new();
+            let mut layout_engine = LayoutEngine::new();
+
+            let mut input = text_input("Hi", ElementId(1))
+                .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)))
+                .scroll_offset(scroll);
+
+            let mut layout_cx =
+                LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+            let node_id = input.request_layout(&mut layout_cx);
+            layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+            let bounds = layout_engine.layout_bounds(node_id);
+            let mut cx = PaintContext::new(
+                &mut scene,
+                &mut text_ctx,
+                &mut hit_tree,
+                &layout_engine,
+                ScaleFactor(1.0),
+            );
+            input.paint(bounds, &mut cx);
+            (scene.quad_count(), scene.text_run_count())
+        };
+
+        let (qc_default, tr_default) = make_scene(0.0);
+        let (qc_explicit, tr_explicit) = make_scene(0.0);
+        assert_eq!(qc_default, qc_explicit);
+        assert_eq!(tr_default, tr_explicit);
     }
 
     #[test]
