@@ -46,6 +46,10 @@ struct TodoApp {
     new_todo_state: TextEditState,
     new_todo_focused: bool,
 
+    // Per-item inline editing
+    editing_id: Option<usize>,
+    editing_state: TextEditState,
+
     // Todo data
     todos: Vec<Todo>,
     next_id: usize,
@@ -65,6 +69,9 @@ impl TodoApp {
             input_state: InputState::new(),
             new_todo_state: TextEditState::new(),
             new_todo_focused: true, // Start focused
+
+            editing_id: None,
+            editing_state: TextEditState::new(),
 
             todos: vec![
                 Todo {
@@ -112,6 +119,38 @@ impl TodoApp {
 
     fn items_left(&self) -> usize {
         self.todos.iter().filter(|t| !t.completed).count()
+    }
+
+    /// Begin inline editing of the todo item with `todo_id`.
+    ///
+    /// Copies the item's current text into `editing_state` and positions the
+    /// cursor at the end.  Unfocuses the new-todo input while editing.
+    fn begin_edit(&mut self, todo_id: usize) {
+        if let Some(todo) = self.todos.iter().find(|t| t.id == todo_id) {
+            let text = todo.text.clone();
+            self.editing_state = TextEditState::new();
+            self.editing_state.set_content(&text);
+            self.editing_state.move_to_end();
+            self.editing_id = Some(todo_id);
+            self.new_todo_focused = false;
+        }
+    }
+
+    /// Commit the current inline edit: save non-empty content or delete if empty.
+    fn commit_edit(&mut self) {
+        if let Some(id) = self.editing_id.take() {
+            let content = self.editing_state.content().trim().to_string();
+            if content.is_empty() {
+                self.todos.retain(|t| t.id != id);
+            } else if let Some(todo) = self.todos.iter_mut().find(|t| t.id == id) {
+                todo.text = content;
+            }
+        }
+    }
+
+    /// Discard the current inline edit without saving.
+    fn cancel_edit(&mut self) {
+        self.editing_id = None;
     }
 }
 
@@ -270,8 +309,51 @@ impl TodoApp {
                 cb.paint(checkbox_bounds, &mut pcx);
             }
 
-            // Todo text
-            {
+            // Todo text / inline edit input
+            // ID 4000 + todo.id → click-to-edit hit area (static mode)
+            // ID 6000 + todo.id → edit TextInput hit area (edit mode)
+            if self.editing_id == Some(todo.id) {
+                // Edit mode: render a focused TextInput in place of the static text
+                let edit_id = ElementId(6000 + todo.id as u64);
+                let edit_bounds = Rect::new(
+                    Point::new(container_x + 46.0, y + 7.0),
+                    Size::new(container_width - 90.0, 36.0),
+                );
+
+                let mut edit_input = text_input(self.editing_state.content(), edit_id)
+                    .focused(true)
+                    .cursor_pos(self.editing_state.cursor_offset())
+                    .selection(self.editing_state.selected_range().clone())
+                    .font_size(18.0);
+
+                let mut layout_cx =
+                    LayoutContext::new(&mut self.layout_engine, &mut self.text_ctx, scale);
+                let node_id = edit_input.request_layout(&mut layout_cx);
+                self.layout_engine
+                    .compute_layout(node_id, 800.0, 600.0, &mut self.text_ctx);
+
+                let layout_bounds = self.layout_engine.layout_bounds(node_id);
+                let offset = Point::new(
+                    edit_bounds.origin.x - layout_bounds.origin.x,
+                    edit_bounds.origin.y - layout_bounds.origin.y,
+                );
+
+                let mut pcx = PaintContext::new(
+                    &mut self.scene,
+                    &mut self.text_ctx,
+                    &mut self.hit_tree,
+                    &self.layout_engine,
+                    scale,
+                );
+                pcx.set_offset(offset);
+                edit_input.paint(edit_bounds, &mut pcx);
+            } else {
+                // Static mode: render text + invisible hit area to trigger editing on click
+                let text_id = ElementId(4000 + todo.id as u64);
+                let text_hit_bounds = Rect::new(
+                    Point::new(container_x + 46.0, y + 4.0),
+                    Size::new(container_width - 90.0, 42.0),
+                );
                 let text_color = if todo.completed {
                     Srgba::new(0.7, 0.7, 0.7, 1.0) // Gray for completed
                 } else {
@@ -285,6 +367,7 @@ impl TodoApp {
                     text_color,
                     &mut self.text_ctx,
                 );
+                self.hit_tree.push(text_id, text_hit_bounds);
             }
 
             // Delete button (X) - ID is 3000 + todo.id
@@ -395,6 +478,13 @@ impl ApplicationHandler for TodoApp {
                     if let Some(clicked) = self.input_state.end_press() {
                         let id = clicked.0;
 
+                        // Commit any in-progress edit when clicking outside the edit input
+                        if let Some(edit_todo_id) = self.editing_id {
+                            if id != 6000 + edit_todo_id as u64 {
+                                self.commit_edit();
+                            }
+                        }
+
                         // New todo input clicked
                         if id == 1000 {
                             self.new_todo_focused = true;
@@ -429,6 +519,41 @@ impl ApplicationHandler for TodoApp {
                             self.new_todo_focused = false;
                         }
 
+                        // Todo text area clicked (4000 + todo_id) → enter edit mode
+                        if (4000..5000).contains(&id) {
+                            let todo_id = (id - 4000) as usize;
+                            self.begin_edit(todo_id);
+                        }
+
+                        // Edit input clicked (6000 + todo_id) → click-to-cursor
+                        if (6000..7000).contains(&id) {
+                            if let Some(click_pos) = self.input_state.cursor_position {
+                                if self.editing_id.is_some() {
+                                    let container_x = self
+                                        .window
+                                        .as_ref()
+                                        .map(|w| {
+                                            let size = w.inner_size();
+                                            let scale = w.scale_factor() as f32;
+                                            (size.width as f32 / scale - 500.0) / 2.0
+                                        })
+                                        .unwrap_or(50.0);
+                                    let input_x = container_x + 46.0;
+                                    let text_x = click_pos.x - input_x - 8.0;
+                                    let scale = self
+                                        .window
+                                        .as_ref()
+                                        .map(|w| w.scale_factor() as f32)
+                                        .unwrap_or(1.0);
+                                    let content = self.editing_state.content().to_string();
+                                    let layout =
+                                        self.text_ctx.layout_text(&content, 18.0 * scale);
+                                    let index = layout.index_for_x(text_x * scale, &content);
+                                    self.editing_state.move_to(index);
+                                }
+                            }
+                        }
+
                         // Checkbox clicked (2000 + todo_id)
                         if (2000..3000).contains(&id) {
                             let todo_id = (id - 2000) as usize;
@@ -442,6 +567,10 @@ impl ApplicationHandler for TodoApp {
                         }
                     } else {
                         self.new_todo_focused = false;
+                        // Click missed all elements → commit any active edit
+                        if self.editing_id.is_some() {
+                            self.commit_edit();
+                        }
                     }
                     self.input_state.handle_mouse_button(btn, false);
                 }
@@ -460,32 +589,57 @@ impl ApplicationHandler for TodoApp {
                     event.state,
                 );
 
-                if self.new_todo_focused && event.state == winit::event::ElementState::Pressed {
+                if event.state == winit::event::ElementState::Pressed {
                     let modifiers = winit::event::Modifiers::from(self.input_state.modifiers);
-                    match self
-                        .new_todo_state
-                        .handle_key_event(&event.logical_key, &modifiers)
-                    {
-                        HandleKeyResult::Handled => {}
-                        HandleKeyResult::NotHandled => {}
-                        HandleKeyResult::Blur
-                        | HandleKeyResult::FocusNext
-                        | HandleKeyResult::FocusPrev => {
-                            self.new_todo_focused = false;
-                        }
-                        HandleKeyResult::Submit => {
-                            let text = self.new_todo_state.content().to_string();
-                            self.add_todo(text);
-                        }
-                        HandleKeyResult::Copy(_)
-                        | HandleKeyResult::Cut(_)
-                        | HandleKeyResult::Paste => {
-                            // TODO: Clipboard
-                        }
-                    }
 
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
+                    if self.editing_id.is_some() {
+                        // Route key events to the per-item edit state
+                        match self
+                            .editing_state
+                            .handle_key_event(&event.logical_key, &modifiers)
+                        {
+                            HandleKeyResult::Submit => self.commit_edit(),
+                            HandleKeyResult::Blur => self.cancel_edit(),
+                            HandleKeyResult::FocusNext | HandleKeyResult::FocusPrev => {
+                                self.commit_edit();
+                            }
+                            HandleKeyResult::Copy(_)
+                            | HandleKeyResult::Cut(_)
+                            | HandleKeyResult::Paste => {
+                                // TODO: Clipboard
+                            }
+                            HandleKeyResult::Handled | HandleKeyResult::NotHandled => {}
+                        }
+
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    } else if self.new_todo_focused {
+                        match self
+                            .new_todo_state
+                            .handle_key_event(&event.logical_key, &modifiers)
+                        {
+                            HandleKeyResult::Handled => {}
+                            HandleKeyResult::NotHandled => {}
+                            HandleKeyResult::Blur
+                            | HandleKeyResult::FocusNext
+                            | HandleKeyResult::FocusPrev => {
+                                self.new_todo_focused = false;
+                            }
+                            HandleKeyResult::Submit => {
+                                let text = self.new_todo_state.content().to_string();
+                                self.add_todo(text);
+                            }
+                            HandleKeyResult::Copy(_)
+                            | HandleKeyResult::Cut(_)
+                            | HandleKeyResult::Paste => {
+                                // TODO: Clipboard
+                            }
+                        }
+
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
                     }
                 }
             }
