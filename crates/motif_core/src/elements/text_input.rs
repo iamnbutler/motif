@@ -42,6 +42,8 @@ pub struct TextInput {
     cursor_pos: usize,
     /// Selection range (start..end byte offsets). Empty range = no selection.
     selection: std::ops::Range<usize>,
+    /// IME composition range — draws a 1px underline below the preedit text.
+    marked_range: Option<std::ops::Range<usize>>,
 }
 
 impl TextInput {
@@ -64,6 +66,7 @@ impl TextInput {
             is_focused: false,
             cursor_pos: 0,
             selection: 0..0,
+            marked_range: None,
         }
     }
 
@@ -120,6 +123,19 @@ impl TextInput {
         let start = range.start.min(self.value.len());
         let end = range.end.min(self.value.len());
         self.selection = start..end;
+        self
+    }
+
+    /// Set the IME composition (preedit) range as byte offsets into the value.
+    ///
+    /// When set, a 1px underline is drawn below the preedit region to indicate
+    /// the text currently being composed. Set this from `TextEditState::marked_range()`
+    /// on each frame. Pass `None` (or omit the call) to clear the underline.
+    pub fn marked_range(mut self, range: std::ops::Range<usize>) -> Self {
+        let len = self.value.len();
+        let start = range.start.min(len);
+        let end = range.end.min(len);
+        self.marked_range = Some(start..end);
         self
     }
 
@@ -332,7 +348,48 @@ impl Element for TextInput {
             cx.scene().push_quad(cursor_quad);
         }
 
-        // 5. Hit-test registration
+        // 5. IME preedit underline
+        if let Some(ref range) = self.marked_range {
+            let range = range.clone();
+            if !range.is_empty() && !self.value.is_empty() {
+                let end = range.end.min(self.value.len());
+                let start = range.start.min(end);
+                let scaled_font_size = self.font_size * scale;
+
+                let preedit_start_x = if start == 0 {
+                    0.0_f32
+                } else {
+                    let text_before = &self.value[..start];
+                    let layout = cx.text_ctx().layout_text(text_before, scaled_font_size);
+                    layout.width() / scale
+                };
+
+                let preedit_end_x = {
+                    let text_to_end = &self.value[..end];
+                    let layout = cx.text_ctx().layout_text(text_to_end, scaled_font_size);
+                    layout.width() / scale
+                };
+
+                let underline_x = bounds.origin.x + self.padding + preedit_start_x;
+                let underline_width = (preedit_end_x - preedit_start_x).max(1.0);
+                // 1px line just below the text bottom
+                let text_bottom = bounds.origin.y
+                    + (bounds.size.height - self.font_size) / 2.0
+                    + self.font_size
+                    + 1.0;
+
+                let underline_quad = crate::Quad::new(
+                    crate::DeviceRect::new(
+                        crate::DevicePoint::new(underline_x * scale, text_bottom * scale),
+                        crate::DeviceSize::new(underline_width * scale, 1.0 * scale),
+                    ),
+                    self.focus_border_color,
+                );
+                cx.scene().push_quad(underline_quad);
+            }
+        }
+
+        // 6. Hit-test registration
         cx.register_hit(self.id, bounds);
     }
 }
@@ -605,5 +662,89 @@ mod tests {
         input.paint(bounds, &mut cx);
 
         assert_eq!(scene.text_run_count(), 0);
+    }
+
+    #[test]
+    fn text_input_marked_range_default_is_none() {
+        let input = text_input("hello", ElementId(1));
+        assert!(input.marked_range.is_none());
+    }
+
+    #[test]
+    fn text_input_marked_range_builder_sets_range() {
+        let input = text_input("hello world", ElementId(1)).marked_range(0..5);
+        assert_eq!(input.marked_range, Some(0..5));
+    }
+
+    #[test]
+    fn text_input_marked_range_clamped_to_len() {
+        // "hi" is 2 bytes; 0..100 should clamp to 0..2
+        let input = text_input("hi", ElementId(1)).marked_range(0..100);
+        assert_eq!(input.marked_range, Some(0..2));
+    }
+
+    #[test]
+    fn text_input_marked_range_paints_extra_quad() {
+        let mut scene = Scene::new();
+        let mut text_ctx = TextContext::new();
+        let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
+
+        // Unfocused with marked range — background + underline = 2 quads
+        let mut input = text_input("hello", ElementId(1))
+            .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)))
+            .focused(false)
+            .marked_range(0..5);
+
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
+
+        // background quad + underline quad = at least 2
+        assert!(
+            scene.quad_count() >= 2,
+            "expected background + underline quads, got {}",
+            scene.quad_count()
+        );
+    }
+
+    #[test]
+    fn text_input_no_marked_range_no_extra_quad() {
+        let mut scene = Scene::new();
+        let mut text_ctx = TextContext::new();
+        let mut hit_tree = HitTree::new();
+        let mut layout_engine = LayoutEngine::new();
+
+        // Unfocused with no marked range — only background quad
+        let mut input = text_input("hello", ElementId(1))
+            .bounds(Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 32.0)))
+            .focused(false);
+
+        let mut layout_cx = LayoutContext::new(&mut layout_engine, &mut text_ctx, ScaleFactor(1.0));
+        let node_id = input.request_layout(&mut layout_cx);
+        layout_engine.compute_layout(node_id, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = layout_engine.layout_bounds(node_id);
+        let mut cx = PaintContext::new(
+            &mut scene,
+            &mut text_ctx,
+            &mut hit_tree,
+            &layout_engine,
+            ScaleFactor(1.0),
+        );
+        input.paint(bounds, &mut cx);
+
+        // Only the background quad; no underline
+        assert_eq!(scene.quad_count(), 1);
     }
 }

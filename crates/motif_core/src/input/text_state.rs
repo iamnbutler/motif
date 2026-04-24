@@ -152,6 +152,24 @@ impl TextEditState {
         self.marked_range.as_ref()
     }
 
+    /// Sets the marked text range (for IME composition).
+    ///
+    /// The marked range indicates text currently being composed via an input method editor.
+    /// Wire this up to `WindowEvent::Ime(ImeEvent::Preedit(text, range))`.
+    /// Call [`clear_marked_range`](Self::clear_marked_range) when composition ends.
+    pub fn set_marked_range(&mut self, range: Range<usize>) {
+        let len = self.content.len();
+        self.marked_range = Some(range.start.min(len)..range.end.min(len));
+    }
+
+    /// Clears the marked text range (IME composition ended).
+    ///
+    /// Call this when receiving `WindowEvent::Ime(ImeEvent::Commit(_))` or
+    /// `WindowEvent::Ime(ImeEvent::Preedit("", None))`.
+    pub fn clear_marked_range(&mut self) {
+        self.marked_range = None;
+    }
+
     /// Sets the selection range, clamping to content length.
     pub fn set_selected_range(&mut self, range: Range<usize>) {
         let len = self.content.len();
@@ -2281,5 +2299,37 @@ mod tests {
     fn new_multiline_creates_multiline_state() {
         let state = TextEditState::new_multiline();
         assert!(state.is_multiline());
+    }
+
+    #[test]
+    fn marked_range_starts_as_none() {
+        let state = TextEditState::new();
+        assert!(state.marked_range().is_none());
+    }
+
+    #[test]
+    fn set_marked_range_stores_range() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.set_marked_range(0..5);
+        assert_eq!(state.marked_range(), Some(&(0..5)));
+    }
+
+    #[test]
+    fn set_marked_range_clamped_to_content_length() {
+        let mut state = TextEditState::new();
+        state.set_content("hi");
+        state.set_marked_range(0..100);
+        assert_eq!(state.marked_range(), Some(&(0..2)));
+    }
+
+    #[test]
+    fn clear_marked_range_removes_range() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_marked_range(0..5);
+        assert!(state.marked_range().is_some());
+        state.clear_marked_range();
+        assert!(state.marked_range().is_none());
     }
 }
