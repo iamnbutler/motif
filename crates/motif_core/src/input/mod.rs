@@ -5,9 +5,13 @@
 
 mod bindings;
 mod text_state;
+mod unicode;
 
 pub use bindings::{InputAction, InputBindings};
 pub use text_state::{HandleKeyResult, TextEditState};
+pub use unicode::{
+    utf16_len, utf16_range_to_utf8, utf16_to_utf8_offset, utf8_range_to_utf16, utf8_to_utf16_offset,
+};
 
 use crate::{ElementId, Point};
 use std::collections::HashSet;
