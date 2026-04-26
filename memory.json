@@ -1,22 +1,22 @@
 {
-  "last_run": "2026-04-21T00:00:00Z",
-  "last_run_id": "24742436300",
+  "last_run": "2026-04-26T00:00:00Z",
+  "last_run_id": "24965074720",
   "monthly_summary_issue": 50,
   "monthly_summary_month": "2026-04",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_pending": false,
   "tasks_run_last": {
-    "task_10_forward": "2026-04-21",
-    "task_11_monthly_summary": "2026-04-21",
+    "task_11_monthly_summary": "2026-04-26",
+    "task_10_forward": "2026-04-26",
+    "task_4_deps": "2026-04-26",
+    "task_1_triage": "2026-04-26",
+    "task_3_improvements": "2026-04-25",
     "task_9_welcome": "2026-04-21",
-    "task_1_triage": "2026-04-21",
     "task_2_fix_prs": "2026-04-21",
     "task_6_stale_nudges": "2026-04-21",
     "task_8_release": "2026-04-20",
-    "task_5_maintain_prs": "2026-04-18",
-    "task_3_improvements": "2026-04-17",
-    "task_7_labels": "2026-04-17",
-    "task_4_deps": "2026-04-19"
+    "task_5_maintain_prs": "2026-04-23",
+    "task_7_labels": "2026-04-23"
   },
   "issues_commented": {
     "11": "2026-03-04",
@@ -57,7 +57,12 @@
     "clipboard": "pr-53-open",
     "drag-to-select": "pr-54-open",
     "cursor-blink": "pr-55-open",
-    "text-metrics-example": "pr-56-open"
+    "text-metrics-example": "pr-56-open",
+    "horizontal-scroll": "pr-57-open",
+    "todomvc-inline-edit": "pr-58-open",
+    "ime-preedit": "pr-59-open",
+    "utf16-utils": "pr-60-open",
+    "animation-primitives": "pr-61-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -89,7 +94,12 @@
     "clipboard-support-implemented",
     "drag-to-select-implemented",
     "cursor-blink-implemented",
-    "text-metrics-example-implemented"
+    "text-metrics-example-implemented",
+    "horizontal-scroll-implemented",
+    "todomvc-inline-edit-implemented",
+    "ime-preedit-implemented",
+    "utf16-utils-implemented",
+    "animation-primitives-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -100,27 +110,35 @@
     "51": "text metrics debug example plan - IMPLEMENTED AS PR #56"
   },
   "backlog_cursor": null,
-  "notes": "2026-04-21: Task 9 — No new contributors (all 21 PRs are Repo Assist). Task 10/3 — Implemented text metrics debug example (crates/motif/examples/text_metrics.rs, ~150 lines, zero new deps). Six metric overlays at four font sizes (14/20/32/56pt): baseline (blue), ascent (green), descent (red), cap_height (purple), x_height (orange), underline (gray). Branch: repo-assist/improve-text-metrics-example. PR #56 submitted. Resolves issue #51. Tasks 1/2/6 — nothing to do (no human-authored issues/PRs, no fixable bugs). Task 11 — Updated Monthly Activity Summary. Next priorities: task_5_maintain_prs (2026-04-18), task_3_improvements (2026-04-17), task_7_labels (2026-04-17).",
+  "notes": "2026-04-26: Task 10/3 — Implemented animation primitives (crates/motif_core/src/animation.rs, ~170 lines + 16 tests). Animation struct with progress()/is_finished()/elapsed()/remaining()/restart(); easing fns linear/ease_in/ease_out/ease_in_out. Zero new deps (std::time only). TDD approach. Branch: repo-assist/improve-animation-primitives. PR #61 submitted. Implements p3 spool task 'Design animation primitives'. Task 4 — deps verified unchanged (glam 0.32.0, winit 0.30.12, taffy 0.9.2, parley 0.7.0, swash 0.2.6 same as 2026-04-19). Task 1 — no new human activity on any open issue. Task 11 — Updated Monthly Activity Summary. Next priorities: task_9_welcome (2026-04-21), task_6_stale_nudges (2026-04-21), task_8_release (2026-04-20).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
   "checked_off_by_maintainer": [],
-  "dep_audit_2026_03_29": {
+  "dep_audit_2026_04_26": {
     "cargo_lock_versions": {
       "glam": "0.32.0",
       "parley": "0.7.0",
       "smallvec": "1.15.1",
       "swash": "0.2.6",
       "taffy": "0.9.2",
-      "unicode-segmentation": "1.12.0",
       "winit": "0.30.12",
       "accesskit_winit": "0.32.0",
       "glamour": "0.18.0",
       "subsecond": "0.7.3"
     },
-    "notes": "All deps resolving to current patch versions. No urgent updates needed. Last verified 2026-04-19 — no changes. accesskit_winit 0.32.0 declared but still unused — needs wiring. No wgpu in lockfile (not yet a dep)."
+    "notes": "All deps at same versions as 2026-04-19 audit. No urgent updates needed."
+  },
+  "animation_primitives_pr_2026_04_26": {
+    "status": "SUBMITTED — PR #61 (branch repo-assist/improve-animation-primitives)",
+    "files_changed": [
+      "crates/motif_core/src/animation.rs (new, ~170 lines + 16 tests)",
+      "crates/motif_core/src/lib.rs (pub mod animation + pub use animation::*)"
+    ],
+    "approach": "Animation struct with Instant start + Duration duration. progress() returns 0.0..=1.0 clamped. Easing fns: linear, ease_in (cubic), ease_out (cubic), ease_in_out (cubic). Zero new deps.",
+    "notes": "Implements p3 spool task 'Design animation primitives' from animation stream. TDD: 16 tests covering endpoints, clamp, monotonicity, restart, elapsed/remaining edge cases."
   },
   "inputstate_tests_pr_2026_04_17": {
     "status": "SUBMITTED — PR #52 (branch repo-assist/test-input-state-comprehensive)",
@@ -142,7 +160,7 @@
       "physical-to-logical pixel scaling"
     ],
     "remaining_gaps": [
-      "IME/marked_range tests (need public set_marked_range() first)",
+      "IME/marked_range tests (need public set_marked_range() first — now public via PR #59)",
       "Cross-module integration tests (InputState + TextEditState)"
     ]
   },
@@ -176,28 +194,13 @@
     "approach": "NSPasteboard via objc2-app-kit 0.2 on macOS; no-op stubs on other platforms. Zero new deps — only added NSPasteboard feature to existing objc2-app-kit dep."
   },
   "escape_key_cancel_edit_investigation_2026_04_16": {
-    "status": "COMPLETE PICTURE",
-    "infrastructure_status": "ALREADY WIRED — InputAction::Escape → HandleKeyResult::Blur in text_state.rs:799; playground.rs:914 and todomvc.rs:471-475 already handle Blur",
-    "missing_for_per_item_editing": [
-      "editing_id: Option<usize> field in TodoApp struct",
-      "editing_state: TextEditState field in TodoApp struct",
-      "Key event routing: when editing_id.is_some(), route to editing_state",
-      "Blur handler: editing_id = None (discard changes)",
-      "Submit handler: save content to todos[idx].text, editing_id = None",
-      "Click-outside handler: save changes, editing_id = None",
-      "Empty-edit deletion: if content.trim().is_empty() { todos.remove(idx) }",
-      "Double-click entry point: requires PR #36 click_count() accessor"
-    ],
-    "alt_entry_without_pr36": "F2 key or Edit button per item",
-    "estimated_lines": "~95-120 lines in todomvc.rs",
-    "new_dependencies": "zero",
-    "blocked_on": "PR #36 for double-click entry (can use alt entry without it)"
+    "status": "COMPLETE PICTURE — per-item editing implemented in PR #58"
   },
   "inputhandler_ime_investigation_2026_04_04": {
-    "status": "COMPLETE PICTURE — zero new dependencies needed. TextEditState already has marked_range: Option<Range<usize>> field and undo/redo skip during composition. Missing: public setter, InputHandler trait, UTF-16 conversion utils (~60-100 lines), WindowEvent::Ime handler in playground.rs (winit 0.30 provides ImeEvent::Preedit/Commit but playground.rs has no Ime match arm). ~600-750 lines total for complete implementation. Deferred until PR backlog clears."
+    "status": "PARTIAL — PR #59 (IME preedit underline), PR #60 (UTF-16 utils) submitted. Remaining: InputHandler trait, UTF-16 wiring, WindowEvent::Ime handler in playground.rs. ~500-650 lines, zero new deps."
   },
   "accesskit_integration_2026_03_26": {
-    "status": "COMPLETE PICTURE — all data structures implemented, wiring plan finalized. App struct needs 3 fields: access_tree: AccessTree, focus_mgr: FocusManager, access_context: Option<accesskit_winit::AccessKitWinitContext>. resumed(): init context after window creation with initial TreeUpdate from access_tree.build_initial_update(). window_event(): on each frame, call adapter.update_if_active(|| build_update()); on focus changes call adapter directly. Elements push AccessNode during draw with bounds set. ~30 lines total across examples. accesskit_winit = '0.32' already in Cargo.toml — zero new deps needed."
+    "status": "COMPLETE PICTURE — all data structures implemented, wiring plan finalized. ~30 lines total across examples. accesskit_winit = '0.32' already in Cargo.toml — zero new deps needed."
   },
   "renderer_trait_investigation_2026_03_23": {
     "status": "DONE — Renderer trait in crates/motif_core/src/renderer.rs is fully implemented."
