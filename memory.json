@@ -1,19 +1,19 @@
 {
-  "last_run": "2026-04-26T00:00:00Z",
-  "last_run_id": "24965074720",
+  "last_run": "2026-04-27T00:00:00Z",
+  "last_run_id": "25015673667",
   "monthly_summary_issue": 50,
   "monthly_summary_month": "2026-04",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_pending": false,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-04-26",
-    "task_10_forward": "2026-04-26",
+    "task_11_monthly_summary": "2026-04-27",
+    "task_10_forward": "2026-04-27",
+    "task_9_welcome": "2026-04-27",
+    "task_6_stale_nudges": "2026-04-27",
     "task_4_deps": "2026-04-26",
     "task_1_triage": "2026-04-26",
     "task_3_improvements": "2026-04-25",
-    "task_9_welcome": "2026-04-21",
     "task_2_fix_prs": "2026-04-21",
-    "task_6_stale_nudges": "2026-04-21",
     "task_8_release": "2026-04-20",
     "task_5_maintain_prs": "2026-04-23",
     "task_7_labels": "2026-04-23"
@@ -62,7 +62,8 @@
     "todomvc-inline-edit": "pr-58-open",
     "ime-preedit": "pr-59-open",
     "utf16-utils": "pr-60-open",
-    "animation-primitives": "pr-61-open"
+    "animation-primitives": "pr-61-open",
+    "accesskit-integration": "pr-62-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -99,7 +100,8 @@
     "todomvc-inline-edit-implemented",
     "ime-preedit-implemented",
     "utf16-utils-implemented",
-    "animation-primitives-implemented"
+    "animation-primitives-implemented",
+    "accesskit-integration-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -110,9 +112,9 @@
     "51": "text metrics debug example plan - IMPLEMENTED AS PR #56"
   },
   "backlog_cursor": null,
-  "notes": "2026-04-26: Task 10/3 — Implemented animation primitives (crates/motif_core/src/animation.rs, ~170 lines + 16 tests). Animation struct with progress()/is_finished()/elapsed()/remaining()/restart(); easing fns linear/ease_in/ease_out/ease_in_out. Zero new deps (std::time only). TDD approach. Branch: repo-assist/improve-animation-primitives. PR #61 submitted. Implements p3 spool task 'Design animation primitives'. Task 4 — deps verified unchanged (glam 0.32.0, winit 0.30.12, taffy 0.9.2, parley 0.7.0, swash 0.2.6 same as 2026-04-19). Task 1 — no new human activity on any open issue. Task 11 — Updated Monthly Activity Summary. Next priorities: task_9_welcome (2026-04-21), task_6_stale_nudges (2026-04-21), task_8_release (2026-04-20).",
+  "notes": "2026-04-27: Task 10 — Implemented AccessKit adapter wiring in playground.rs. Added Adapter::new init in resumed(), process_event in window_event, update_if_active at end of handler. Zero new deps (accesskit_winit = '0.32' already in Cargo.toml). Implements p2 spool task 'Complete AccessKit integration' from accessibility stream. Branch: repo-assist/improve-accesskit-integration. PR #62 submitted. Task 9 — no new contributors (all PRs are Repo Assist drafts). Task 6 — no human-authored PRs to nudge. Task 11 — Updated Monthly Activity Summary. Next priorities: task_2_fix_prs (2026-04-21), task_8_release (2026-04-20), task_5_maintain_prs/task_7_labels (2026-04-23).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
@@ -131,6 +133,14 @@
     },
     "notes": "All deps at same versions as 2026-04-19 audit. No urgent updates needed."
   },
+  "accesskit_integration_pr_2026_04_27": {
+    "status": "SUBMITTED — PR #62 (branch repo-assist/improve-accesskit-integration)",
+    "files_changed": [
+      "crates/motif/examples/playground.rs (added Adapter import, access_adapter field, init in resumed, process_event + update_if_active in window_event)"
+    ],
+    "approach": "Adapter::new(&window, initial_tree_fn) in resumed(); process_event(&window, &event) at start of window_event; update_if_active(|| build_tree) at end of window_event. Initial tree: single AccessRole::Window root node. Zero new deps — accesskit_winit already in Cargo.toml.",
+    "notes": "Implements p2 spool task 'Complete AccessKit integration' from accessibility stream. update_if_active is no-op when no screen reader active. Future work: enrich tree with per-element AccessNodes via DrawContext::with_accessibility; apply same pattern to todomvc.rs."
+  },
   "animation_primitives_pr_2026_04_26": {
     "status": "SUBMITTED — PR #61 (branch repo-assist/improve-animation-primitives)",
     "files_changed": [
@@ -144,63 +154,26 @@
     "status": "SUBMITTED — PR #52 (branch repo-assist/test-input-state-comprehensive)",
     "tests_added": 14,
     "total_after": 42,
-    "covers": [
-      "handle_cursor_entered (with and without prior position)",
-      "cursor position in Down events",
-      "cursor position in Scroll events",
-      "simultaneous multi-button tracking",
-      "releasing one button keeps others pressed",
-      "take_events idempotency",
-      "event ordering (Move/Down/Up sequence)",
-      "modifier snapshot in mouse events",
-      "modifier snapshot in key events",
-      "begin_press with no hover records None",
-      "end_press without begin returns None",
-      "key release events",
-      "physical-to-logical pixel scaling"
-    ],
     "remaining_gaps": [
       "IME/marked_range tests (need public set_marked_range() first — now public via PR #59)",
       "Cross-module integration tests (InputState + TextEditState)"
     ]
   },
   "cursor_blink_pr_2026_04_20": {
-    "status": "SUBMITTED — PR #55 (branch repo-assist/improve-cursor-blink)",
-    "files_changed": [
-      "crates/motif_core/src/elements/text_input.rs (cursor_visible field + builder method)",
-      "crates/motif/examples/playground.rs (new_events + about_to_wait + blink state)",
-      "crates/motif/examples/todomvc.rs (new_events + about_to_wait + blink state)"
-    ],
-    "approach": "530 ms WaitUntil via about_to_wait; toggles in new_events on ResumeTimeReached; resets to visible on click/keypress. Zero new deps.",
-    "notes": "cursor_visible defaults to true so existing TextInput users are unaffected"
+    "status": "SUBMITTED — PR #55 (branch repo-assist/improve-cursor-blink)"
   },
   "text_metrics_example_pr_2026_04_21": {
     "status": "SUBMITTED — PR #56 (branch repo-assist/improve-text-metrics-example)",
-    "files_changed": [
-      "crates/motif/examples/text_metrics.rs (new, ~150 lines)"
-    ],
-    "approach": "layout_text(text, font_size) → line_metrics()/font_metrics(); overlay 1px quads at baseline/ascent/descent/cap_height/x_height/underline with paint_quad; labels via paint_text. Zero new deps.",
-    "notes": "Resolves issue #51. Uses only existing TextLayout, DrawContext APIs."
+    "notes": "Resolves issue #51."
   },
   "clipboard_pr_2026_04_18": {
-    "status": "SUBMITTED — PR #53 (branch repo-assist/improve-clipboard-support-17765406)",
-    "files_changed": [
-      "crates/motif_core/src/clipboard.rs (new)",
-      "crates/motif_core/Cargo.toml (NSPasteboard feature added)",
-      "crates/motif_core/src/lib.rs (pub mod clipboard)",
-      "crates/motif/examples/playground.rs (wired up Copy/Cut/Paste)",
-      "crates/motif/examples/todomvc.rs (wired up Copy/Cut/Paste)"
-    ],
-    "approach": "NSPasteboard via objc2-app-kit 0.2 on macOS; no-op stubs on other platforms. Zero new deps — only added NSPasteboard feature to existing objc2-app-kit dep."
-  },
-  "escape_key_cancel_edit_investigation_2026_04_16": {
-    "status": "COMPLETE PICTURE — per-item editing implemented in PR #58"
+    "status": "SUBMITTED — PR #53 (branch repo-assist/improve-clipboard-support-17765406)"
   },
   "inputhandler_ime_investigation_2026_04_04": {
     "status": "PARTIAL — PR #59 (IME preedit underline), PR #60 (UTF-16 utils) submitted. Remaining: InputHandler trait, UTF-16 wiring, WindowEvent::Ime handler in playground.rs. ~500-650 lines, zero new deps."
   },
   "accesskit_integration_2026_03_26": {
-    "status": "COMPLETE PICTURE — all data structures implemented, wiring plan finalized. ~30 lines total across examples. accesskit_winit = '0.32' already in Cargo.toml — zero new deps needed."
+    "status": "IMPLEMENTED — PR #62 submitted 2026-04-27. Wired up Adapter in playground.rs. Future: enrich tree with per-element nodes, apply to todomvc.rs."
   },
   "renderer_trait_investigation_2026_03_23": {
     "status": "DONE — Renderer trait in crates/motif_core/src/renderer.rs is fully implemented."
