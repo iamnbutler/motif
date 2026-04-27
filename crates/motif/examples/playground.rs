@@ -5,15 +5,16 @@
 //!
 //! Run with: cargo run --example playground
 
+use accesskit_winit::Adapter as AccessAdapter;
 use motif_core::{
     checkbox, div,
     element::{Element, LayoutContext, PaintContext},
     focus::{FocusEvent, FocusHandle, FocusState},
     input::{InputState, MouseButton, ScrollDelta, TextEditState},
     metal::{MetalRenderer, MetalSurface},
-    text, text_input, ArcStr, DrawContext, ElementId, HitTree, IntoElement, LayoutEngine,
-    ParentElement, Point, Rect, Render, RenderOnce, Renderer, ScaleFactor, Scene, Size, Srgba,
-    TextContext, ViewContext, WindowContext,
+    text, text_input, AccessId, AccessNode, AccessRole, AccessTree, ArcStr, DrawContext, ElementId,
+    HitTree, IntoElement, LayoutEngine, ParentElement, Point, Rect, Render, RenderOnce, Renderer,
+    ScaleFactor, Scene, Size, Srgba, TextContext, ViewContext, WindowContext,
 };
 use motif_debug::{DebugServer, InputStateSnapshot, SceneSnapshot};
 use winit::{
@@ -260,6 +261,8 @@ struct App {
     checkbox_states: [bool; 3],
     text_edit_state: TextEditState,
     text_input_focused: bool,
+    // Accessibility
+    access_adapter: Option<AccessAdapter>,
 }
 
 impl Default for App {
@@ -287,6 +290,7 @@ impl Default for App {
                 state
             },
             text_input_focused: false,
+            access_adapter: None,
         }
     }
 }
@@ -309,6 +313,19 @@ impl ApplicationHandler for App {
                 }
             }
 
+            // Initialize accessibility adapter with an initial tree describing the window.
+            let root_id = AccessId(0);
+            let adapter = AccessAdapter::new(&window, move || {
+                let mut tree = AccessTree::new(root_id);
+                tree.push(AccessNode::new(
+                    root_id,
+                    AccessRole::Window,
+                    "Motif — Playground".to_string(),
+                ));
+                tree.build_initial_update(None)
+            });
+            self.access_adapter = Some(adapter);
+
             window.request_redraw();
             self.window = Some(window);
             self.renderer = Some(renderer);
@@ -317,6 +334,13 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Forward window events to the accessibility adapter so screen readers
+        // receive focus changes, window activation/deactivation, etc.
+        if let (Some(window), Some(adapter)) = (self.window.as_ref(), self.access_adapter.as_ref())
+        {
+            adapter.process_event(window, &event);
+        }
+
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
@@ -951,6 +975,20 @@ impl ApplicationHandler for App {
         if let Some(ref debug_server) = self.debug_server {
             let snapshot = InputStateSnapshot::from_input_state(&self.input_state);
             debug_server.update_input(snapshot);
+        }
+
+        // Push an updated accessibility tree to the screen reader (no-op when
+        // no screen reader is running, since update_if_active only runs the
+        // closure when an assistive technology has activated the adapter).
+        if let Some(ref adapter) = self.access_adapter {
+            let root_id = AccessId(0);
+            let mut tree = AccessTree::new(root_id);
+            tree.push(AccessNode::new(
+                root_id,
+                AccessRole::Window,
+                "Motif — Playground".to_string(),
+            ));
+            adapter.update_if_active(move || tree.build_initial_update(None));
         }
     }
 }
