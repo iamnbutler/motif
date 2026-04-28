@@ -1,18 +1,18 @@
 {
-  "last_run": "2026-04-27T00:00:00Z",
-  "last_run_id": "25015673667",
+  "last_run": "2026-04-28T00:00:00Z",
+  "last_run_id": "25073865047",
   "monthly_summary_issue": 50,
   "monthly_summary_month": "2026-04",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_pending": false,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-04-27",
-    "task_10_forward": "2026-04-27",
+    "task_11_monthly_summary": "2026-04-28",
+    "task_10_forward": "2026-04-28",
     "task_9_welcome": "2026-04-27",
     "task_6_stale_nudges": "2026-04-27",
     "task_4_deps": "2026-04-26",
     "task_1_triage": "2026-04-26",
-    "task_3_improvements": "2026-04-25",
+    "task_3_improvements": "2026-04-28",
     "task_2_fix_prs": "2026-04-21",
     "task_8_release": "2026-04-20",
     "task_5_maintain_prs": "2026-04-23",
@@ -63,7 +63,8 @@
     "ime-preedit": "pr-59-open",
     "utf16-utils": "pr-60-open",
     "animation-primitives": "pr-61-open",
-    "accesskit-integration": "pr-62-open"
+    "accesskit-integration": "pr-62-open",
+    "input-handler-trait": "pr-63-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -101,7 +102,8 @@
     "ime-preedit-implemented",
     "utf16-utils-implemented",
     "animation-primitives-implemented",
-    "accesskit-integration-implemented"
+    "accesskit-integration-implemented",
+    "input-handler-trait-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -112,9 +114,9 @@
     "51": "text metrics debug example plan - IMPLEMENTED AS PR #56"
   },
   "backlog_cursor": null,
-  "notes": "2026-04-27: Task 10 — Implemented AccessKit adapter wiring in playground.rs. Added Adapter::new init in resumed(), process_event in window_event, update_if_active at end of handler. Zero new deps (accesskit_winit = '0.32' already in Cargo.toml). Implements p2 spool task 'Complete AccessKit integration' from accessibility stream. Branch: repo-assist/improve-accesskit-integration. PR #62 submitted. Task 9 — no new contributors (all PRs are Repo Assist drafts). Task 6 — no human-authored PRs to nudge. Task 11 — Updated Monthly Activity Summary. Next priorities: task_2_fix_prs (2026-04-21), task_8_release (2026-04-20), task_5_maintain_prs/task_7_labels (2026-04-23).",
+  "notes": "2026-04-28: Task 10/3 — Implemented InputHandler trait. New file: crates/motif_core/src/input/handler.rs. Trait: handle_key_event, commit, set_marked_text, unmark_text, content, cursor_offset, selected_range, marked_range. TextEditState implements it. New TextEditState methods: set_marked_range, clear_marked_range, set_marked_text. playground.rs: set_ime_allowed(true) on focus, WindowEvent::Ime handler (Preedit→set_marked_text, Commit→insert_text, Disabled→clear_marked_range). 12 TDD tests. PR #63. Note: set_marked_range/clear_marked_range overlap with PR #59 — trivial conflict resolve when merging second. Next priorities: task_2_fix_prs (2026-04-21), task_8_release (2026-04-20), task_5_maintain_prs/task_7_labels (2026-04-23).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
@@ -133,6 +135,17 @@
     },
     "notes": "All deps at same versions as 2026-04-19 audit. No urgent updates needed."
   },
+  "input_handler_trait_pr_2026_04_28": {
+    "status": "SUBMITTED — PR #63 (branch repo-assist/improve-input-handler-trait)",
+    "files_changed": [
+      "crates/motif_core/src/input/handler.rs (new — InputHandler trait + impl for TextEditState + 6 tests)",
+      "crates/motif_core/src/input/mod.rs (added handler mod + pub use InputHandler)",
+      "crates/motif_core/src/input/text_state.rs (added set_marked_range, clear_marked_range, set_marked_text + 6 tests)",
+      "crates/motif/examples/playground.rs (set_ime_allowed + WindowEvent::Ime handler)"
+    ],
+    "approach": "InputHandler trait with 8 methods. TextEditState implements via forwarding to inherent methods. playground.rs wires Preedit->set_marked_text, Commit->insert_text, Disabled->clear_marked_range. 12 TDD tests total.",
+    "notes": "set_marked_range/clear_marked_range overlap with PR #59. Trivial conflict: deduplicate when second PR merges."
+  },
   "accesskit_integration_pr_2026_04_27": {
     "status": "SUBMITTED — PR #62 (branch repo-assist/improve-accesskit-integration)",
     "files_changed": [
@@ -149,34 +162,5 @@
     ],
     "approach": "Animation struct with Instant start + Duration duration. progress() returns 0.0..=1.0 clamped. Easing fns: linear, ease_in (cubic), ease_out (cubic), ease_in_out (cubic). Zero new deps.",
     "notes": "Implements p3 spool task 'Design animation primitives' from animation stream. TDD: 16 tests covering endpoints, clamp, monotonicity, restart, elapsed/remaining edge cases."
-  },
-  "inputstate_tests_pr_2026_04_17": {
-    "status": "SUBMITTED — PR #52 (branch repo-assist/test-input-state-comprehensive)",
-    "tests_added": 14,
-    "total_after": 42,
-    "remaining_gaps": [
-      "IME/marked_range tests (need public set_marked_range() first — now public via PR #59)",
-      "Cross-module integration tests (InputState + TextEditState)"
-    ]
-  },
-  "cursor_blink_pr_2026_04_20": {
-    "status": "SUBMITTED — PR #55 (branch repo-assist/improve-cursor-blink)"
-  },
-  "text_metrics_example_pr_2026_04_21": {
-    "status": "SUBMITTED — PR #56 (branch repo-assist/improve-text-metrics-example)",
-    "notes": "Resolves issue #51."
-  },
-  "clipboard_pr_2026_04_18": {
-    "status": "SUBMITTED — PR #53 (branch repo-assist/improve-clipboard-support-17765406)"
-  },
-  "inputhandler_ime_investigation_2026_04_04": {
-    "status": "PARTIAL — PR #59 (IME preedit underline), PR #60 (UTF-16 utils) submitted. Remaining: InputHandler trait, UTF-16 wiring, WindowEvent::Ime handler in playground.rs. ~500-650 lines, zero new deps."
-  },
-  "accesskit_integration_2026_03_26": {
-    "status": "IMPLEMENTED — PR #62 submitted 2026-04-27. Wired up Adapter in playground.rs. Future: enrich tree with per-element nodes, apply to todomvc.rs."
-  },
-  "renderer_trait_investigation_2026_03_23": {
-    "status": "DONE — Renderer trait in crates/motif_core/src/renderer.rs is fully implemented."
-  },
-  "pr_35_status": "merged by iamnbutler on 2026-03-04 — confirms PR #20 (Repo Assist TodoMVC) is definitively superseded and should be closed"
+  }
 }
