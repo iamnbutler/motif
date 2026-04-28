@@ -152,6 +152,43 @@ impl TextEditState {
         self.marked_range.as_ref()
     }
 
+    /// Sets the IME composition (marked) range directly, clamping to content length.
+    pub fn set_marked_range(&mut self, range: Range<usize>) {
+        let len = self.content.len();
+        self.marked_range = Some(range.start.min(len)..range.end.min(len));
+    }
+
+    /// Clears the IME composition range without modifying content.
+    pub fn clear_marked_range(&mut self) {
+        self.marked_range = None;
+    }
+
+    /// Replaces the current marked range (or selection) with IME preedit text.
+    ///
+    /// Called during IME composition as the user types. The text is not
+    /// committed — it replaces any previous preedit in-place and remains
+    /// marked so the next preedit or commit can replace it again.
+    ///
+    /// Passing an empty string cancels the preedit without committing.
+    pub fn set_marked_text(&mut self, preedit: &str) {
+        let range = self
+            .marked_range
+            .clone()
+            .unwrap_or_else(|| self.selected_range.clone());
+        let len = self.content.len();
+        let range = range.start.min(len)..range.end.min(len);
+        self.content.replace_range(range.clone(), preedit);
+        if preedit.is_empty() {
+            self.marked_range = None;
+            self.selected_range = range.start..range.start;
+        } else {
+            let new_end = range.start + preedit.len();
+            self.marked_range = Some(range.start..new_end);
+            self.selected_range = new_end..new_end;
+        }
+        self.selection_reversed = false;
+    }
+
     /// Sets the selection range, clamping to content length.
     pub fn set_selected_range(&mut self, range: Range<usize>) {
         let len = self.content.len();
@@ -2281,5 +2318,83 @@ mod tests {
     fn new_multiline_creates_multiline_state() {
         let state = TextEditState::new_multiline();
         assert!(state.is_multiline());
+    }
+
+    // ============================================================
+    // IME / marked range methods
+    // ============================================================
+
+    #[test]
+    fn set_marked_range_clamps_to_content_len() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_marked_range(2..100);
+        assert_eq!(state.marked_range(), Some(&(2..5)));
+    }
+
+    #[test]
+    fn clear_marked_range_removes_mark() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_marked_range(0..5);
+        assert!(state.marked_range().is_some());
+        state.clear_marked_range();
+        assert!(state.marked_range().is_none());
+    }
+
+    #[test]
+    fn set_marked_text_inserts_preedit_over_selection() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.set_selected_range(2..4); // select "ll"
+        state.set_marked_text("xyz");
+        // "ll" replaced by "xyz": "he" + "xyz" + "o" = "hexyzo"
+        assert_eq!(state.content(), "hexyzo");
+        assert_eq!(state.marked_range(), Some(&(2..5)));
+        assert_eq!(state.cursor_offset(), 5);
+    }
+
+    #[test]
+    fn set_marked_text_updates_existing_preedit() {
+        let mut state = TextEditState::new();
+        state.set_content("hi");
+        state.move_to(2);
+        state.set_marked_text("abc");
+        // content now "hiabc", cursor at 5, marked 2..5
+        assert_eq!(state.content(), "hiabc");
+        assert_eq!(state.marked_range(), Some(&(2..5)));
+        // Second preedit update replaces the first
+        state.set_marked_text("de");
+        assert_eq!(state.content(), "hide");
+        assert_eq!(state.marked_range(), Some(&(2..4)));
+        assert_eq!(state.cursor_offset(), 4);
+    }
+
+    #[test]
+    fn set_marked_text_empty_cancels_preedit() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        state.move_to(3);
+        state.set_marked_text("xyz");
+        // content: "helxyz", cursor at 6, marked 3..6
+        assert_eq!(state.content(), "helxyz");
+        // Cancel by sending empty preedit
+        state.set_marked_text("");
+        // "xyz" is removed, marked range cleared
+        assert_eq!(state.content(), "hel");
+        assert!(state.marked_range().is_none());
+        assert_eq!(state.cursor_offset(), 3);
+    }
+
+    #[test]
+    fn insert_text_commits_preedit_and_clears_mark() {
+        let mut state = TextEditState::new();
+        state.set_content("hi");
+        state.move_to(2);
+        state.set_marked_text("abc");
+        // Commit: replace marked range with committed text
+        state.insert_text("ABC");
+        assert_eq!(state.content(), "hiABC");
+        assert!(state.marked_range().is_none());
     }
 }

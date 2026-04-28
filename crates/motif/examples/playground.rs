@@ -821,6 +821,9 @@ impl ApplicationHandler for App {
                         // Check if clicked on text input (ID 3100)
                         if id == 3100 {
                             self.text_input_focused = true;
+                            if let Some(window) = &self.window {
+                                window.set_ime_allowed(true);
+                            }
 
                             // Click-to-cursor: convert click position to byte offset
                             if let Some(click_pos) = self.input_state.cursor_position {
@@ -941,6 +944,32 @@ impl ApplicationHandler for App {
 
                     if let Some(window) = &self.window {
                         window.request_redraw();
+                    }
+                }
+            }
+            WindowEvent::Ime(ime_event) => {
+                if self.text_input_focused {
+                    use winit::event::Ime;
+                    match ime_event {
+                        Ime::Enabled => {}
+                        Ime::Preedit(text, _cursor) => {
+                            self.text_edit_state.set_marked_text(&text);
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
+                            }
+                        }
+                        Ime::Commit(text) => {
+                            self.text_edit_state.insert_text(&text);
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
+                            }
+                        }
+                        Ime::Disabled => {
+                            self.text_edit_state.clear_marked_range();
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
+                            }
+                        }
                     }
                 }
             }
