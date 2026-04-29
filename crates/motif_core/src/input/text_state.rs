@@ -423,6 +423,34 @@ impl TextEditState {
         self.select_to(self.content.len());
     }
 
+    /// Selects the word at the given byte offset.
+    ///
+    /// Useful for implementing double-click word selection. If the offset
+    /// falls on whitespace or punctuation between words, the cursor is
+    /// collapsed to that offset with no selection.
+    pub fn select_word_at(&mut self, offset: usize) {
+        let (start, end) = self.word_range_at(offset);
+        if start == end {
+            // Not inside a word — collapse cursor with no selection.
+            self.move_to(offset.min(self.content.len()));
+        } else {
+            self.selected_range = start..end;
+            self.selection_reversed = false;
+        }
+    }
+
+    /// Selects the entire line containing the given byte offset.
+    ///
+    /// Useful for implementing triple-click line selection. In single-line
+    /// content (no newlines) this selects the entire string, equivalent to
+    /// `select_all`.
+    pub fn select_line_at(&mut self, offset: usize) {
+        let start = self.find_line_start(offset);
+        let end = self.find_line_end(offset);
+        self.selected_range = start..end;
+        self.selection_reversed = false;
+    }
+
     // === Text manipulation ===
 
     /// Inserts text at the cursor position, replacing any selection.
@@ -1647,6 +1675,78 @@ mod tests {
         state.select_to_end();
         assert_eq!(state.selected_range(), &(8..11)); // extends from anchor (8)
         assert!(!state.selection_reversed());
+    }
+
+    // ============================================================
+    // select_word_at / select_line_at
+    // ============================================================
+
+    #[test]
+    fn select_word_at_selects_word_under_cursor() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.select_word_at(2); // inside "hello"
+        assert_eq!(state.selected_range(), &(0..5));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_word_at_second_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.select_word_at(8); // inside "world"
+        assert_eq!(state.selected_range(), &(6..11));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_word_at_whitespace_collapses_cursor() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.select_word_at(5); // on the space between words
+        // No word at space: cursor collapses to offset 5
+        assert_eq!(state.selected_range(), &(5..5));
+    }
+
+    #[test]
+    fn select_word_at_start_of_word() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.select_word_at(0); // at the very start of "hello"
+        assert_eq!(state.selected_range(), &(0..5));
+    }
+
+    #[test]
+    fn select_line_at_selects_full_single_line() {
+        let mut state = TextEditState::new();
+        state.set_content("hello world");
+        state.select_line_at(4);
+        assert_eq!(state.selected_range(), &(0..11));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn select_line_at_selects_correct_line_in_multiline() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("first\nsecond\nthird");
+        state.select_line_at(8); // inside "second" (offsets 6..12)
+        assert_eq!(state.selected_range(), &(6..12));
+    }
+
+    #[test]
+    fn select_line_at_selects_first_line() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("first\nsecond\nthird");
+        state.select_line_at(2); // inside "first"
+        assert_eq!(state.selected_range(), &(0..5));
+    }
+
+    #[test]
+    fn select_line_at_selects_last_line() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("first\nsecond\nthird");
+        state.select_line_at(15); // inside "third"
+        assert_eq!(state.selected_range(), &(13..18));
     }
 
     // ============================================================
