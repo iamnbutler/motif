@@ -1,22 +1,22 @@
 {
-  "last_run": "2026-04-28T00:00:00Z",
-  "last_run_id": "25073865047",
+  "last_run": "2026-04-29T00:00:00Z",
+  "last_run_id": "25129992291",
   "monthly_summary_issue": 50,
   "monthly_summary_month": "2026-04",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_pending": false,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-04-28",
-    "task_10_forward": "2026-04-28",
+    "task_11_monthly_summary": "2026-04-29",
+    "task_10_forward": "2026-04-29",
+    "task_7_labels": "2026-04-29",
+    "task_5_maintain_prs": "2026-04-29",
+    "task_8_release": "2026-04-29",
     "task_9_welcome": "2026-04-27",
     "task_6_stale_nudges": "2026-04-27",
     "task_4_deps": "2026-04-26",
     "task_1_triage": "2026-04-26",
     "task_3_improvements": "2026-04-28",
-    "task_2_fix_prs": "2026-04-21",
-    "task_8_release": "2026-04-20",
-    "task_5_maintain_prs": "2026-04-23",
-    "task_7_labels": "2026-04-23"
+    "task_2_fix_prs": "2026-04-21"
   },
   "issues_commented": {
     "11": "2026-03-04",
@@ -64,7 +64,8 @@
     "utf16-utils": "pr-60-open",
     "animation-primitives": "pr-61-open",
     "accesskit-integration": "pr-62-open",
-    "input-handler-trait": "pr-63-open"
+    "input-handler-trait": "pr-63-open",
+    "word-line-selection": "pr-64-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -103,7 +104,8 @@
     "utf16-utils-implemented",
     "animation-primitives-implemented",
     "accesskit-integration-implemented",
-    "input-handler-trait-implemented"
+    "input-handler-trait-implemented",
+    "word-line-selection-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -114,9 +116,9 @@
     "51": "text metrics debug example plan - IMPLEMENTED AS PR #56"
   },
   "backlog_cursor": null,
-  "notes": "2026-04-28: Task 10/3 — Implemented InputHandler trait. New file: crates/motif_core/src/input/handler.rs. Trait: handle_key_event, commit, set_marked_text, unmark_text, content, cursor_offset, selected_range, marked_range. TextEditState implements it. New TextEditState methods: set_marked_range, clear_marked_range, set_marked_text. playground.rs: set_ime_allowed(true) on focus, WindowEvent::Ime handler (Preedit→set_marked_text, Commit→insert_text, Disabled→clear_marked_range). 12 TDD tests. PR #63. Note: set_marked_range/clear_marked_range overlap with PR #59 — trivial conflict resolve when merging second. Next priorities: task_2_fix_prs (2026-04-21), task_8_release (2026-04-20), task_5_maintain_prs/task_7_labels (2026-04-23).",
+  "notes": "2026-04-29: Task 10/7/5/8 — Added select_word_at + select_line_at to TextEditState. Building blocks for double/triple-click selection. select_word_at uses word_range_at(); select_line_at uses find_line_start/find_line_end. 8 TDD tests. PR #64. Task 7: All 29 PRs correctly labeled. Task 5: main unchanged at 57a5ad8, no conflicts. Task 8: no release needed. Next priorities: task_1_triage (2026-04-26), task_4_deps (2026-04-26), task_2_fix_prs (2026-04-21).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
@@ -135,6 +137,14 @@
     },
     "notes": "All deps at same versions as 2026-04-19 audit. No urgent updates needed."
   },
+  "word_line_selection_pr_2026_04_29": {
+    "status": "SUBMITTED — PR #64 (branch repo-assist/improve-word-line-selection)",
+    "files_changed": [
+      "crates/motif_core/src/input/text_state.rs (select_word_at + select_line_at + 8 tests)"
+    ],
+    "approach": "select_word_at delegates to existing word_range_at(); collapses cursor on whitespace/punctuation. select_line_at delegates to find_line_start/find_line_end. Both are O(n). 8 TDD tests.",
+    "notes": "Building blocks for double-click word selection (p2) and triple-click line selection (p3). Event-handler wiring needs PR #36 (click_count) to merge first."
+  },
   "input_handler_trait_pr_2026_04_28": {
     "status": "SUBMITTED — PR #63 (branch repo-assist/improve-input-handler-trait)",
     "files_changed": [
@@ -145,22 +155,5 @@
     ],
     "approach": "InputHandler trait with 8 methods. TextEditState implements via forwarding to inherent methods. playground.rs wires Preedit->set_marked_text, Commit->insert_text, Disabled->clear_marked_range. 12 TDD tests total.",
     "notes": "set_marked_range/clear_marked_range overlap with PR #59. Trivial conflict: deduplicate when second PR merges."
-  },
-  "accesskit_integration_pr_2026_04_27": {
-    "status": "SUBMITTED — PR #62 (branch repo-assist/improve-accesskit-integration)",
-    "files_changed": [
-      "crates/motif/examples/playground.rs (added Adapter import, access_adapter field, init in resumed, process_event + update_if_active in window_event)"
-    ],
-    "approach": "Adapter::new(&window, initial_tree_fn) in resumed(); process_event(&window, &event) at start of window_event; update_if_active(|| build_tree) at end of window_event. Initial tree: single AccessRole::Window root node. Zero new deps — accesskit_winit already in Cargo.toml.",
-    "notes": "Implements p2 spool task 'Complete AccessKit integration' from accessibility stream. update_if_active is no-op when no screen reader active. Future work: enrich tree with per-element AccessNodes via DrawContext::with_accessibility; apply same pattern to todomvc.rs."
-  },
-  "animation_primitives_pr_2026_04_26": {
-    "status": "SUBMITTED — PR #61 (branch repo-assist/improve-animation-primitives)",
-    "files_changed": [
-      "crates/motif_core/src/animation.rs (new, ~170 lines + 16 tests)",
-      "crates/motif_core/src/lib.rs (pub mod animation + pub use animation::*)"
-    ],
-    "approach": "Animation struct with Instant start + Duration duration. progress() returns 0.0..=1.0 clamped. Easing fns: linear, ease_in (cubic), ease_out (cubic), ease_in_out (cubic). Zero new deps.",
-    "notes": "Implements p3 spool task 'Design animation primitives' from animation stream. TDD: 16 tests covering endpoints, clamp, monotonicity, restart, elapsed/remaining edge cases."
   }
 }
