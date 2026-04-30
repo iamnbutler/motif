@@ -28,3 +28,13 @@ winit = "0.30"
 objc2 = "0.5"
 objc2-app-kit = "0.2"
 objc2-foundation = "0.2"
+
+# ── Build profiles ────────────────────────────────────────────────────────────
+
+[profile.dev]
+# Emit only line-table debug info (backtraces work; variable inspection does not).
+# This cuts linker time noticeably, which matters most during hot-reload cycles
+# where the binary is re-linked on every file save.
+# Override locally with `RUSTFLAGS="-Cdebuginfo=2"` when you need a rich debug
+# session, or set `debug = true` temporarily in a local `.cargo/config.toml`.
+debug = "line-tables-only"
