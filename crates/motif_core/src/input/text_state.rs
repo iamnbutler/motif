@@ -66,6 +66,8 @@ pub struct TextEditState {
     /// Whether this is a multiline input (textarea) or single-line (input).
     /// Affects Enter (newline vs submit) and Tab (tab char vs focus change).
     multiline: bool,
+    /// Whether this input currently has keyboard focus.
+    focused: bool,
 }
 
 impl TextEditState {
@@ -84,6 +86,7 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: false,
+            focused: false,
         }
     }
 
@@ -101,12 +104,37 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: true,
+            focused: false,
         }
     }
 
     /// Returns whether this is a multiline input.
     pub fn is_multiline(&self) -> bool {
         self.multiline
+    }
+
+    // === Focus state ===
+
+    /// Returns whether this input currently has keyboard focus.
+    ///
+    /// Use this to decide whether to render the cursor and accept key events.
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    /// Marks this input as focused (receives keyboard input).
+    ///
+    /// Called when the user clicks the field or focus is programmatically moved here.
+    pub fn focus(&mut self) {
+        self.focused = true;
+    }
+
+    /// Marks this input as unfocused (ignores keyboard input).
+    ///
+    /// Called when `handle_key_event` returns `HandleKeyResult::Blur`, when another
+    /// element is focused, or when the window loses focus.
+    pub fn blur(&mut self) {
+        self.focused = false;
     }
 
     // === Content accessors ===
@@ -2281,5 +2309,63 @@ mod tests {
     fn new_multiline_creates_multiline_state() {
         let state = TextEditState::new_multiline();
         assert!(state.is_multiline());
+    }
+
+    // === Focus state tests ===
+
+    #[test]
+    fn new_defaults_to_unfocused() {
+        let state = TextEditState::new();
+        assert!(!state.is_focused());
+    }
+
+    #[test]
+    fn new_multiline_defaults_to_unfocused() {
+        let state = TextEditState::new_multiline();
+        assert!(!state.is_focused());
+    }
+
+    #[test]
+    fn focus_sets_focused_true() {
+        let mut state = TextEditState::new();
+        assert!(!state.is_focused());
+        state.focus();
+        assert!(state.is_focused());
+    }
+
+    #[test]
+    fn blur_sets_focused_false() {
+        let mut state = TextEditState::new();
+        state.focus();
+        assert!(state.is_focused());
+        state.blur();
+        assert!(!state.is_focused());
+    }
+
+    #[test]
+    fn focus_blur_cycle_works() {
+        let mut state = TextEditState::new();
+        state.focus();
+        assert!(state.is_focused());
+        state.blur();
+        assert!(!state.is_focused());
+        state.focus();
+        assert!(state.is_focused());
+    }
+
+    #[test]
+    fn blur_on_unfocused_is_idempotent() {
+        let mut state = TextEditState::new();
+        assert!(!state.is_focused());
+        state.blur();
+        assert!(!state.is_focused());
+    }
+
+    #[test]
+    fn focus_on_focused_is_idempotent() {
+        let mut state = TextEditState::new();
+        state.focus();
+        state.focus();
+        assert!(state.is_focused());
     }
 }
