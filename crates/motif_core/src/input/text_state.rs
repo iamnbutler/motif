@@ -18,7 +18,13 @@ pub enum HandleKeyResult {
     Handled,
     /// The key was not recognized by the input bindings.
     NotHandled,
-    /// The escape key was pressed - blur focus.
+    /// Escape was pressed — cancel the current edit without committing changes.
+    ///
+    /// The caller should discard any in-progress edit (e.g. restore the
+    /// pre-edit value in an inline TodoMVC editor) and blur the input.
+    Cancel,
+    /// The input lost focus through a means other than Escape (reserved for
+    /// future use by external focus management code).
     Blur,
     /// Copy requested - contains the text to copy.
     Copy(String),
@@ -630,7 +636,7 @@ impl TextEditState {
     /// Returns a `HandleKeyResult` indicating what happened:
     /// - `Handled`: The key modified the input state
     /// - `NotHandled`: The key wasn't recognized
-    /// - `Blur`: Escape was pressed, blur focus
+    /// - `Cancel`: Escape was pressed, discard the in-progress edit and blur
     /// - `Copy(text)`: Copy requested, caller should copy text to clipboard
     /// - `Cut(text)`: Cut requested, text was removed and should be copied to clipboard
     /// - `Paste`: Paste requested, caller should call `paste()` with clipboard content
@@ -796,7 +802,7 @@ impl TextEditState {
             }
 
             // Focus
-            InputAction::Escape => HandleKeyResult::Blur,
+            InputAction::Escape => HandleKeyResult::Cancel,
         }
     }
 }
@@ -2154,13 +2160,25 @@ mod tests {
     }
 
     #[test]
-    fn handle_key_event_escape_blurs() {
+    fn handle_key_event_escape_cancels() {
         let mut state = TextEditState::new();
         state.set_content("hello");
 
         let result = state.handle_key_event(&Key::Named(NamedKey::Escape), &no_mods());
 
-        assert_eq!(result, HandleKeyResult::Blur);
+        assert_eq!(result, HandleKeyResult::Cancel);
+    }
+
+    #[test]
+    fn handle_key_event_escape_cancel_does_not_modify_content() {
+        // Cancel is the caller's responsibility to restore previous content;
+        // TextEditState itself does not revert on Escape.
+        let mut state = TextEditState::new();
+        state.set_content("in-progress edit");
+
+        state.handle_key_event(&Key::Named(NamedKey::Escape), &no_mods());
+
+        assert_eq!(state.content(), "in-progress edit");
     }
 
     #[test]
