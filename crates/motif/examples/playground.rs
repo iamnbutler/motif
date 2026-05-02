@@ -911,9 +911,11 @@ impl ApplicationHandler for App {
                     {
                         HandleKeyResult::Handled => {}
                         HandleKeyResult::NotHandled => {}
-                        HandleKeyResult::Blur => {
+                        HandleKeyResult::Cancel => {
+                            // Escape: discard in-progress edit and blur.
                             self.text_input_focused = false;
                         }
+                        HandleKeyResult::Blur => {}
                         HandleKeyResult::Copy(_text) => {
                             // TODO: Copy to system clipboard
                         }
