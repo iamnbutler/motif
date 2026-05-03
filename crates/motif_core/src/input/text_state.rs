@@ -11,6 +11,36 @@ use winit::keyboard::Key;
 
 use super::bindings::{InputAction, InputBindings};
 
+/// Events emitted by [`TextEditState`] when its content or history changes.
+///
+/// Events are accumulated internally and can be drained after each operation
+/// using [`TextEditState::take_events`]. This lets callers react to state
+/// changes (e.g. re-validate a form, persist the value, trigger a re-render)
+/// without polling.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// state.insert_text("hello");
+/// for event in state.take_events() {
+///     match event {
+///         InputStateEvent::TextChanged => println!("content is now: {}", state.content()),
+///         InputStateEvent::Undo       => println!("undo applied"),
+///         InputStateEvent::Redo       => println!("redo applied"),
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputStateEvent {
+    /// Text content changed — triggered by insertions, deletions, paste, and
+    /// [`TextEditState::set_content`].
+    TextChanged,
+    /// An undo operation was successfully applied (undo stack was non-empty).
+    Undo,
+    /// A redo operation was successfully applied (redo stack was non-empty).
+    Redo,
+}
+
 /// Result of handling a key event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HandleKeyResult {
@@ -66,6 +96,8 @@ pub struct TextEditState {
     /// Whether this is a multiline input (textarea) or single-line (input).
     /// Affects Enter (newline vs submit) and Tab (tab char vs focus change).
     multiline: bool,
+    /// Accumulated events since the last [`take_events`](TextEditState::take_events) call.
+    pending_events: Vec<InputStateEvent>,
 }
 
 impl TextEditState {
@@ -84,6 +116,7 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: false,
+            pending_events: Vec::new(),
         }
     }
 
@@ -101,6 +134,7 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: true,
+            pending_events: Vec::new(),
         }
     }
 
@@ -124,6 +158,19 @@ impl TextEditState {
         self.marked_range = None;
         self.undo_stack.clear();
         self.redo_stack.clear();
+        self.pending_events.push(InputStateEvent::TextChanged);
+    }
+
+    // === Event emission ===
+
+    /// Drains and returns all pending events, clearing the internal queue.
+    ///
+    /// Call this after processing one or more input operations to handle
+    /// any state-change notifications. Events are returned in the order
+    /// they were emitted. Calling this when no events are pending returns
+    /// an empty `Vec`.
+    pub fn take_events(&mut self) -> Vec<InputStateEvent> {
+        std::mem::take(&mut self.pending_events)
     }
 
     // === Selection accessors ===
@@ -450,6 +497,7 @@ impl TextEditState {
         self.content.replace_range(range.clone(), text);
         self.selected_range = range.start + text.len()..range.start + text.len();
         self.marked_range = None;
+        self.pending_events.push(InputStateEvent::TextChanged);
     }
 
     /// Deletes the character before the cursor (backspace).
@@ -584,6 +632,7 @@ impl TextEditState {
             self.content.replace_range(inserted_range, &entry.old_text);
             self.selected_range = entry.cursor_before..entry.cursor_before;
             self.selection_reversed = false;
+            self.pending_events.push(InputStateEvent::Undo);
         }
     }
 
@@ -608,6 +657,7 @@ impl TextEditState {
             let new_cursor = entry.range.start + entry.old_text.len();
             self.selected_range = new_cursor..new_cursor;
             self.selection_reversed = false;
+            self.pending_events.push(InputStateEvent::Redo);
         }
     }
 
@@ -2281,5 +2331,103 @@ mod tests {
     fn new_multiline_creates_multiline_state() {
         let state = TextEditState::new_multiline();
         assert!(state.is_multiline());
+    }
+
+    // ============================================================
+    // Task: Implement event emission
+    // ============================================================
+
+    #[test]
+    fn take_events_starts_empty() {
+        let mut state = TextEditState::new();
+        assert_eq!(state.take_events(), vec![]);
+    }
+
+    #[test]
+    fn insert_text_emits_text_changed() {
+        let mut state = TextEditState::new();
+        state.insert_text("hi");
+        assert_eq!(state.take_events(), vec![InputStateEvent::TextChanged]);
+    }
+
+    #[test]
+    fn take_events_clears_queue() {
+        let mut state = TextEditState::new();
+        state.insert_text("hi");
+        let _ = state.take_events();
+        assert_eq!(state.take_events(), vec![]);
+    }
+
+    #[test]
+    fn set_content_emits_text_changed() {
+        let mut state = TextEditState::new();
+        state.set_content("hello");
+        assert_eq!(state.take_events(), vec![InputStateEvent::TextChanged]);
+    }
+
+    #[test]
+    fn delete_backward_emits_text_changed() {
+        let mut state = TextEditState::new();
+        state.set_content("hi");
+        state.move_to(2);
+        let _ = state.take_events(); // clear setup events
+        state.delete_backward();
+        assert_eq!(state.take_events(), vec![InputStateEvent::TextChanged]);
+    }
+
+    #[test]
+    fn delete_backward_at_start_emits_no_event() {
+        let mut state = TextEditState::new();
+        state.set_content("hi");
+        state.move_to(0);
+        let _ = state.take_events();
+        state.delete_backward();
+        // At position 0 there is nothing to delete — no event should be emitted.
+        assert_eq!(state.take_events(), vec![]);
+    }
+
+    #[test]
+    fn undo_emits_undo_event() {
+        let mut state = TextEditState::new();
+        state.insert_text("hi");
+        let _ = state.take_events();
+        state.undo();
+        assert_eq!(state.take_events(), vec![InputStateEvent::Undo]);
+    }
+
+    #[test]
+    fn undo_when_empty_emits_no_event() {
+        let mut state = TextEditState::new();
+        state.undo();
+        assert_eq!(state.take_events(), vec![]);
+    }
+
+    #[test]
+    fn redo_emits_redo_event() {
+        let mut state = TextEditState::new();
+        state.insert_text("hi");
+        state.undo();
+        let _ = state.take_events();
+        state.redo();
+        assert_eq!(state.take_events(), vec![InputStateEvent::Redo]);
+    }
+
+    #[test]
+    fn redo_when_empty_emits_no_event() {
+        let mut state = TextEditState::new();
+        state.redo();
+        assert_eq!(state.take_events(), vec![]);
+    }
+
+    #[test]
+    fn multiple_operations_accumulate_events() {
+        let mut state = TextEditState::new();
+        state.insert_text("a");
+        state.insert_text("b");
+        let events = state.take_events();
+        assert_eq!(
+            events,
+            vec![InputStateEvent::TextChanged, InputStateEvent::TextChanged]
+        );
     }
 }

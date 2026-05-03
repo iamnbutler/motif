@@ -7,7 +7,7 @@ mod bindings;
 mod text_state;
 
 pub use bindings::{InputAction, InputBindings};
-pub use text_state::{HandleKeyResult, TextEditState};
+pub use text_state::{HandleKeyResult, InputStateEvent, TextEditState};
 
 use crate::{ElementId, Point};
 use std::collections::HashSet;
