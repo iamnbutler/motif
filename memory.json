@@ -1,16 +1,16 @@
 {
-  "last_run": "2026-05-02T00:00:00Z",
-  "last_run_id": "25259999664",
+  "last_run": "2026-05-03T00:00:00Z",
+  "last_run_id": "25288607287",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-02",
+    "task_11_monthly_summary": "2026-05-03",
+    "task_10_forward": "2026-05-03",
     "task_3_improvements": "2026-05-02",
     "task_2_fix_prs": "2026-05-01",
     "task_1_triage": "2026-05-01",
-    "task_10_forward": "2026-04-30",
     "task_4_deps": "2026-04-30",
     "task_7_labels": "2026-04-29",
     "task_5_maintain_prs": "2026-04-29",
@@ -68,7 +68,8 @@
     "word-line-selection": "pr-64-open",
     "hot-reload-profile": "pr-65-open",
     "text-edit-focus-state": "pr-66-open",
-    "escape-cancel-result": "pr-68-open"
+    "escape-cancel-result": "pr-68-open",
+    "input-state-events": "pr-69-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -111,7 +112,8 @@
     "word-line-selection-implemented",
     "hot-reload-dev-profile-implemented",
     "text-edit-focus-state-implemented",
-    "escape-cancel-handlekeyresult-implemented"
+    "escape-cancel-handlekeyresult-implemented",
+    "input-state-event-emission-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -123,9 +125,9 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-02: Task 3: Implemented p2 TODO 'Escape key handling in HandleKeyResult (cancel edit)' — added HandleKeyResult::Cancel variant; Escape now returns Cancel instead of Blur; Blur retained for future external-blur events; playground.rs updated; 2 new tests → PR #68. Task 11: Updated May monthly summary (#67). Next priorities: task_5_maintain_prs (2026-04-29), task_7_labels (2026-04-29), task_8_release (2026-04-29).",
+  "notes": "2026-05-03: Task 10: Implemented p2 spool task 'Implement event emission' from text-input-rewrite stream — added InputStateEvent enum (TextChanged|Undo|Redo), pending_events queue, take_events() drain to TextEditState; 11 new tests; non-breaking → PR #69. Task 11: Updated May monthly summary (#67). Observation: 'Abstract renderer trait' TODO already satisfied by initial commit (Renderer trait in renderer.rs, MetalRenderer + DebugRenderer both impl it). Next priorities: task_5_maintain_prs (2026-04-29), task_7_labels (2026-04-29), task_8_release (2026-04-29), task_6_stale_nudges (2026-04-27), task_9_welcome (2026-04-27).",
   "pr_merge_order_issue": "48",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20],
   "priority_pr": 36,
@@ -143,6 +145,15 @@
       "subsecond": "0.7.3"
     },
     "notes": "Verified 2026-04-30: still same versions as 2026-04-26 audit. No urgent updates needed."
+  },
+  "input_state_events_pr_2026_05_03": {
+    "status": "SUBMITTED — PR #69 (branch repo-assist/improve-input-state-events)",
+    "files_changed": [
+      "crates/motif_core/src/input/text_state.rs (InputStateEvent enum + pending_events field + take_events() + 11 tests)",
+      "crates/motif_core/src/input/mod.rs (re-export InputStateEvent)"
+    ],
+    "approach": "Drain-based event queue (std::mem::take) — idiomatic Rust, avoids FnMut closure borrow issues. TextChanged emitted from insert_text + set_content; Undo/Redo emitted only when stacks are non-empty. No-op operations (backspace at offset 0, empty undo/redo stack) emit nothing.",
+    "notes": "Implements p2 spool task 'Implement event emission' (mmbvrl76-pqfm) from text-input-rewrite stream. Completes the last unaddressed p2 text-input-rewrite task."
   },
   "escape_cancel_pr_2026_05_02": {
     "status": "SUBMITTED — PR #68 (branch repo-assist/improve-escape-cancel-result)",
