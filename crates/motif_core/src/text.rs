@@ -174,6 +174,69 @@ impl TextLayout {
         }
     }
 
+    /// Find the byte offset in the source text closest to the given (x, y) point.
+    ///
+    /// Works for both single-line and multiline text. Pass the pixel coordinates
+    /// of the point (e.g. a mouse click position relative to the text origin).
+    /// The function determines which cluster the point is closest to and whether
+    /// the cursor should be placed before or after it.
+    ///
+    /// This is the multiline equivalent of [`index_for_x`] and is needed for
+    /// vertical cursor movement — the caller supplies the `y` of the target line
+    /// (obtained from [`line_metrics`]) together with the preferred `x`.
+    pub fn index_for_point(&self, x: f32, y: f32, source_text: &str) -> usize {
+        use parley::layout::{Cluster, ClusterSide};
+
+        if let Some((cluster, side)) = Cluster::from_point(&self.layout, x, y) {
+            let text_range = cluster.text_range();
+            match side {
+                ClusterSide::Left => text_range.start,
+                ClusterSide::Right => text_range.end,
+            }
+        } else {
+            // Point is outside all clusters — clamp to nearest text boundary.
+            if y <= 0.0 {
+                // Above the text: delegate to the single-line helper (y=0),
+                // which handles the x-axis clamping for the first line.
+                self.index_for_x(x, source_text)
+            } else {
+                // Below the last line — clamp to end of text.
+                source_text.len()
+            }
+        }
+    }
+
+    /// Return the cumulative top-y offset (in pixels, from the text origin) of the
+    /// line that contains the given byte `offset`.
+    ///
+    /// Returns `(line_index, line_top_y)` where `line_index` is 0-based.
+    /// If the offset is past the end of text the last line is returned.
+    ///
+    /// Together with [`line_metrics`] this lets callers compute the baseline y of
+    /// the target line for vertical cursor movement:
+    ///
+    /// ```text
+    /// let (idx, top_y) = layout.line_top_for_offset(cursor_offset);
+    /// let metrics = layout.line_metrics();
+    /// // Move up:  target_y = top_of_previous_line + metrics[idx-1].baseline
+    /// // Move down: target_y = top_of_next_line    + metrics[idx+1].baseline
+    /// ```
+    pub fn line_top_for_offset(&self, offset: usize) -> (usize, f32) {
+        let mut cumulative_y = 0.0_f32;
+        let mut last_result = (0usize, 0.0_f32);
+        for (i, line) in self.layout.lines().enumerate() {
+            last_result = (i, cumulative_y);
+            // line.text_range() returns the byte span of this line in the source text,
+            // including any trailing newline.
+            if offset < line.text_range().end {
+                return (i, cumulative_y);
+            }
+            cumulative_y += line.metrics().line_height;
+        }
+        // offset is at or past the end of the last line — return the last line.
+        last_result
+    }
+
     /// Iterate over glyph runs for rendering.
     pub fn glyph_runs(&self) -> impl Iterator<Item = GlyphRun> + '_ {
         self.layout.lines().flat_map(|line| {
@@ -490,5 +553,123 @@ mod tests {
         // Second call should hit cache (same result, no additional entry)
         let _ = cache.rasterize(font_data, &run.normalized_coords, glyph.id, run.font_size);
         assert_eq!(cache.len(), 1);
+    }
+
+    // index_for_point tests
+
+    #[test]
+    fn index_for_point_at_origin_returns_zero() {
+        let mut ctx = TextContext::new();
+        let text = "Hello";
+        let layout = ctx.layout_text(text, 16.0);
+
+        // Click at the very start
+        let idx = layout.index_for_point(0.0, 0.0, text);
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn index_for_point_far_right_returns_end() {
+        let mut ctx = TextContext::new();
+        let text = "Hi";
+        let layout = ctx.layout_text(text, 16.0);
+
+        // Click well beyond the text width
+        let idx = layout.index_for_point(10_000.0, 0.0, text);
+        assert_eq!(idx, text.len());
+    }
+
+    #[test]
+    fn index_for_point_below_text_returns_end() {
+        let mut ctx = TextContext::new();
+        let text = "Hello";
+        let layout = ctx.layout_text(text, 16.0);
+
+        // Click far below the text
+        let idx = layout.index_for_point(10.0, 10_000.0, text);
+        assert_eq!(idx, text.len());
+    }
+
+    #[test]
+    fn index_for_point_matches_index_for_x_on_single_line() {
+        let mut ctx = TextContext::new();
+        let text = "Hello world";
+        let layout = ctx.layout_text(text, 16.0);
+
+        // For single-line text, index_for_point(x, 0) should match index_for_x(x)
+        let x = layout.width() / 2.0;
+        let from_x = layout.index_for_x(x, text);
+        let from_point = layout.index_for_point(x, 0.0, text);
+        assert_eq!(from_x, from_point);
+    }
+
+    #[test]
+    fn index_for_point_multiline_first_line() {
+        let mut ctx = TextContext::new();
+        let text = "Line one\nLine two";
+        let layout = ctx.layout_text(text, 16.0);
+
+        // Clicking near the start of the first line should return an offset in line one
+        let idx = layout.index_for_point(1.0, 0.0, text);
+        assert!(idx < 9, "expected offset within first line, got {idx}");
+    }
+
+    #[test]
+    fn index_for_point_multiline_second_line() {
+        let mut ctx = TextContext::new();
+        let text = "Line one\nLine two";
+        let layout = ctx.layout_text(text, 16.0);
+
+        let line_metrics = layout.line_metrics();
+        assert!(line_metrics.len() >= 2, "expected at least 2 lines");
+
+        // Y in the middle of the second line
+        let second_line_y = line_metrics[0].line_height + line_metrics[1].line_height / 2.0;
+        let idx = layout.index_for_point(0.0, second_line_y, text);
+
+        // The offset should be in the second line (past the '\n' at index 8)
+        assert!(idx > 8, "expected offset past newline, got {idx}");
+    }
+
+    // line_top_for_offset tests
+
+    #[test]
+    fn line_top_for_offset_single_line_is_zero() {
+        let mut ctx = TextContext::new();
+        let text = "Hello";
+        let layout = ctx.layout_text(text, 16.0);
+
+        let (line_idx, top_y) = layout.line_top_for_offset(0);
+        assert_eq!(line_idx, 0);
+        assert_eq!(top_y, 0.0);
+    }
+
+    #[test]
+    fn line_top_for_offset_multiline_first_line() {
+        let mut ctx = TextContext::new();
+        let text = "First line\nSecond line";
+        let layout = ctx.layout_text(text, 16.0);
+
+        let (line_idx, top_y) = layout.line_top_for_offset(0);
+        assert_eq!(line_idx, 0);
+        assert_eq!(top_y, 0.0);
+    }
+
+    #[test]
+    fn line_top_for_offset_multiline_second_line() {
+        let mut ctx = TextContext::new();
+        let text = "First line\nSecond line";
+        let layout = ctx.layout_text(text, 16.0);
+
+        let line_metrics = layout.line_metrics();
+        assert!(line_metrics.len() >= 2, "expected at least 2 lines");
+
+        // Offset 11 is the start of "Second line"
+        let (line_idx, top_y) = layout.line_top_for_offset(11);
+        assert_eq!(line_idx, 1);
+        assert!(
+            (top_y - line_metrics[0].line_height).abs() < 1.0,
+            "expected top_y ≈ first line_height, got {top_y}"
+        );
     }
 }
