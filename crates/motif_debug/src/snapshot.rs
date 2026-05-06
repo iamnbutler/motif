@@ -1,7 +1,7 @@
 //! Scene snapshot: a serializable capture of the current scene state.
 
 use motif_core::input::{InputState, MouseButton};
-use motif_core::Scene;
+use motif_core::{HitTree, Scene};
 use serde::Serialize;
 
 /// A debug overlay quad injected via the debug CLI.
@@ -348,6 +348,140 @@ impl SceneSnapshot {
     }
 }
 
+/// Serializable info about a single hit-tree entry.
+#[derive(Debug, Clone, Serialize)]
+pub struct HitEntryInfo {
+    pub id: u64,
+    pub bounds: BoundsInfo,
+    pub z_index: u32,
+}
+
+/// A serializable snapshot of the current hit tree.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct HitTreeSnapshot {
+    pub entries: Vec<HitEntryInfo>,
+}
+
+impl HitTreeSnapshot {
+    /// Create a snapshot from a HitTree.
+    pub fn from_hit_tree(hit_tree: &HitTree) -> Self {
+        let entries = hit_tree
+            .entries()
+            .iter()
+            .map(|e| HitEntryInfo {
+                id: e.id.0,
+                bounds: BoundsInfo {
+                    x: e.bounds.origin.x,
+                    y: e.bounds.origin.y,
+                    w: e.bounds.size.width,
+                    h: e.bounds.size.height,
+                },
+                z_index: e.z_index,
+            })
+            .collect();
+        Self { entries }
+    }
+
+    /// Return a flat JSON array of all elements sorted by z-order (for `element.list`).
+    pub fn list_json(&self) -> serde_json::Value {
+        let items: Vec<serde_json::Value> = self
+            .entries
+            .iter()
+            .map(|e| {
+                serde_json::json!({
+                    "id": e.id,
+                    "bounds": {
+                        "x": e.bounds.x,
+                        "y": e.bounds.y,
+                        "w": e.bounds.w,
+                        "h": e.bounds.h,
+                    },
+                    "z_index": e.z_index,
+                })
+            })
+            .collect();
+        serde_json::Value::Array(items)
+    }
+
+    /// Return a containment tree as a JSON array of root nodes (for `elements.tree`).
+    ///
+    /// Hierarchy is inferred spatially: an element is a child of the tightest
+    /// enclosing ancestor that was painted before it (lower z_index). Elements
+    /// that are not contained by any predecessor become roots.
+    pub fn tree_json(&self) -> serde_json::Value {
+        let n = self.entries.len();
+        if n == 0 {
+            return serde_json::Value::Array(vec![]);
+        }
+
+        // For each entry i, find its parent: the entry j < i (painted earlier)
+        // whose bounds fully contain i's bounds, with the smallest area.
+        let mut parent_idx: Vec<Option<usize>> = vec![None; n];
+        for i in 0..n {
+            let mut best: Option<usize> = None;
+            let mut best_area = f32::MAX;
+            for j in 0..i {
+                if bounds_contains_fully(&self.entries[j].bounds, &self.entries[i].bounds) {
+                    let area = self.entries[j].bounds.w * self.entries[j].bounds.h;
+                    if area < best_area {
+                        best_area = area;
+                        best = Some(j);
+                    }
+                }
+            }
+            parent_idx[i] = best;
+        }
+
+        // Build children lists and collect root indices.
+        let mut children: Vec<Vec<usize>> = vec![vec![]; n];
+        let mut roots: Vec<usize> = vec![];
+        for i in 0..n {
+            match parent_idx[i] {
+                Some(p) => children[p].push(i),
+                None => roots.push(i),
+            }
+        }
+
+        let roots_json: Vec<serde_json::Value> = roots
+            .iter()
+            .map(|&r| build_tree_node(r, &self.entries, &children))
+            .collect();
+        serde_json::Value::Array(roots_json)
+    }
+}
+
+/// Returns true if `outer` fully contains `inner` (inclusive on all sides).
+fn bounds_contains_fully(outer: &BoundsInfo, inner: &BoundsInfo) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.w <= outer.x + outer.w
+        && inner.y + inner.h <= outer.y + outer.h
+}
+
+/// Recursively build a tree-node JSON value.
+fn build_tree_node(
+    i: usize,
+    entries: &[HitEntryInfo],
+    children: &[Vec<usize>],
+) -> serde_json::Value {
+    let e = &entries[i];
+    let child_nodes: Vec<serde_json::Value> = children[i]
+        .iter()
+        .map(|&c| build_tree_node(c, entries, children))
+        .collect();
+    serde_json::json!({
+        "id": e.id,
+        "bounds": {
+            "x": e.bounds.x,
+            "y": e.bounds.y,
+            "w": e.bounds.w,
+            "h": e.bounds.h,
+        },
+        "z_index": e.z_index,
+        "children": child_nodes,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,5 +775,174 @@ mod tests {
         let json = snap.text_runs_json();
         let arr = json.as_array().unwrap();
         assert!(arr.is_empty());
+    }
+
+    // --- HitTreeSnapshot tests ---
+
+    fn hit_rect(x: f32, y: f32, w: f32, h: f32) -> motif_core::Rect {
+        motif_core::Rect::new(motif_core::Point::new(x, y), motif_core::Size::new(w, h))
+    }
+
+    #[test]
+    fn hit_tree_snapshot_from_empty_tree() {
+        let tree = HitTree::new();
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        assert!(snap.entries.is_empty());
+    }
+
+    #[test]
+    fn hit_tree_snapshot_captures_entries() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        tree.push(ElementId(1), hit_rect(10.0, 20.0, 100.0, 50.0));
+        tree.push(ElementId(2), hit_rect(50.0, 60.0, 30.0, 20.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+
+        assert_eq!(snap.entries.len(), 2);
+        assert_eq!(snap.entries[0].id, 1);
+        assert_eq!(snap.entries[0].bounds.x, 10.0);
+        assert_eq!(snap.entries[0].bounds.y, 20.0);
+        assert_eq!(snap.entries[0].bounds.w, 100.0);
+        assert_eq!(snap.entries[0].bounds.h, 50.0);
+        assert_eq!(snap.entries[0].z_index, 0);
+        assert_eq!(snap.entries[1].id, 2);
+        assert_eq!(snap.entries[1].z_index, 1);
+    }
+
+    #[test]
+    fn list_json_returns_flat_array() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        tree.push(ElementId(5), hit_rect(0.0, 0.0, 200.0, 100.0));
+        tree.push(ElementId(7), hit_rect(10.0, 10.0, 50.0, 30.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.list_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["id"], 5);
+        assert_eq!(arr[0]["z_index"], 0);
+        assert_eq!(arr[0]["bounds"]["x"], 0.0);
+        assert_eq!(arr[1]["id"], 7);
+        assert_eq!(arr[1]["z_index"], 1);
+        assert_eq!(arr[1]["bounds"]["x"], 10.0);
+    }
+
+    #[test]
+    fn list_json_empty_tree() {
+        let tree = HitTree::new();
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.list_json();
+        assert!(json.as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tree_json_empty() {
+        let tree = HitTree::new();
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        assert_eq!(json.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn tree_json_single_element() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        tree.push(ElementId(1), hit_rect(0.0, 0.0, 100.0, 100.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["id"], 1);
+        assert!(arr[0]["children"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tree_json_nested_elements() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        // Parent painted first (z=0), child inside it painted second (z=1).
+        tree.push(ElementId(1), hit_rect(0.0, 0.0, 200.0, 200.0));
+        tree.push(ElementId(2), hit_rect(50.0, 50.0, 100.0, 100.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 1, "should have one root");
+        assert_eq!(arr[0]["id"], 1);
+        let children = arr[0]["children"].as_array().unwrap();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0]["id"], 2);
+        assert!(children[0]["children"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tree_json_siblings_become_roots() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        // Two non-overlapping elements at the same level.
+        tree.push(ElementId(1), hit_rect(0.0, 0.0, 100.0, 100.0));
+        tree.push(ElementId(2), hit_rect(200.0, 0.0, 100.0, 100.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 2, "both should be roots");
+        assert!(arr[0]["children"].as_array().unwrap().is_empty());
+        assert!(arr[1]["children"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tree_json_three_levels_deep() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        tree.push(ElementId(1), hit_rect(0.0, 0.0, 300.0, 300.0)); // root
+        tree.push(ElementId(2), hit_rect(50.0, 50.0, 200.0, 200.0)); // child of 1
+        tree.push(ElementId(3), hit_rect(100.0, 100.0, 100.0, 100.0)); // child of 2
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["id"], 1);
+        let l1 = arr[0]["children"].as_array().unwrap();
+        assert_eq!(l1.len(), 1);
+        assert_eq!(l1[0]["id"], 2);
+        let l2 = l1[0]["children"].as_array().unwrap();
+        assert_eq!(l2.len(), 1);
+        assert_eq!(l2[0]["id"], 3);
+    }
+
+    #[test]
+    fn tree_json_tightest_parent_wins() {
+        use motif_core::ElementId;
+        let mut tree = HitTree::new();
+        // Outer container
+        tree.push(ElementId(1), hit_rect(0.0, 0.0, 400.0, 400.0));
+        // Inner container (both contain element 3)
+        tree.push(ElementId(2), hit_rect(50.0, 50.0, 200.0, 200.0));
+        // Leaf — inside both 1 and 2; should be child of 2 (smaller area).
+        tree.push(ElementId(3), hit_rect(100.0, 100.0, 50.0, 50.0));
+
+        let snap = HitTreeSnapshot::from_hit_tree(&tree);
+        let json = snap.tree_json();
+        let arr = json.as_array().unwrap();
+
+        assert_eq!(arr.len(), 1);
+        let root_children = arr[0]["children"].as_array().unwrap();
+        // id=2 is child of root (id=1)
+        assert_eq!(root_children.len(), 1);
+        assert_eq!(root_children[0]["id"], 2);
+        // id=3 is child of id=2, not id=1
+        let inner_children = root_children[0]["children"].as_array().unwrap();
+        assert_eq!(inner_children.len(), 1);
+        assert_eq!(inner_children[0]["id"], 3);
     }
 }

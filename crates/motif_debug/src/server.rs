@@ -12,7 +12,7 @@ use std::thread;
 use crate::input_sim::{self, WindowPosition};
 use crate::protocol::{DebugRequest, DebugResponse};
 use crate::screenshot;
-use crate::snapshot::{ColorInfo, InputStateSnapshot, OverlayQuad, SceneSnapshot};
+use crate::snapshot::{ColorInfo, HitTreeSnapshot, InputStateSnapshot, OverlayQuad, SceneSnapshot};
 
 /// Shared state for debug overlays injected via the debug CLI.
 ///
@@ -75,6 +75,7 @@ pub struct DebugServer {
     socket_path: PathBuf,
     snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
     input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
+    hit_tree: Arc<Mutex<Option<HitTreeSnapshot>>>,
     window_id: Arc<Mutex<Option<u32>>>,
     window_position: Arc<Mutex<WindowPosition>>,
     overlays: Arc<Mutex<DebugOverlays>>,
@@ -105,6 +106,7 @@ impl DebugServer {
 
         let snapshot: Arc<Mutex<Option<SceneSnapshot>>> = Arc::new(Mutex::new(None));
         let input_state: Arc<Mutex<Option<InputStateSnapshot>>> = Arc::new(Mutex::new(None));
+        let hit_tree: Arc<Mutex<Option<HitTreeSnapshot>>> = Arc::new(Mutex::new(None));
         let window_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
         let window_position: Arc<Mutex<WindowPosition>> =
             Arc::new(Mutex::new(WindowPosition::default()));
@@ -113,6 +115,7 @@ impl DebugServer {
 
         let server_snapshot = Arc::clone(&snapshot);
         let server_input_state = Arc::clone(&input_state);
+        let server_hit_tree = Arc::clone(&hit_tree);
         let server_window_id = Arc::clone(&window_id);
         let server_window_position = Arc::clone(&window_position);
         let server_overlays = Arc::clone(&overlays);
@@ -123,6 +126,7 @@ impl DebugServer {
                 listener,
                 server_snapshot,
                 server_input_state,
+                server_hit_tree,
                 server_window_id,
                 server_window_position,
                 server_overlays,
@@ -136,6 +140,7 @@ impl DebugServer {
             socket_path,
             snapshot,
             input_state,
+            hit_tree,
             window_id,
             window_position,
             overlays,
@@ -153,6 +158,13 @@ impl DebugServer {
     /// Update the shared input state snapshot. Called from the event loop.
     pub fn update_input(&self, snapshot: InputStateSnapshot) {
         if let Ok(mut guard) = self.input_state.lock() {
+            *guard = Some(snapshot);
+        }
+    }
+
+    /// Update the shared hit tree snapshot. Called from the render loop each frame.
+    pub fn update_hit_tree(&self, snapshot: HitTreeSnapshot) {
+        if let Ok(mut guard) = self.hit_tree.lock() {
             *guard = Some(snapshot);
         }
     }
@@ -193,6 +205,7 @@ impl DebugServer {
         listener: UnixListener,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
         input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
+        hit_tree: Arc<Mutex<Option<HitTreeSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
         window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
@@ -212,11 +225,12 @@ impl DebugServer {
 
                     let snap = Arc::clone(&snapshot);
                     let inp = Arc::clone(&input_state);
+                    let ht = Arc::clone(&hit_tree);
                     let wid = Arc::clone(&window_id);
                     let wpos = Arc::clone(&window_position);
                     let ovl = Arc::clone(&overlays);
                     thread::spawn(move || {
-                        Self::handle_connection(stream, snap, inp, wid, wpos, ovl);
+                        Self::handle_connection(stream, snap, inp, ht, wid, wpos, ovl);
                     });
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -235,6 +249,7 @@ impl DebugServer {
         stream: std::os::unix::net::UnixStream,
         snapshot: Arc<Mutex<Option<SceneSnapshot>>>,
         input_state: Arc<Mutex<Option<InputStateSnapshot>>>,
+        hit_tree: Arc<Mutex<Option<HitTreeSnapshot>>>,
         window_id: Arc<Mutex<Option<u32>>>,
         window_position: Arc<Mutex<WindowPosition>>,
         overlays: Arc<Mutex<DebugOverlays>>,
@@ -271,6 +286,7 @@ impl DebugServer {
                 &request,
                 &snapshot,
                 &input_state,
+                &hit_tree,
                 &window_id,
                 &window_position,
                 &overlays,
@@ -283,6 +299,7 @@ impl DebugServer {
         request: &DebugRequest,
         snapshot: &Arc<Mutex<Option<SceneSnapshot>>>,
         input_state: &Arc<Mutex<Option<InputStateSnapshot>>>,
+        hit_tree: &Arc<Mutex<Option<HitTreeSnapshot>>>,
         window_id: &Arc<Mutex<Option<u32>>>,
         window_position: &Arc<Mutex<WindowPosition>>,
         overlays: &Arc<Mutex<DebugOverlays>>,
@@ -320,6 +337,28 @@ impl DebugServer {
                 match guard.as_ref() {
                     Some(snap) => DebugResponse::ok(request.id, snap.to_json()),
                     None => DebugResponse::err(request.id, -32000, "No input state available yet"),
+                }
+            }
+            "element.list" => {
+                let guard = hit_tree.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(ht) => DebugResponse::ok(request.id, ht.list_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No hit tree snapshot available yet — call update_hit_tree() each frame",
+                    ),
+                }
+            }
+            "elements.tree" => {
+                let guard = hit_tree.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.as_ref() {
+                    Some(ht) => DebugResponse::ok(request.id, ht.tree_json()),
+                    None => DebugResponse::err(
+                        request.id,
+                        -32000,
+                        "No hit tree snapshot available yet — call update_hit_tree() each frame",
+                    ),
                 }
             }
             "input.activate" => Self::handle_input_activate(request, window_position),

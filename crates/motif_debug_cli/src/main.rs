@@ -82,6 +82,8 @@ fn print_usage() {
     eprintln!("  scene.quads              List all quads in the scene");
     eprintln!("  scene.text_runs          List all text runs in the scene");
     eprintln!("  input.state              Show current input state (cursor, buttons, modifiers)");
+    eprintln!("  element.list             List all registered elements (flat, z-order)");
+    eprintln!("  elements.tree            Show element containment tree (inferred from bounds)");
     eprintln!("  screenshot <path.png>    Capture scene to a PNG file");
     eprintln!();
     eprintln!("DEBUG OVERLAY COMMANDS:");
@@ -363,6 +365,90 @@ fn format_debug_list(value: &serde_json::Value) -> String {
     out
 }
 
+fn format_element_list(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No element data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No registered elements.\n".to_string();
+    }
+
+    out.push_str("Elements (flat, z-order)\n");
+    out.push_str("───────────────────────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "  {:<12}  {:<22}  {:<14}  {}\n",
+        "ID", "POSITION", "SIZE", "Z"
+    ));
+    out.push_str("  ────────────  ──────────────────────  ──────────────  ───\n");
+
+    for e in arr.iter() {
+        let id = e["id"].as_u64().unwrap_or(0);
+        let x = e["bounds"]["x"].as_f64().unwrap_or(0.0);
+        let y = e["bounds"]["y"].as_f64().unwrap_or(0.0);
+        let w = e["bounds"]["w"].as_f64().unwrap_or(0.0);
+        let h = e["bounds"]["h"].as_f64().unwrap_or(0.0);
+        let z = e["z_index"].as_u64().unwrap_or(0);
+
+        out.push_str(&format!(
+            "  {:<12}  ({:>7.1}, {:>7.1})      {:>5.0} x {:<5.0}  {}\n",
+            id, x, y, w, h, z
+        ));
+    }
+
+    out.push_str(&format!("\n  Total: {} elements\n", arr.len()));
+    out
+}
+
+fn format_elements_tree(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let arr = match value.as_array() {
+        Some(a) => a,
+        None => return "No element tree data.\n".to_string(),
+    };
+
+    if arr.is_empty() {
+        return "No registered elements.\n".to_string();
+    }
+
+    out.push_str("Element Tree\n");
+    out.push_str("───────────────────────────────────────────────────────────────\n");
+
+    fn print_node(node: &serde_json::Value, out: &mut String, prefix: &str, is_last: bool) {
+        let id = node["id"].as_u64().unwrap_or(0);
+        let x = node["bounds"]["x"].as_f64().unwrap_or(0.0);
+        let y = node["bounds"]["y"].as_f64().unwrap_or(0.0);
+        let w = node["bounds"]["w"].as_f64().unwrap_or(0.0);
+        let h = node["bounds"]["h"].as_f64().unwrap_or(0.0);
+        let z = node["z_index"].as_u64().unwrap_or(0);
+        let connector = if is_last { "└─" } else { "├─" };
+        out.push_str(&format!(
+            "{}{}id:{} ({:.0}, {:.0}) {:.0}×{:.0} [z={}]\n",
+            prefix, connector, id, x, y, w, h, z
+        ));
+        let children = match node["children"].as_array() {
+            Some(c) => c,
+            None => return,
+        };
+        let child_prefix = if is_last {
+            format!("{}  ", prefix)
+        } else {
+            format!("{}│ ", prefix)
+        };
+        for (i, child) in children.iter().enumerate() {
+            print_node(child, out, &child_prefix, i == children.len() - 1);
+        }
+    }
+
+    for (i, node) in arr.iter().enumerate() {
+        print_node(node, &mut out, "", i == arr.len() - 1);
+    }
+
+    out
+}
+
 fn connect(socket: Option<&str>) -> DebugClient {
     let result = match socket {
         Some(path) => DebugClient::connect(path),
@@ -583,6 +669,8 @@ fn print_response(method: &str, response: &motif_debug::DebugResponse, json_mode
         "scene.quads" => print!("{}", format_scene_quads(result)),
         "scene.text_runs" => print!("{}", format_scene_text_runs(result)),
         "input.state" => print!("{}", format_input_state(result)),
+        "element.list" => print!("{}", format_element_list(result)),
+        "elements.tree" => print!("{}", format_elements_tree(result)),
         "screenshot" => print!("{}", format_screenshot(result)),
         "debug.draw_quad" => print!("{}", format_draw_quad(result)),
         "debug.clear" => print!("{}", format_debug_clear(result)),
