@@ -527,6 +527,10 @@ impl Default for MetalRenderer {
 impl Renderer for MetalRenderer {
     type Surface = MetalSurface;
 
+    fn resize_surface(&self, surface: &mut MetalSurface, width: f32, height: f32) {
+        surface.resize(width, height);
+    }
+
     fn render(&mut self, scene: &Scene, surface: &mut MetalSurface) {
         let quads = scene.quads();
         let text_runs = scene.text_runs();
