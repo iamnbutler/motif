@@ -82,6 +82,16 @@ pub enum InputAction {
     /// Redo last undone edit.
     Redo,
 
+    // Vertical navigation
+    /// Move cursor up one line (multiline only).
+    MoveUp,
+    /// Move cursor down one line (multiline only).
+    MoveDown,
+    /// Extend selection up one line.
+    SelectUp,
+    /// Extend selection down one line.
+    SelectDown,
+
     // Focus
     /// Blur focus (typically Escape).
     Escape,
@@ -169,6 +179,20 @@ impl InputBindings {
                         Some(InputAction::End)
                     } else {
                         Some(InputAction::Right)
+                    }
+                }
+                NamedKey::ArrowUp => {
+                    if shift {
+                        Some(InputAction::SelectUp)
+                    } else {
+                        Some(InputAction::MoveUp)
+                    }
+                }
+                NamedKey::ArrowDown => {
+                    if shift {
+                        Some(InputAction::SelectDown)
+                    } else {
+                        Some(InputAction::MoveDown)
                     }
                 }
                 NamedKey::Home => {
@@ -306,6 +330,28 @@ mod tests {
         assert_eq!(
             bindings.action_for_key(&Key::Named(NamedKey::ArrowRight), &no_mods()),
             Some(InputAction::Right)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowUp), &no_mods()),
+            Some(InputAction::MoveUp)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowDown), &no_mods()),
+            Some(InputAction::MoveDown)
+        );
+    }
+
+    #[test]
+    fn shift_up_down_selects() {
+        let bindings = InputBindings::new();
+
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowUp), &shift()),
+            Some(InputAction::SelectUp)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowDown), &shift()),
+            Some(InputAction::SelectDown)
         );
     }
 
