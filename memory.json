@@ -1,13 +1,14 @@
 {
-  "last_run": "2026-05-07T00:00:00Z",
-  "last_run_id": "25518063166",
+  "last_run": "2026-05-08T00:00:00Z",
+  "last_run_id": "25575781258",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-07",
-    "task_10_forward": "2026-05-07",
+    "task_11_monthly_summary": "2026-05-08",
+    "task_10_forward": "2026-05-08",
+    "task_1_triage": "2026-05-08",
     "task_4_deps": "2026-05-07",
     "task_9_welcome": "2026-05-05",
     "task_8_release": "2026-05-05",
@@ -15,7 +16,6 @@
     "task_7_labels": "2026-05-04",
     "task_3_improvements": "2026-05-02",
     "task_2_fix_prs": "2026-05-01",
-    "task_1_triage": "2026-05-01",
     "task_5_maintain_prs": "2026-04-29"
   },
   "issues_commented": {
@@ -23,7 +23,8 @@
     "12": "2026-03-04",
     "15": "2026-03-12",
     "23": "2026-03-05",
-    "48": "2026-05-05"
+    "48": "2026-05-05",
+    "51": "2026-05-08"
   },
   "pr_nudges": {
     "21": "2026-03-19",
@@ -73,7 +74,8 @@
     "input-state-events": "pr-69-open",
     "text-layout-index-for-point": "pr-70-open",
     "element-tree-query": "pr-71-open",
-    "abstract-renderer-trait": "pr-72-open"
+    "abstract-renderer-trait": "pr-72-open",
+    "vertical-cursor-movement": "pr-73-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -121,7 +123,8 @@
     "text-layout-index-for-point-implemented",
     "pr-merge-order-updated-issue-48",
     "element-tree-query-implemented",
-    "abstract-renderer-trait-implemented"
+    "abstract-renderer-trait-implemented",
+    "vertical-cursor-movement-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -129,14 +132,14 @@
     "48": "PR backlog merge order",
     "49": "wgpu backend architecture and implementation plan",
     "50": "monthly summary april 2026 - CLOSED 2026-05-01",
-    "51": "text metrics debug example plan - IMPLEMENTED AS PR #56",
+    "51": "text metrics debug example plan - IMPLEMENTED AS PR #56 - commented 2026-05-08",
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-07: Task 10: Added resize_surface lifecycle method to Renderer trait in renderer.rs (default no-op); MetalRenderer override delegates to MetalSurface::resize(); 5 TDD tests. Resolves p2 spool task 'Abstract renderer trait' (cross-platform stream). PR #72. Task 4: Verified deps unchanged (glam 0.32.0, parley 0.7.0, winit 0.30.12 — same as 2026-04-30 audit). Task 5: Could not check PR branch conflicts (shallow clone, no remote branches fetched). Remaining unimplemented spool tasks without a PR: 'Vertical cursor movement up/down (p3)' (needs PR #70 merged), 'Vertical scrolling multiline (p3)', 'Line layout system multiline (p3)', 'Move hardcoded colors to Theme (p3)'. Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_1_triage (2026-05-01), task_2_fix_prs (2026-05-01).",
+  "notes": "2026-05-08: Task 10: Implemented vertical cursor movement (move_up/move_down/select_up/select_down) in TextEditState with preferred_col tracking; ArrowUp/ArrowDown bindings in InputAction; 12 TDD tests; resolves p3 spool task 'Implement vertical cursor movement (up/down)'. PR #73. Task 1: Commented on issue #51 noting implementation is in PR #56. Remaining unimplemented spool tasks without a PR: 'Vertical scrolling multiline (p3)', 'Line layout system multiline (p3)', 'Move hardcoded colors to Theme (p3)' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64). Pixel-precise vertical movement upgrade possible after PR #70 merges. Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_2_fix_prs (2026-05-01), task_7_labels (2026-05-04).",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -162,7 +165,6 @@
       "crates/motif_debug/src/server.rs (hit_tree field + update_hit_tree + element.list + elements.tree handlers)",
       "crates/motif_debug_cli/src/main.rs (format_element_list + format_elements_tree + print_usage + print_response)"
     ],
-    "approach": "HitTreeSnapshot wraps Vec<HitEntryInfo> (id, bounds, z_index). tree_json() builds containment hierarchy: for each entry i, parent = entry j<i with smallest area whose bounds fully contain i. build_tree_node() is a module-level recursive fn (valid Rust). Supersedes PR #21 (flat list only).",
     "spool_task": "mlr43t5f-ycj4 Query element tree (p1, debug-infrastructure stream)"
   },
   "abstract_renderer_trait_pr_2026_05_07": {
@@ -172,5 +174,14 @@
       "crates/motif_core/src/metal/mod.rs (resize_surface override in MetalRenderer — delegates to MetalSurface::resize)"
     ],
     "spool_task": "Abstract renderer trait (p2, cross-platform stream)"
+  },
+  "vertical_cursor_movement_pr_2026_05_08": {
+    "status": "SUBMITTED — PR #73 (branch repo-assist/improve-vertical-cursor-movement)",
+    "files_changed": [
+      "crates/motif_core/src/input/bindings.rs (MoveUp/MoveDown/SelectUp/SelectDown InputAction variants; ArrowUp/ArrowDown key handling; 2 new binding tests)",
+      "crates/motif_core/src/input/text_state.rs (preferred_col field; move_up/move_down/select_up/select_down methods; move_to/select_to clear preferred_col; handle_key_event dispatch; 12 TDD tests)"
+    ],
+    "spool_task": "Implement vertical cursor movement (up/down) (p3, text-input-rewrite stream)",
+    "approach": "Content-level grapheme column tracking. Preferred column preserved across consecutive moves through shorter lines. Horizontal navigation clears preferred_col. Upgrade path: pixel-precise movement possible after PR #70 merges (adds index_for_point to TextLayout)."
   }
 }
