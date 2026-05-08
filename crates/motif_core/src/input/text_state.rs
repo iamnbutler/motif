@@ -66,6 +66,12 @@ pub struct TextEditState {
     /// Whether this is a multiline input (textarea) or single-line (input).
     /// Affects Enter (newline vs submit) and Tab (tab char vs focus change).
     multiline: bool,
+    /// Preferred grapheme column for vertical movement (up/down).
+    ///
+    /// Preserved across consecutive up/down moves so that navigating through
+    /// a shorter line snaps back to the original column on a longer line.
+    /// Cleared by any non-vertical navigation or text edit.
+    preferred_col: Option<usize>,
 }
 
 impl TextEditState {
@@ -84,6 +90,7 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: false,
+            preferred_col: None,
         }
     }
 
@@ -101,6 +108,7 @@ impl TextEditState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             multiline: true,
+            preferred_col: None,
         }
     }
 
@@ -281,14 +289,33 @@ impl TextEditState {
     // === Cursor movement ===
 
     /// Moves the cursor to the given offset, collapsing any selection.
+    ///
+    /// Clears the preferred column for vertical movement. Use `move_to_preserving_col`
+    /// internally if the preferred column should be maintained.
     pub fn move_to(&mut self, offset: usize) {
+        self.move_to_preserving_col(offset);
+        self.preferred_col = None;
+    }
+
+    /// Extends the selection to the given offset.
+    ///
+    /// Clears the preferred column for vertical movement.
+    pub fn select_to(&mut self, offset: usize) {
+        self.select_to_preserving_col(offset);
+        self.preferred_col = None;
+    }
+
+    /// Moves the cursor without clearing the preferred column.
+    /// Only used internally by vertical navigation methods.
+    fn move_to_preserving_col(&mut self, offset: usize) {
         let clamped = offset.min(self.content.len());
         self.selected_range = clamped..clamped;
         self.selection_reversed = false;
     }
 
-    /// Extends the selection to the given offset.
-    pub fn select_to(&mut self, offset: usize) {
+    /// Extends the selection without clearing the preferred column.
+    /// Only used internally by vertical navigation methods.
+    fn select_to_preserving_col(&mut self, offset: usize) {
         let clamped = offset.min(self.content.len());
 
         // The anchor is the non-cursor end of the selection
@@ -381,6 +408,139 @@ impl TextEditState {
         self.move_to(self.content.len());
     }
 
+    // === Vertical navigation ===
+
+    /// Helper: find the grapheme column of `byte_offset` within its line.
+    fn grapheme_col_at(&self, byte_offset: usize) -> usize {
+        let line_start = self.find_line_start(byte_offset);
+        self.content[line_start..byte_offset]
+            .graphemes(true)
+            .count()
+    }
+
+    /// Helper: find the byte offset of grapheme column `col` in the line
+    /// bounded by `[line_start, line_end)` (where `line_end` is the \n or content end).
+    /// Clamps to `line_end` if the column is beyond the line's length.
+    fn offset_for_col_in_line(&self, line_start: usize, line_end: usize, col: usize) -> usize {
+        self.content[line_start..line_end]
+            .grapheme_indices(true)
+            .nth(col)
+            .map(|(i, _)| line_start + i)
+            .unwrap_or(line_end)
+    }
+
+    /// Moves the cursor up one line, maintaining the grapheme column.
+    ///
+    /// The preferred column is preserved across consecutive up/down moves so
+    /// that moving through a shorter line snaps back to the original column on
+    /// a longer line. Any other navigation clears the preferred column.
+    ///
+    /// If the cursor is already on the first line, it moves to the beginning of
+    /// the content (offset 0).
+    pub fn move_up(&mut self) {
+        let cursor = self.cursor_offset();
+        let current_line_start = self.find_line_start(cursor);
+
+        // Compute or recall the preferred column before touching position
+        let target_col = self
+            .preferred_col
+            .unwrap_or_else(|| self.grapheme_col_at(cursor));
+
+        if current_line_start == 0 {
+            // Already on first line — move to beginning
+            self.move_to_preserving_col(0);
+            self.preferred_col = None;
+            return;
+        }
+
+        // The byte just before current_line_start is the '\n' that ends the previous line
+        let prev_newline = current_line_start - 1;
+        let prev_line_start = self.find_line_start(prev_newline);
+        // Previous line content is content[prev_line_start..prev_newline]
+
+        let target = self.offset_for_col_in_line(prev_line_start, prev_newline, target_col);
+
+        self.move_to_preserving_col(target);
+        self.preferred_col = Some(target_col);
+    }
+
+    /// Moves the cursor down one line, maintaining the grapheme column.
+    ///
+    /// If the cursor is already on the last line, it moves to the end of the
+    /// content.
+    pub fn move_down(&mut self) {
+        let cursor = self.cursor_offset();
+        let current_line_end = self.find_line_end(cursor);
+
+        let target_col = self
+            .preferred_col
+            .unwrap_or_else(|| self.grapheme_col_at(cursor));
+
+        if current_line_end == self.content.len() {
+            // Already on last line — move to end
+            self.move_to_preserving_col(self.content.len());
+            self.preferred_col = None;
+            return;
+        }
+
+        // Next line starts after the '\n'
+        let next_line_start = current_line_end + 1;
+        let next_line_end = self.find_line_end(next_line_start);
+
+        let target = self.offset_for_col_in_line(next_line_start, next_line_end, target_col);
+
+        self.move_to_preserving_col(target);
+        self.preferred_col = Some(target_col);
+    }
+
+    /// Extends the selection up one line, maintaining the grapheme column.
+    pub fn select_up(&mut self) {
+        let cursor = self.cursor_offset();
+        let current_line_start = self.find_line_start(cursor);
+
+        let target_col = self
+            .preferred_col
+            .unwrap_or_else(|| self.grapheme_col_at(cursor));
+
+        if current_line_start == 0 {
+            self.select_to_preserving_col(0);
+            self.preferred_col = None;
+            return;
+        }
+
+        let prev_newline = current_line_start - 1;
+        let prev_line_start = self.find_line_start(prev_newline);
+
+        let target = self.offset_for_col_in_line(prev_line_start, prev_newline, target_col);
+
+        self.select_to_preserving_col(target);
+        self.preferred_col = Some(target_col);
+    }
+
+    /// Extends the selection down one line, maintaining the grapheme column.
+    pub fn select_down(&mut self) {
+        let cursor = self.cursor_offset();
+        let current_line_end = self.find_line_end(cursor);
+
+        let target_col = self
+            .preferred_col
+            .unwrap_or_else(|| self.grapheme_col_at(cursor));
+
+        if current_line_end == self.content.len() {
+            self.select_to_preserving_col(self.content.len());
+            self.preferred_col = None;
+            return;
+        }
+
+        let next_line_start = current_line_end + 1;
+        let next_line_end = self.find_line_end(next_line_start);
+
+        let target = self.offset_for_col_in_line(next_line_start, next_line_end, target_col);
+
+        self.select_to_preserving_col(target);
+        self.preferred_col = Some(target_col);
+    }
+
     // === Selection extension ===
 
     /// Extends selection left by one grapheme.
@@ -411,6 +571,7 @@ impl TextEditState {
     pub fn select_all(&mut self) {
         self.selected_range = 0..self.content.len();
         self.selection_reversed = false;
+        self.preferred_col = None;
     }
 
     /// Extends selection to the beginning of the content.
@@ -792,6 +953,24 @@ impl TextEditState {
             }
             InputAction::Redo => {
                 self.redo();
+                HandleKeyResult::Handled
+            }
+
+            // Vertical navigation
+            InputAction::MoveUp => {
+                self.move_up();
+                HandleKeyResult::Handled
+            }
+            InputAction::MoveDown => {
+                self.move_down();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectUp => {
+                self.select_up();
+                HandleKeyResult::Handled
+            }
+            InputAction::SelectDown => {
+                self.select_down();
                 HandleKeyResult::Handled
             }
 
@@ -2281,5 +2460,181 @@ mod tests {
     fn new_multiline_creates_multiline_state() {
         let state = TextEditState::new_multiline();
         assert!(state.is_multiline());
+    }
+
+    // ============================================================
+    // Task: Implement vertical cursor movement (up/down)
+    // ============================================================
+
+    #[test]
+    fn move_up_on_first_line_goes_to_beginning() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(3); // col 3 in "hello"
+
+        state.move_up();
+
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn move_up_maintains_grapheme_column() {
+        let mut state = TextEditState::new_multiline();
+        // "hello" (5 chars) + \n + "world" (5 chars)
+        state.set_content("hello\nworld");
+        state.move_to(9); // col 3 in "world" (offset = 6+3 = 9)
+
+        state.move_up();
+
+        // Should land at col 3 in "hello" = offset 3
+        assert_eq!(state.cursor_offset(), 3);
+    }
+
+    #[test]
+    fn move_up_clamps_to_shorter_line() {
+        let mut state = TextEditState::new_multiline();
+        // "hi" (2 chars) + \n + "hello world" (11 chars)
+        state.set_content("hi\nhello world");
+        state.move_to(12); // col 9 in "hello world"
+
+        state.move_up();
+
+        // "hi" only has 2 chars, so clamp to end of "hi" = offset 2
+        assert_eq!(state.cursor_offset(), 2);
+    }
+
+    #[test]
+    fn move_down_on_last_line_goes_to_end() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(8); // col 2 in "world"
+
+        state.move_down();
+
+        assert_eq!(state.cursor_offset(), 11); // end of content
+    }
+
+    #[test]
+    fn move_down_maintains_grapheme_column() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(3); // col 3 in "hello"
+
+        state.move_down();
+
+        // Should land at col 3 in "world" = offset 6+3 = 9
+        assert_eq!(state.cursor_offset(), 9);
+    }
+
+    #[test]
+    fn move_down_clamps_to_shorter_line() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello world\nhi");
+        state.move_to(9); // col 9 in "hello world"
+
+        state.move_down();
+
+        // "hi" only has 2 chars, so clamp to end of "hi" = offset 14
+        assert_eq!(state.cursor_offset(), 14);
+    }
+
+    #[test]
+    fn preferred_col_preserved_across_up_down_through_short_line() {
+        let mut state = TextEditState::new_multiline();
+        // Line 0: "hello world" (11 chars, index 0..11)
+        // Line 1: "hi"          (2 chars,  index 12..14)
+        // Line 2: "good morning" (12 chars, index 15..27)
+        state.set_content("hello world\nhi\ngood morning");
+        state.move_to(9); // col 9 in "hello world"
+
+        // Move down to "hi" — clamps to end (col 2)
+        state.move_down();
+        assert_eq!(state.cursor_offset(), 14); // end of "hi"
+
+        // Move down to "good morning" — preferred col 9 should restore
+        state.move_down();
+        assert_eq!(state.cursor_offset(), 24); // col 9 in "good morning" = 15+9 = 24
+    }
+
+    #[test]
+    fn horizontal_nav_clears_preferred_col() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(9); // col 3 in "world"
+
+        // Move up sets preferred_col = 3
+        state.move_up();
+        assert_eq!(state.preferred_col, Some(3));
+
+        // Move right clears preferred_col
+        state.right();
+        assert_eq!(state.preferred_col, None);
+    }
+
+    #[test]
+    fn select_up_extends_selection_to_previous_line() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(9); // col 3 in "world"
+
+        state.select_up();
+
+        // Selection should extend from offset 3 (col 3 of "hello") to 9 (col 3 of "world")
+        // with cursor at the start (reversed)
+        assert_eq!(state.selected_range(), &(3..9));
+        assert!(state.selection_reversed());
+    }
+
+    #[test]
+    fn select_down_extends_selection_to_next_line() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(3); // col 3 in "hello"
+
+        state.select_down();
+
+        // Selection extends from 3 to col 3 of "world" = 9
+        assert_eq!(state.selected_range(), &(3..9));
+        assert!(!state.selection_reversed());
+    }
+
+    #[test]
+    fn move_up_empty_content_stays_at_zero() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("");
+        state.move_up();
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn move_down_empty_content_stays_at_zero() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("");
+        state.move_down();
+        assert_eq!(state.cursor_offset(), 0);
+    }
+
+    #[test]
+    fn handle_key_event_arrow_up_moves_cursor_up() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(9); // col 3 in "world"
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::ArrowUp), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.cursor_offset(), 3); // col 3 in "hello"
+    }
+
+    #[test]
+    fn handle_key_event_arrow_down_moves_cursor_down() {
+        let mut state = TextEditState::new_multiline();
+        state.set_content("hello\nworld");
+        state.move_to(3); // col 3 in "hello"
+
+        let result = state.handle_key_event(&Key::Named(NamedKey::ArrowDown), &no_mods());
+
+        assert_eq!(result, HandleKeyResult::Handled);
+        assert_eq!(state.cursor_offset(), 9); // col 3 in "world"
     }
 }
