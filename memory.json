@@ -1,19 +1,19 @@
 {
-  "last_run": "2026-05-08T00:00:00Z",
-  "last_run_id": "25575781258",
+  "last_run": "2026-05-09T00:00:00Z",
+  "last_run_id": "25609928148",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-08",
-    "task_10_forward": "2026-05-08",
+    "task_11_monthly_summary": "2026-05-09",
+    "task_10_forward": "2026-05-09",
+    "task_7_labels": "2026-05-09",
     "task_1_triage": "2026-05-08",
     "task_4_deps": "2026-05-07",
     "task_9_welcome": "2026-05-05",
     "task_8_release": "2026-05-05",
     "task_6_stale_nudges": "2026-05-05",
-    "task_7_labels": "2026-05-04",
     "task_3_improvements": "2026-05-02",
     "task_2_fix_prs": "2026-05-01",
     "task_5_maintain_prs": "2026-04-29"
@@ -75,7 +75,8 @@
     "text-layout-index-for-point": "pr-70-open",
     "element-tree-query": "pr-71-open",
     "abstract-renderer-trait": "pr-72-open",
-    "vertical-cursor-movement": "pr-73-open"
+    "vertical-cursor-movement": "pr-73-open",
+    "line-layout-multiline": "pr-74-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -124,7 +125,8 @@
     "pr-merge-order-updated-issue-48",
     "element-tree-query-implemented",
     "abstract-renderer-trait-implemented",
-    "vertical-cursor-movement-implemented"
+    "vertical-cursor-movement-implemented",
+    "line-layout-multiline-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -136,10 +138,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-08: Task 10: Implemented vertical cursor movement (move_up/move_down/select_up/select_down) in TextEditState with preferred_col tracking; ArrowUp/ArrowDown bindings in InputAction; 12 TDD tests; resolves p3 spool task 'Implement vertical cursor movement (up/down)'. PR #73. Task 1: Commented on issue #51 noting implementation is in PR #56. Remaining unimplemented spool tasks without a PR: 'Vertical scrolling multiline (p3)', 'Line layout system multiline (p3)', 'Move hardcoded colors to Theme (p3)' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64). Pixel-precise vertical movement upgrade possible after PR #70 merges. Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_2_fix_prs (2026-05-01), task_7_labels (2026-05-04).",
+  "notes": "2026-05-09: Task 10: Implemented LineLayout struct (line_layout.rs) for efficient byte-offset <-> (line,col) mapping via binary_search. O(n) build, O(log n) lookup. 18 TDD tests covering empty string, single/multi-line, trailing newlines, consecutive newlines, clamping, round-trip, unicode. Re-exported from motif_core::input. PR #74 (branch repo-assist/improve-line-layout-multiline). Resolves p3 spool task 'Implement line layout system for multiline'. Task 7: Verified all 5 open issues have correct labels - no changes needed. Remaining unimplemented spool tasks without a PR: 'Vertical scrolling multiline (p3)' (next after PR #73+#74 merge), 'Move hardcoded colors to Theme (p3)' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64). Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_1_triage (2026-05-08), task_2_fix_prs (2026-05-01).",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -182,6 +184,15 @@
       "crates/motif_core/src/input/text_state.rs (preferred_col field; move_up/move_down/select_up/select_down methods; move_to/select_to clear preferred_col; handle_key_event dispatch; 12 TDD tests)"
     ],
     "spool_task": "Implement vertical cursor movement (up/down) (p3, text-input-rewrite stream)",
-    "approach": "Content-level grapheme column tracking. Preferred column preserved across consecutive moves through shorter lines. Horizontal navigation clears preferred_col. Upgrade path: pixel-precise movement possible after PR #70 merges (adds index_for_point to TextLayout)."
+    "approach": "Content-level grapheme column tracking. Preferred column preserved across consecutive moves through shorter lines. Horizontal navigation clears preferred_col. Upgrade path: pixel-precise movement possible after PR #70 merges (adds index_for_point to TextLayout) and PR #74 merges (adds LineLayout)."
+  },
+  "line_layout_multiline_pr_2026_05_09": {
+    "status": "SUBMITTED — PR #74 (branch repo-assist/improve-line-layout-multiline)",
+    "files_changed": [
+      "crates/motif_core/src/input/line_layout.rs (LineLayout struct; new/line_count/line_for_offset/line_start/line_end/col_for_offset/offset_for_line_col; 18 TDD tests)",
+      "crates/motif_core/src/input/mod.rs (mod line_layout; pub use line_layout::LineLayout)"
+    ],
+    "spool_task": "Implement line layout system for multiline (p3, text-input-rewrite stream)",
+    "approach": "Vec<usize> of line starts computed O(n) once; binary_search for O(log n) line_for_offset. Provides foundation for vertical scroll offset calculation and upgrade path for move_up/move_down in PR #73."
   }
 }
