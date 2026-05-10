@@ -1,13 +1,13 @@
 {
-  "last_run": "2026-05-09T00:00:00Z",
-  "last_run_id": "25609928148",
+  "last_run": "2026-05-10T00:00:00Z",
+  "last_run_id": "25637799760",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-09",
-    "task_10_forward": "2026-05-09",
+    "task_11_monthly_summary": "2026-05-10",
+    "task_10_forward": "2026-05-10",
     "task_7_labels": "2026-05-09",
     "task_1_triage": "2026-05-08",
     "task_4_deps": "2026-05-07",
@@ -76,7 +76,8 @@
     "element-tree-query": "pr-71-open",
     "abstract-renderer-trait": "pr-72-open",
     "vertical-cursor-movement": "pr-73-open",
-    "line-layout-multiline": "pr-74-open"
+    "line-layout-multiline": "pr-74-open",
+    "vertical-scroll-state": "pr-75-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -126,7 +127,8 @@
     "element-tree-query-implemented",
     "abstract-renderer-trait-implemented",
     "vertical-cursor-movement-implemented",
-    "line-layout-multiline-implemented"
+    "line-layout-multiline-implemented",
+    "vertical-scroll-state-implemented"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -138,10 +140,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-09: Task 10: Implemented LineLayout struct (line_layout.rs) for efficient byte-offset <-> (line,col) mapping via binary_search. O(n) build, O(log n) lookup. 18 TDD tests covering empty string, single/multi-line, trailing newlines, consecutive newlines, clamping, round-trip, unicode. Re-exported from motif_core::input. PR #74 (branch repo-assist/improve-line-layout-multiline). Resolves p3 spool task 'Implement line layout system for multiline'. Task 7: Verified all 5 open issues have correct labels - no changes needed. Remaining unimplemented spool tasks without a PR: 'Vertical scrolling multiline (p3)' (next after PR #73+#74 merge), 'Move hardcoded colors to Theme (p3)' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64). Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_1_triage (2026-05-08), task_2_fix_prs (2026-05-01).",
+  "notes": "2026-05-10: Task 10: Implemented VerticalScrollState (scroll_state.rs) — line-level vertical scroll management for multiline text areas. scroll_to_ensure_visible(cursor_line, total_lines), scroll_by(delta, total_lines), line_is_visible(line), first_visible_line(), last_visible_line(), set_visible_line_count(n). 20 TDD tests covering construction, last_visible_line edge cases, line_is_visible, scroll_to_ensure_visible (up/down/no-op/boundary/zero-viewport/short-content), scroll_by (positive/negative/clamp-start/clamp-end/zero-content), set_visible_line_count, round-trip. Re-exported from motif_core::input. PR #75 (branch repo-assist/improve-vertical-scroll-multiline). Resolves p3 spool task 'Implement vertical scrolling for multiline'. Task 11: Updated May 2026 monthly summary. Remaining unimplemented spool tasks without a PR: 'Move hardcoded colors to Theme (p3)' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64), 'Visual regression test harness' (needs #37). Next run priorities: task_5_maintain_prs (2026-04-29 oldest), task_2_fix_prs (2026-05-01), task_3_improvements (2026-05-02), task_1_triage (2026-05-08).",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -160,39 +162,13 @@
     },
     "notes": "Verified 2026-05-07: still same versions as 2026-04-26 audit. No urgent updates needed."
   },
-  "element_tree_query_pr_2026_05_06": {
-    "status": "SUBMITTED — PR #71 (branch repo-assist/improve-element-tree-query)",
+  "vertical_scroll_state_pr_2026_05_10": {
+    "status": "SUBMITTED — PR #75 (branch repo-assist/improve-vertical-scroll-multiline)",
     "files_changed": [
-      "crates/motif_debug/src/snapshot.rs (HitEntryInfo + HitTreeSnapshot + from_hit_tree + list_json + tree_json + bounds_contains_fully + build_tree_node + 9 tests)",
-      "crates/motif_debug/src/server.rs (hit_tree field + update_hit_tree + element.list + elements.tree handlers)",
-      "crates/motif_debug_cli/src/main.rs (format_element_list + format_elements_tree + print_usage + print_response)"
+      "crates/motif_core/src/input/scroll_state.rs (VerticalScrollState struct; new/with_visible_lines/first_visible_line/last_visible_line/line_is_visible/set_visible_line_count/scroll_by/scroll_to_ensure_visible; 20 TDD tests)",
+      "crates/motif_core/src/input/mod.rs (mod scroll_state; pub use scroll_state::VerticalScrollState)"
     ],
-    "spool_task": "mlr43t5f-ycj4 Query element tree (p1, debug-infrastructure stream)"
-  },
-  "abstract_renderer_trait_pr_2026_05_07": {
-    "status": "SUBMITTED — PR #72 (branch repo-assist/improve-abstract-renderer-trait)",
-    "files_changed": [
-      "crates/motif_core/src/renderer.rs (resize_surface default no-op on Renderer trait; DebugRenderer explicit no-op override; comprehensive module docs; 5 TDD tests)",
-      "crates/motif_core/src/metal/mod.rs (resize_surface override in MetalRenderer — delegates to MetalSurface::resize)"
-    ],
-    "spool_task": "Abstract renderer trait (p2, cross-platform stream)"
-  },
-  "vertical_cursor_movement_pr_2026_05_08": {
-    "status": "SUBMITTED — PR #73 (branch repo-assist/improve-vertical-cursor-movement)",
-    "files_changed": [
-      "crates/motif_core/src/input/bindings.rs (MoveUp/MoveDown/SelectUp/SelectDown InputAction variants; ArrowUp/ArrowDown key handling; 2 new binding tests)",
-      "crates/motif_core/src/input/text_state.rs (preferred_col field; move_up/move_down/select_up/select_down methods; move_to/select_to clear preferred_col; handle_key_event dispatch; 12 TDD tests)"
-    ],
-    "spool_task": "Implement vertical cursor movement (up/down) (p3, text-input-rewrite stream)",
-    "approach": "Content-level grapheme column tracking. Preferred column preserved across consecutive moves through shorter lines. Horizontal navigation clears preferred_col. Upgrade path: pixel-precise movement possible after PR #70 merges (adds index_for_point to TextLayout) and PR #74 merges (adds LineLayout)."
-  },
-  "line_layout_multiline_pr_2026_05_09": {
-    "status": "SUBMITTED — PR #74 (branch repo-assist/improve-line-layout-multiline)",
-    "files_changed": [
-      "crates/motif_core/src/input/line_layout.rs (LineLayout struct; new/line_count/line_for_offset/line_start/line_end/col_for_offset/offset_for_line_col; 18 TDD tests)",
-      "crates/motif_core/src/input/mod.rs (mod line_layout; pub use line_layout::LineLayout)"
-    ],
-    "spool_task": "Implement line layout system for multiline (p3, text-input-rewrite stream)",
-    "approach": "Vec<usize> of line starts computed O(n) once; binary_search for O(log n) line_for_offset. Provides foundation for vertical scroll offset calculation and upgrade path for move_up/move_down in PR #73."
+    "spool_task": "Implement vertical scrolling for multiline (p3, text-input-rewrite stream)",
+    "approach": "Line-level (not pixel-level) scroll tracking. Renderer multiplies first_visible_line() * line_height for pixel offset. Pairs with LineLayout (PR #74) for cursor_line derivation and TextEditState (PR #73) for cursor_offset."
   }
 }
