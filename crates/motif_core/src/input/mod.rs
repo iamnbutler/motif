@@ -4,9 +4,11 @@
 //! translating from winit's physical-pixel events.
 
 mod bindings;
+mod scroll_state;
 mod text_state;
 
 pub use bindings::{InputAction, InputBindings};
+pub use scroll_state::VerticalScrollState;
 pub use text_state::{HandleKeyResult, TextEditState};
 
 use crate::{ElementId, Point};
