@@ -125,3 +125,172 @@ impl Scene {
         self.text_runs.len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Corners, DevicePoint, DeviceRect, DeviceSize, Edges};
+    use linebender_resource_handle::{Blob, FontData};
+    use palette::Srgba;
+
+    fn dummy_font() -> FontData {
+        FontData::new(Blob::from(vec![0u8; 4]), 0)
+    }
+
+    fn red() -> Srgba {
+        Srgba::new(1.0, 0.0, 0.0, 1.0)
+    }
+
+    fn unit_rect() -> DeviceRect {
+        DeviceRect::new(DevicePoint::new(0.0, 0.0), DeviceSize::new(100.0, 50.0))
+    }
+
+    // --- Quad tests ---
+
+    #[test]
+    fn quad_new_has_transparent_border_color() {
+        let q = Quad::new(unit_rect(), red());
+        assert_eq!(q.border_color, Srgba::new(0.0, 0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn quad_new_has_zero_border_widths() {
+        let q = Quad::new(unit_rect(), red());
+        assert_eq!(q.border_widths, Edges::default());
+    }
+
+    #[test]
+    fn quad_new_has_no_clip_bounds() {
+        let q = Quad::new(unit_rect(), red());
+        assert!(q.clip_bounds.is_none());
+    }
+
+    #[test]
+    fn quad_new_has_zero_corner_radii() {
+        let q = Quad::new(unit_rect(), red());
+        assert_eq!(q.corner_radii, Corners::default());
+    }
+
+    #[test]
+    fn quad_clip_bounds_can_be_set() {
+        let mut q = Quad::new(unit_rect(), red());
+        let clip = DeviceRect::new(DevicePoint::new(10.0, 10.0), DeviceSize::new(50.0, 30.0));
+        q.clip_bounds = Some(clip);
+        assert!(q.clip_bounds.is_some());
+    }
+
+    // --- TextRun tests ---
+
+    #[test]
+    fn text_run_new_has_empty_glyphs() {
+        let run = TextRun::new(DevicePoint::new(10.0, 20.0), red(), 16.0, dummy_font());
+        assert!(run.glyphs.is_empty());
+    }
+
+    #[test]
+    fn text_run_new_has_empty_normalized_coords() {
+        let run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 12.0, dummy_font());
+        assert!(run.normalized_coords.is_empty());
+    }
+
+    #[test]
+    fn text_run_push_glyph_stores_correct_fields() {
+        let mut run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font());
+        run.push_glyph(42, 1.5, 2.5);
+        assert_eq!(run.glyphs.len(), 1);
+        assert_eq!(run.glyphs[0].glyph_id, 42);
+        assert_eq!(run.glyphs[0].x, 1.5);
+        assert_eq!(run.glyphs[0].y, 2.5);
+    }
+
+    #[test]
+    fn text_run_with_normalized_coords_sets_coords() {
+        let run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font())
+            .with_normalized_coords(vec![100, 200]);
+        assert_eq!(run.normalized_coords, vec![100i16, 200i16]);
+    }
+
+    #[test]
+    fn text_run_multiple_glyphs_accumulate() {
+        let mut run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font());
+        run.push_glyph(1, 0.0, 0.0);
+        run.push_glyph(2, 10.0, 0.0);
+        run.push_glyph(3, 20.0, 0.0);
+        assert_eq!(run.glyphs.len(), 3);
+    }
+
+    // --- Scene tests ---
+
+    #[test]
+    fn scene_new_is_empty() {
+        let scene = Scene::new();
+        assert_eq!(scene.quad_count(), 0);
+        assert_eq!(scene.text_run_count(), 0);
+    }
+
+    #[test]
+    fn scene_default_is_empty() {
+        let scene = Scene::default();
+        assert_eq!(scene.quad_count(), 0);
+        assert_eq!(scene.text_run_count(), 0);
+    }
+
+    #[test]
+    fn scene_push_quad_increments_count() {
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        assert_eq!(scene.quad_count(), 1);
+    }
+
+    #[test]
+    fn scene_quads_returns_pushed_quads() {
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        assert_eq!(scene.quads().len(), 1);
+    }
+
+    #[test]
+    fn scene_push_text_run_increments_count() {
+        let mut scene = Scene::new();
+        let run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font());
+        scene.push_text_run(run);
+        assert_eq!(scene.text_run_count(), 1);
+    }
+
+    #[test]
+    fn scene_text_runs_returns_pushed_runs() {
+        let mut scene = Scene::new();
+        let run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font());
+        scene.push_text_run(run);
+        assert_eq!(scene.text_runs().len(), 1);
+    }
+
+    #[test]
+    fn scene_clear_removes_all_primitives() {
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        let run = TextRun::new(DevicePoint::new(0.0, 0.0), red(), 16.0, dummy_font());
+        scene.push_text_run(run);
+        scene.clear();
+        assert_eq!(scene.quad_count(), 0);
+        assert_eq!(scene.text_run_count(), 0);
+    }
+
+    #[test]
+    fn scene_clear_allows_reuse() {
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        scene.clear();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        assert_eq!(scene.quad_count(), 1);
+    }
+
+    #[test]
+    fn scene_multiple_quads_accumulate() {
+        let mut scene = Scene::new();
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        scene.push_quad(Quad::new(unit_rect(), red()));
+        assert_eq!(scene.quad_count(), 3);
+    }
+}
