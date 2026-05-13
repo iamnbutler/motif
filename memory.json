@@ -1,13 +1,13 @@
 {
-  "last_run": "2026-05-12T00:00:00Z",
-  "last_run_id": "25758011063",
+  "last_run": "2026-05-13T00:00:00Z",
+  "last_run_id": "25822294049",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-12",
-    "task_10_forward": "2026-05-12",
+    "task_11_monthly_summary": "2026-05-13",
+    "task_10_forward": "2026-05-13",
     "task_5_maintain_prs": "2026-05-11",
     "task_1_triage": "2026-05-11",
     "task_3_improvements": "2026-05-11",
@@ -80,7 +80,8 @@
     "line-layout-multiline": "pr-74-open",
     "vertical-scroll-state": "pr-75-open",
     "geometry-edges-rect-utils": "pr-76-open",
-    "scene-tests": "pr-77-open"
+    "scene-tests": "pr-77-open",
+    "renderer-tests": "pr-78-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -133,7 +134,8 @@
     "line-layout-multiline-implemented",
     "vertical-scroll-state-implemented",
     "geometry-edges-inset-expand-implemented",
-    "scene-rendering-primitives-tests"
+    "scene-rendering-primitives-tests",
+    "renderer-debugrenderer-tests"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -145,10 +147,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-12: Task 10: Added 19 unit tests to scene.rs for Quad/TextRun/GlyphInstance/Scene — PR #77 (branch repo-assist/improve-scene-tests). Added linebender_resource_handle as dev-dep (transitive-only before, needed for dummy FontData in tests). Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest), task_7_labels (2026-05-09). Next improvement candidates: (a) callbacks.rs or renderer.rs test coverage (both small files); (b) hit_tree.rs deeper tests; (c) context.rs tests for DrawContext paint stack. Spool tasks still blocked: 'Move hardcoded colors to Theme' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64), 'Visual regression test harness' (needs #37).",
+  "notes": "2026-05-13: Task 10: Added 6 unit tests to renderer.rs for DebugRenderer — PR #78 (branch repo-assist/improve-renderer-tests). Pure Rust tests, no Metal/macOS deps, no new dev-deps needed. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest), task_7_labels (2026-05-09). Next improvement candidates: (a) hit_tree.rs deeper tests (hit detection with nested/overlapping regions); (b) context.rs tests for DrawContext paint stack; (c) focus.rs tests. Spool tasks still blocked: 'Move hardcoded colors to Theme' (needs #44), 'Double-click word selection wiring' (needs #36+#64), 'Triple-click line selection wiring' (needs #36+#64), 'Visual regression test harness' (needs #37).",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -182,5 +184,12 @@
       "Cargo.lock (updated dep graph)"
     ],
     "approach": "Tests cover: Quad constructor defaults (border color, border widths, clip bounds, corner radii, clip mutation); TextRun constructor defaults (empty glyphs/coords), push_glyph field storage, with_normalized_coords builder, multi-glyph accumulation; Scene new/default empty, push_quad/text_run count, quads()/text_runs() slice access, clear() removes both, clear() allows reuse, multi-quad accumulation."
+  },
+  "renderer_tests_pr_2026_05_13": {
+    "status": "SUBMITTED — PR #78 (branch repo-assist/improve-renderer-tests)",
+    "files_changed": [
+      "crates/motif_core/src/renderer.rs (6 unit tests for DebugRenderer)"
+    ],
+    "approach": "Tests: initial state (frames=0, quads=0), increment frame count, record quad count from scene, accumulate frames across renders, update quad count each frame, zero quads after scene.clear(). Pure Rust — no Metal deps, no new dev-deps. Uses Scene/Quad/DeviceRect already in scope."
   }
 }
