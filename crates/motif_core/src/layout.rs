@@ -418,4 +418,203 @@ mod tests {
         assert_eq!(inner_bounds.origin.x, 15.0);
         assert_eq!(inner_bounds.origin.y, 15.0);
     }
+
+    #[test]
+    fn flex_row_gap_spaces_children() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        let child1 = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+        let child2 = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        let parent = engine.new_with_children(
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                gap: taffy::Size {
+                    width: length(10.0),
+                    height: length(0.0),
+                },
+                ..Default::default()
+            },
+            &[child1, child2],
+        );
+
+        engine.compute_layout(parent, 800.0, 600.0, &mut text_ctx);
+
+        let bounds1 = engine.layout_bounds(child1);
+        let bounds2 = engine.layout_bounds(child2);
+
+        // First child starts at x=0; second starts at x=50+10=60 due to 10px gap
+        assert_eq!(bounds1.origin.x, 0.0);
+        assert_eq!(bounds2.origin.x, 60.0, "second child should be offset by gap");
+    }
+
+    #[test]
+    fn flex_grow_expands_child_to_fill_parent() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        // Single child with flex_grow=1 in a fixed-size parent — should fill width
+        let child = engine.new_leaf(Style {
+            flex_grow: 1.0,
+            ..Default::default()
+        });
+
+        let parent = engine.new_with_children(
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                size: taffy::Size {
+                    width: length(200.0),
+                    height: length(50.0),
+                },
+                ..Default::default()
+            },
+            &[child],
+        );
+
+        engine.compute_layout(parent, 800.0, 600.0, &mut text_ctx);
+
+        let child_bounds = engine.layout_bounds(child);
+        assert_eq!(
+            child_bounds.size.width, 200.0,
+            "flex_grow child should fill parent width"
+        );
+        assert_eq!(child_bounds.size.height, 50.0);
+    }
+
+    #[test]
+    fn clear_allows_engine_reuse() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        // Build an initial layout tree
+        let child = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+        let parent = engine.new_with_children(Style::default(), &[child]);
+        engine.compute_layout(parent, 800.0, 600.0, &mut text_ctx);
+
+        // Clear and build a fresh tree — must not panic
+        engine.clear();
+        let new_node = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(120.0),
+                height: length(80.0),
+            },
+            ..Default::default()
+        });
+        engine.compute_layout(new_node, 800.0, 600.0, &mut text_ctx);
+
+        let bounds = engine.layout_bounds(new_node);
+        assert_eq!(bounds.size.width, 120.0);
+        assert_eq!(bounds.size.height, 80.0);
+    }
+
+    #[test]
+    fn justify_content_space_between_pushes_children_to_edges() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        let child1 = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+        let child2 = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        // 200px container with two 50px children and space-between:
+        // child1 at x=0, child2 at x=150 (200-50)
+        let parent = engine.new_with_children(
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: Some(JustifyContent::SpaceBetween),
+                size: taffy::Size {
+                    width: length(200.0),
+                    height: length(50.0),
+                },
+                ..Default::default()
+            },
+            &[child1, child2],
+        );
+
+        engine.compute_layout(parent, 800.0, 600.0, &mut text_ctx);
+
+        let bounds1 = engine.layout_bounds(child1);
+        let bounds2 = engine.layout_bounds(child2);
+
+        assert_eq!(bounds1.origin.x, 0.0, "first child should be at left edge");
+        assert_eq!(
+            bounds2.origin.x, 150.0,
+            "second child should be at right edge (200-50)"
+        );
+    }
+
+    #[test]
+    fn layout_returns_relative_position_layout_bounds_returns_absolute() {
+        let mut engine = LayoutEngine::new();
+        let mut text_ctx = TextContext::new();
+
+        let child = engine.new_leaf(Style {
+            size: taffy::Size {
+                width: length(30.0),
+                height: length(30.0),
+            },
+            ..Default::default()
+        });
+
+        // Parent at origin (no parent itself) with asymmetric padding
+        let parent = engine.new_with_children(
+            Style {
+                padding: taffy::Rect {
+                    left: length(20.0),
+                    right: length(0.0),
+                    top: length(15.0),
+                    bottom: length(0.0),
+                },
+                ..Default::default()
+            },
+            &[child],
+        );
+
+        engine.compute_layout(parent, 800.0, 600.0, &mut text_ctx);
+
+        // Raw layout gives position relative to direct parent
+        let raw = engine.layout(child);
+        assert_eq!(raw.location.x, 20.0, "child relative x = left padding");
+        assert_eq!(raw.location.y, 15.0, "child relative y = top padding");
+
+        // layout_bounds accumulates up the tree — same here since parent is at root
+        let abs = engine.layout_bounds(child);
+        assert_eq!(abs.origin.x, 20.0, "child absolute x = left padding");
+        assert_eq!(abs.origin.y, 15.0, "child absolute y = top padding");
+        assert_eq!(abs.size.width, 30.0);
+        assert_eq!(abs.size.height, 30.0);
+    }
 }
