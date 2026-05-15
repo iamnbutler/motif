@@ -1,17 +1,17 @@
 {
-  "last_run": "2026-05-14T00:00:00Z",
-  "last_run_id": "25881573691",
+  "last_run": "2026-05-15T00:00:00Z",
+  "last_run_id": "25937772373",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-14",
+    "task_11_monthly_summary": "2026-05-15",
+    "task_3_improvements": "2026-05-15",
+    "task_1_triage": "2026-05-15",
+    "task_7_labels": "2026-05-15",
     "task_10_forward": "2026-05-14",
     "task_5_maintain_prs": "2026-05-11",
-    "task_1_triage": "2026-05-11",
-    "task_3_improvements": "2026-05-14",
-    "task_7_labels": "2026-05-09",
     "task_4_deps": "2026-05-07",
     "task_9_welcome": "2026-05-05",
     "task_8_release": "2026-05-05",
@@ -82,7 +82,8 @@
     "geometry-edges-rect-utils": "pr-76-open",
     "scene-tests": "pr-77-open",
     "renderer-tests": "pr-78-open",
-    "layout-tests-extended": "pr-79-open"
+    "layout-tests-extended": "pr-79-open",
+    "arc-str-tests": "pr-80-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -137,7 +138,8 @@
     "geometry-edges-inset-expand-implemented",
     "scene-rendering-primitives-tests",
     "renderer-debugrenderer-tests",
-    "layout-tests-gap-flexgrow-clear-justifycontent-rawbounds"
+    "layout-tests-gap-flexgrow-clear-justifycontent-rawbounds",
+    "arc-str-comprehensive-tests"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -149,10 +151,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-14: Task 3/10: Added 5 unit tests to layout.rs — PR #79 (branch repo-assist/improve-layout-tests). Tests cover: flex_row_gap_spaces_children, flex_grow_expands_child_to_fill_parent, clear_allows_engine_reuse, justify_content_space_between_pushes_children_to_edges, layout_returns_relative_position_layout_bounds_returns_absolute. Pure Taffy tests, no text measurement needed for most. Build fails on Linux due to known fontconfig infrastructure issue (TextContext::new() requirement); should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest — verify no new bug issues), task_7_labels (2026-05-09), task_1_triage (2026-05-11). Test coverage status: hit_tree.rs (24 tests), context.rs (9), focus.rs (14), text_state.rs (many - 2286 lines), layout.rs (7+5=12), scene.rs (pending PR #77), renderer.rs (pending PR #78), accessibility.rs (11+), geometry.rs (many + PR #76). Next improvement candidates: (a) view memoization design (no open PR); (b) CONTRIBUTING.md — PR #17 was closed, investigate why before retrying; (c) spool tasks blocked — most need unmerged PRs.",
+  "notes": "2026-05-15: Task 3: Added 10 unit tests to arc_str.rs — PR #80 (branch repo-assist/improve-arc-str-tests). Tests cover: new_constructor_creates_owned, from_arc_str (From<Arc<str>>), deref_to_str, display_format, debug_format, ordering (Ord/PartialOrd), static_and_owned_equal_same_content, eq_with_string (PartialEq<String>), as_ref_str (AsRef<str>). Coverage: 5 → 15 tests. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 1: Verified all open issues (#15, #48, #49, #51, #67) — no new human activity since last comments. Task 7: Verified labels on all 5 open issues — all appropriate. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest — no bug issues currently), task_6_stale_nudges (2026-05-05), task_8_release (2026-05-05), task_10_forward (2026-05-14). Test coverage status: arc_str.rs (15 tests), hit_tree.rs (24), context.rs (9), focus.rs (14), text_state.rs (many), layout.rs (12), scene.rs (pending PR #77, 19 tests), renderer.rs (pending PR #78, 6 tests), accessibility.rs (11+), geometry.rs (many + PR #76). Next improvement candidates: (a) callbacks.rs edge cases (AnyElement panic path, registry overwrite behavior); (b) context.rs nested clips; (c) view memoization design; (d) CONTRIBUTING.md — PR #17 closed, investigate why.",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -171,12 +173,19 @@
     },
     "notes": "Verified 2026-05-07: still same versions as 2026-04-26 audit. No urgent updates needed."
   },
+  "arc_str_tests_pr_2026_05_15": {
+    "status": "SUBMITTED — PR #80 (branch repo-assist/improve-arc-str-tests)",
+    "files_changed": [
+      "crates/motif_core/src/arc_str.rs (10 new tests in existing #[cfg(test)] mod tests block)"
+    ],
+    "approach": "Covers: new() creates Owned variant, From<Arc<str>>, Deref to &str, Display format, Debug format (quoted), Ord/PartialOrd lexicographic, Static==Owned same content, PartialEq<String>, AsRef<str>."
+  },
   "geometry_edges_rect_utils_pr_2026_05_11": {
     "status": "SUBMITTED — PR #76 (branch repo-assist/improve-geometry-edges-rect-utils)",
     "files_changed": [
       "crates/motif_core/src/geometry.rs (impl Edges<f32> with inset_rect/expand_rect + 7 TDD tests)"
     ],
-    "approach": "inset_rect shrinks Rect by edge values (shifts origin right/down, clamps width/height to 0.0); expand_rect grows Rect by edge values (shifts origin left/up, increases size). Both use existing horizontal()/vertical() helpers. Tests: uniform, asymmetric, offset-origin, clamp-to-zero, expand-uniform, expand-asymmetric, roundtrip."
+    "approach": "inset_rect shrinks Rect by edge values; expand_rect grows Rect by edge values. Tests: uniform, asymmetric, offset-origin, clamp-to-zero, expand-uniform, expand-asymmetric, roundtrip."
   },
   "scene_tests_pr_2026_05_12": {
     "status": "SUBMITTED — PR #77 (branch repo-assist/improve-scene-tests)",
@@ -185,20 +194,20 @@
       "crates/motif_core/Cargo.toml (added linebender_resource_handle dev-dep)",
       "Cargo.lock (updated dep graph)"
     ],
-    "approach": "Tests cover: Quad constructor defaults (border color, border widths, clip bounds, corner radii, clip mutation); TextRun constructor defaults (empty glyphs/coords), push_glyph field storage, with_normalized_coords builder, multi-glyph accumulation; Scene new/default empty, push_quad/text_run count, quads()/text_runs() slice access, clear() removes both, clear() allows reuse, multi-quad accumulation."
+    "approach": "Tests cover Quad/TextRun constructors, Scene push/clear/count operations."
   },
   "renderer_tests_pr_2026_05_13": {
     "status": "SUBMITTED — PR #78 (branch repo-assist/improve-renderer-tests)",
     "files_changed": [
       "crates/motif_core/src/renderer.rs (6 unit tests for DebugRenderer)"
     ],
-    "approach": "Tests: initial state (frames=0, quads=0), increment frame count, record quad count from scene, accumulate frames across renders, update quad count each frame, zero quads after scene.clear(). Pure Rust — no Metal deps, no new dev-deps. Uses Scene/Quad/DeviceRect already in scope."
+    "approach": "Tests: initial state, frame count increment, quad count recording, accumulation across frames."
   },
   "layout_tests_pr_2026_05_14": {
     "status": "SUBMITTED — PR #79 (branch repo-assist/improve-layout-tests)",
     "files_changed": [
       "crates/motif_core/src/layout.rs (5 new tests extending coverage from 7 to 12)"
     ],
-    "approach": "Tests cover: flex_row_gap (10px gap shifts second child to x=60), flex_grow (fill parent width=200), clear+reuse (engine.clear() then fresh layout), justify_content SpaceBetween (first at x=0, second at x=150 in 200px container), layout vs layout_bounds (relative vs absolute coords with asymmetric padding)."
+    "approach": "Tests cover: flex_row_gap, flex_grow, clear+reuse, justify_content SpaceBetween, layout vs layout_bounds."
   }
 }
