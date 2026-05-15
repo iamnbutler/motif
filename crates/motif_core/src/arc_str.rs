@@ -145,4 +145,66 @@ mod tests {
         let s = ArcStr::default();
         assert_eq!(s.as_str(), "");
     }
+
+    #[test]
+    fn new_constructor_creates_owned() {
+        let s = ArcStr::new("dynamic");
+        assert_eq!(s.as_str(), "dynamic");
+        assert!(matches!(s, ArcStr::Owned(_)));
+    }
+
+    #[test]
+    fn from_arc_str() {
+        let arc: Arc<str> = Arc::from("arc_backed");
+        let s = ArcStr::from(arc);
+        assert_eq!(s, "arc_backed");
+    }
+
+    #[test]
+    fn deref_to_str() {
+        let s = ArcStr::new_static("deref_me");
+        let r: &str = &*s;
+        assert_eq!(r, "deref_me");
+    }
+
+    #[test]
+    fn display_format() {
+        let s = ArcStr::new_static("display");
+        assert_eq!(format!("{s}"), "display");
+    }
+
+    #[test]
+    fn debug_format() {
+        let s = ArcStr::new_static("debug");
+        assert_eq!(format!("{s:?}"), "\"debug\"");
+    }
+
+    #[test]
+    fn ordering() {
+        let a = ArcStr::new_static("apple");
+        let b = ArcStr::new_static("banana");
+        assert!(a < b);
+        assert!(b > a);
+        assert_eq!(a.cmp(&a), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn static_and_owned_equal_same_content() {
+        let static_s = ArcStr::new_static("same");
+        let owned_s = ArcStr::from(String::from("same"));
+        assert_eq!(static_s, owned_s);
+    }
+
+    #[test]
+    fn eq_with_string() {
+        let s = ArcStr::new_static("hello");
+        assert_eq!(s, String::from("hello"));
+    }
+
+    #[test]
+    fn as_ref_str() {
+        let s = ArcStr::new_static("as_ref");
+        let r: &str = s.as_ref();
+        assert_eq!(r, "as_ref");
+    }
 }
