@@ -1,16 +1,16 @@
 {
-  "last_run": "2026-05-15T00:00:00Z",
-  "last_run_id": "25937772373",
+  "last_run": "2026-05-16T00:00:00Z",
+  "last_run_id": "25970943887",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-15",
+    "task_11_monthly_summary": "2026-05-16",
+    "task_10_forward": "2026-05-16",
     "task_3_improvements": "2026-05-15",
     "task_1_triage": "2026-05-15",
     "task_7_labels": "2026-05-15",
-    "task_10_forward": "2026-05-14",
     "task_5_maintain_prs": "2026-05-11",
     "task_4_deps": "2026-05-07",
     "task_9_welcome": "2026-05-05",
@@ -83,7 +83,8 @@
     "scene-tests": "pr-77-open",
     "renderer-tests": "pr-78-open",
     "layout-tests-extended": "pr-79-open",
-    "arc-str-tests": "pr-80-open"
+    "arc-str-tests": "pr-80-open",
+    "callbacks-tests": "pr-81-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -139,7 +140,8 @@
     "scene-rendering-primitives-tests",
     "renderer-debugrenderer-tests",
     "layout-tests-gap-flexgrow-clear-justifycontent-rawbounds",
-    "arc-str-comprehensive-tests"
+    "arc-str-comprehensive-tests",
+    "callbacks-registry-edge-case-tests"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -151,10 +153,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-15: Task 3: Added 10 unit tests to arc_str.rs — PR #80 (branch repo-assist/improve-arc-str-tests). Tests cover: new_constructor_creates_owned, from_arc_str (From<Arc<str>>), deref_to_str, display_format, debug_format, ordering (Ord/PartialOrd), static_and_owned_equal_same_content, eq_with_string (PartialEq<String>), as_ref_str (AsRef<str>). Coverage: 5 → 15 tests. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 1: Verified all open issues (#15, #48, #49, #51, #67) — no new human activity since last comments. Task 7: Verified labels on all 5 open issues — all appropriate. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest — no bug issues currently), task_6_stale_nudges (2026-05-05), task_8_release (2026-05-05), task_10_forward (2026-05-14). Test coverage status: arc_str.rs (15 tests), hit_tree.rs (24), context.rs (9), focus.rs (14), text_state.rs (many), layout.rs (12), scene.rs (pending PR #77, 19 tests), renderer.rs (pending PR #78, 6 tests), accessibility.rs (11+), geometry.rs (many + PR #76). Next improvement candidates: (a) callbacks.rs edge cases (AnyElement panic path, registry overwrite behavior); (b) context.rs nested clips; (c) view memoization design; (d) CONTRIBUTING.md — PR #17 closed, investigate why.",
+  "notes": "2026-05-16: Task 10: Added 7 unit tests to callbacks.rs — PR #81 (branch repo-assist/improve-callbacks-tests). Tests cover: dispatch_click_returns_true_for_registered, default_creates_empty_registry, on_click_overwrite_replaces_handler (HashMap insert semantics), handler_invokable_multiple_times, dispatch_after_clear_returns_false, dispatching_one_does_not_affect_others, has_click_handler_true_for_registered. Coverage: 4 → 11 tests. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest — no bug issues currently), task_1_triage (check for new activity on open issues), task_6_stale_nudges (2026-05-05), task_8_release (2026-05-05). Next improvement candidates: (a) element.rs / AnyElement edge cases; (b) context.rs nested clips tests; (c) bindings.rs — home/end with cmd modifier on non-macOS; (d) CONTRIBUTING.md — investigate PR #17 closure reason.",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -172,6 +174,13 @@
       "subsecond": "0.7.3"
     },
     "notes": "Verified 2026-05-07: still same versions as 2026-04-26 audit. No urgent updates needed."
+  },
+  "callbacks_tests_pr_2026_05_16": {
+    "status": "SUBMITTED — PR #81 (branch repo-assist/improve-callbacks-tests)",
+    "files_changed": [
+      "crates/motif_core/src/callbacks.rs (7 new tests in existing #[cfg(test)] mod tests block)"
+    ],
+    "approach": "Covers: dispatch returns true, Default::default() empty, on_click overwrite (HashMap insert semantics), handler persists across multiple dispatches, dispatch after clear returns false, dispatching one id doesn't affect others, has_click_handler explicit assertion."
   },
   "arc_str_tests_pr_2026_05_15": {
     "status": "SUBMITTED — PR #80 (branch repo-assist/improve-arc-str-tests)",
