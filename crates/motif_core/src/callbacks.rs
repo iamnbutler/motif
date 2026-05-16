@@ -113,4 +113,91 @@ mod tests {
         registry.dispatch_click(ElementId(2));
         assert_eq!(count.get(), 11);
     }
+
+    #[test]
+    fn dispatch_click_returns_true_for_registered() {
+        let mut registry = CallbackRegistry::new();
+        registry.on_click(ElementId(5), || {});
+        assert!(registry.dispatch_click(ElementId(5)));
+    }
+
+    #[test]
+    fn default_creates_empty_registry() {
+        let mut registry = CallbackRegistry::default();
+        assert!(!registry.has_click_handler(ElementId(0)));
+        assert!(!registry.dispatch_click(ElementId(0)));
+    }
+
+    #[test]
+    fn on_click_overwrite_replaces_handler() {
+        let mut registry = CallbackRegistry::new();
+        let first_called = Rc::new(Cell::new(false));
+        let second_called = Rc::new(Cell::new(false));
+
+        let f = first_called.clone();
+        registry.on_click(ElementId(1), move || f.set(true));
+
+        let s = second_called.clone();
+        // Register a second handler for the same id — should overwrite
+        registry.on_click(ElementId(1), move || s.set(true));
+
+        registry.dispatch_click(ElementId(1));
+
+        // Only the second handler should have been called
+        assert!(!first_called.get(), "first handler should be overwritten");
+        assert!(second_called.get(), "second handler should be called");
+    }
+
+    #[test]
+    fn handler_invokable_multiple_times() {
+        let mut registry = CallbackRegistry::new();
+        let count = Rc::new(Cell::new(0u32));
+
+        let c = count.clone();
+        registry.on_click(ElementId(7), move || c.set(c.get() + 1));
+
+        registry.dispatch_click(ElementId(7));
+        registry.dispatch_click(ElementId(7));
+        registry.dispatch_click(ElementId(7));
+
+        assert_eq!(count.get(), 3, "handler should be invokable multiple times");
+    }
+
+    #[test]
+    fn dispatch_after_clear_returns_false() {
+        let mut registry = CallbackRegistry::new();
+        registry.on_click(ElementId(3), || {});
+
+        assert!(registry.dispatch_click(ElementId(3)));
+        registry.clear();
+        assert!(!registry.dispatch_click(ElementId(3)));
+    }
+
+    #[test]
+    fn dispatching_one_does_not_affect_others() {
+        let mut registry = CallbackRegistry::new();
+        let a_count = Rc::new(Cell::new(0u32));
+        let b_count = Rc::new(Cell::new(0u32));
+
+        let a = a_count.clone();
+        registry.on_click(ElementId(10), move || a.set(a.get() + 1));
+
+        let b = b_count.clone();
+        registry.on_click(ElementId(11), move || b.set(b.get() + 1));
+
+        // Dispatch only element 10
+        registry.dispatch_click(ElementId(10));
+        registry.dispatch_click(ElementId(10));
+
+        assert_eq!(a_count.get(), 2);
+        assert_eq!(b_count.get(), 0, "element 11 should not be affected");
+    }
+
+    #[test]
+    fn has_click_handler_true_for_registered() {
+        let mut registry = CallbackRegistry::new();
+        assert!(!registry.has_click_handler(ElementId(99)));
+        registry.on_click(ElementId(99), || {});
+        assert!(registry.has_click_handler(ElementId(99)));
+    }
 }
