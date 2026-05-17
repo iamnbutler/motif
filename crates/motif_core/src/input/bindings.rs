@@ -464,4 +464,85 @@ mod tests {
             Some(InputAction::SelectEnd)
         );
     }
+
+    #[test]
+    fn home_end_with_cmd_moves_to_content_boundary() {
+        // Home+cmd → MoveToBeginning; End+cmd → MoveToEnd (Ctrl on non-macOS, Cmd on macOS)
+        let bindings = InputBindings::new();
+
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::Home), &cmd()),
+            Some(InputAction::MoveToBeginning)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::End), &cmd()),
+            Some(InputAction::MoveToEnd)
+        );
+    }
+
+    #[test]
+    fn home_end_shift_cmd_selects_to_content_boundary() {
+        // Home+shift+cmd → SelectToBeginning; End+shift+cmd → SelectToEnd
+        let bindings = InputBindings::new();
+
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::Home), &cmd_shift()),
+            Some(InputAction::SelectToBeginning)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::End), &cmd_shift()),
+            Some(InputAction::SelectToEnd)
+        );
+    }
+
+    #[test]
+    fn shift_word_navigation() {
+        // shift+word_mod+arrow → extend selection by word (Alt on macOS, Ctrl on others)
+        let bindings = InputBindings::new();
+
+        // Build shift+word_mod modifiers inline to be explicit about the platform key
+        #[cfg(target_os = "macos")]
+        let shift_word = mods(true, false, true, false); // shift+alt
+        #[cfg(not(target_os = "macos"))]
+        let shift_word = mods(true, true, false, false); // shift+ctrl
+
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowLeft), &shift_word),
+            Some(InputAction::SelectWordLeft)
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::ArrowRight), &shift_word),
+            Some(InputAction::SelectWordRight)
+        );
+    }
+
+    #[test]
+    fn unrecognized_named_key_returns_none() {
+        let bindings = InputBindings::new();
+
+        // PageUp and PageDown are not mapped
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::PageUp), &no_mods()),
+            None
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Named(NamedKey::PageDown), &no_mods()),
+            None
+        );
+    }
+
+    #[test]
+    fn cmd_unknown_character_returns_none() {
+        // cmd+key with no mapping should return None
+        let bindings = InputBindings::new();
+
+        assert_eq!(
+            bindings.action_for_key(&Key::Character("q".into()), &cmd()),
+            None
+        );
+        assert_eq!(
+            bindings.action_for_key(&Key::Character("w".into()), &cmd()),
+            None
+        );
+    }
 }
