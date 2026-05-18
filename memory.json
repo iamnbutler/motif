@@ -1,14 +1,14 @@
 {
-  "last_run": "2026-05-16T00:00:00Z",
-  "last_run_id": "25970943887",
+  "last_run": "2026-05-18T00:00:00Z",
+  "last_run_id": "26056284540",
   "monthly_summary_issue": 67,
   "monthly_summary_month": "2026-05",
   "monthly_summary_march_closed": true,
   "monthly_summary_april_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-05-16",
-    "task_10_forward": "2026-05-16",
-    "task_3_improvements": "2026-05-15",
+    "task_11_monthly_summary": "2026-05-18",
+    "task_3_improvements": "2026-05-18",
+    "task_10_forward": "2026-05-18",
     "task_1_triage": "2026-05-15",
     "task_7_labels": "2026-05-15",
     "task_5_maintain_prs": "2026-05-11",
@@ -84,7 +84,9 @@
     "renderer-tests": "pr-78-open",
     "layout-tests-extended": "pr-79-open",
     "arc-str-tests": "pr-80-open",
-    "callbacks-tests": "pr-81-open"
+    "callbacks-tests": "pr-81-open",
+    "bindings-tests": "pr-82-open",
+    "geometry-constructors-tests": "pr-83-open"
   },
   "improvement_ideas_submitted": [
     "workspace-deps-consolidation",
@@ -141,7 +143,9 @@
     "renderer-debugrenderer-tests",
     "layout-tests-gap-flexgrow-clear-justifycontent-rawbounds",
     "arc-str-comprehensive-tests",
-    "callbacks-registry-edge-case-tests"
+    "callbacks-registry-edge-case-tests",
+    "bindings-cmd-home-end-shift-word-nav-tests",
+    "geometry-constructors-axis-scalefactor-tests"
   ],
   "issues_created": {
     "13": "fix doc name clash",
@@ -153,10 +157,10 @@
     "67": "monthly summary may 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-05-16: Task 10: Added 7 unit tests to callbacks.rs — PR #81 (branch repo-assist/improve-callbacks-tests). Tests cover: dispatch_click_returns_true_for_registered, default_creates_empty_registry, on_click_overwrite_replaces_handler (HashMap insert semantics), handler_invokable_multiple_times, dispatch_after_clear_returns_false, dispatching_one_does_not_affect_others, has_click_handler_true_for_registered. Coverage: 4 → 11 tests. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest — no bug issues currently), task_1_triage (check for new activity on open issues), task_6_stale_nudges (2026-05-05), task_8_release (2026-05-05). Next improvement candidates: (a) element.rs / AnyElement edge cases; (b) context.rs nested clips tests; (c) bindings.rs — home/end with cmd modifier on non-macOS; (d) CONTRIBUTING.md — investigate PR #17 closure reason.",
+  "notes": "2026-05-18: Task 3/10: Added 8 unit tests to geometry.rs covering previously untested constructors and utilities — PR #83 (branch repo-assist/improve-geometry-constructors-tests). Tests cover: Edges::all, Edges::symmetric, Corners::all, Corners::top_bottom, Axis::invert (Horizontal→Vertical and Vertical→Horizontal), ScaleFactor::scale_size, ScaleFactor::unscale_size. Coverage: 3 → 11 tests. Build fails on Linux due to known fontconfig infrastructure issue; should pass on macOS CI. Task 11: Updated May 2026 monthly summary issue #67. Next run priorities: task_2_fix_prs (2026-05-01 oldest), task_6_stale_nudges (no human PRs — skip), task_8_release (no merged PRs to release), task_9_welcome (no new contributors). Next improvement candidates: (a) button.rs — visual state paint tests (pressed/hovered bg color verification); (b) div.rs — children layout paint test; (c) text.rs elements — paint test with font size; (d) context.rs — nested clip bounds test.",
   "pr_merge_order_issue": "48",
   "pr_merge_order_updated": "2026-05-05",
-  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81],
+  "open_repo_assist_prs": [20, 21, 22, 25, 27, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
   "open_repo_assist_prs_pending": [],
   "prs_to_close": [20, 21],
   "priority_pr": 36,
@@ -175,6 +179,13 @@
     },
     "notes": "Verified 2026-05-07: still same versions as 2026-04-26 audit. No urgent updates needed."
   },
+  "geometry_constructors_tests_pr_2026_05_18": {
+    "status": "SUBMITTED — PR #83 (branch repo-assist/improve-geometry-constructors-tests)",
+    "files_changed": [
+      "crates/motif_core/src/geometry.rs (8 new tests in existing #[cfg(test)] mod tests block)"
+    ],
+    "approach": "Covers: Edges::all, Edges::symmetric, Corners::all, Corners::top_bottom, Axis::invert (both directions), ScaleFactor::scale_size, ScaleFactor::unscale_size."
+  },
   "callbacks_tests_pr_2026_05_16": {
     "status": "SUBMITTED — PR #81 (branch repo-assist/improve-callbacks-tests)",
     "files_changed": [
@@ -188,35 +199,5 @@
       "crates/motif_core/src/arc_str.rs (10 new tests in existing #[cfg(test)] mod tests block)"
     ],
     "approach": "Covers: new() creates Owned variant, From<Arc<str>>, Deref to &str, Display format, Debug format (quoted), Ord/PartialOrd lexicographic, Static==Owned same content, PartialEq<String>, AsRef<str>."
-  },
-  "geometry_edges_rect_utils_pr_2026_05_11": {
-    "status": "SUBMITTED — PR #76 (branch repo-assist/improve-geometry-edges-rect-utils)",
-    "files_changed": [
-      "crates/motif_core/src/geometry.rs (impl Edges<f32> with inset_rect/expand_rect + 7 TDD tests)"
-    ],
-    "approach": "inset_rect shrinks Rect by edge values; expand_rect grows Rect by edge values. Tests: uniform, asymmetric, offset-origin, clamp-to-zero, expand-uniform, expand-asymmetric, roundtrip."
-  },
-  "scene_tests_pr_2026_05_12": {
-    "status": "SUBMITTED — PR #77 (branch repo-assist/improve-scene-tests)",
-    "files_changed": [
-      "crates/motif_core/src/scene.rs (19 unit tests: 5 Quad, 5 TextRun, 9 Scene)",
-      "crates/motif_core/Cargo.toml (added linebender_resource_handle dev-dep)",
-      "Cargo.lock (updated dep graph)"
-    ],
-    "approach": "Tests cover Quad/TextRun constructors, Scene push/clear/count operations."
-  },
-  "renderer_tests_pr_2026_05_13": {
-    "status": "SUBMITTED — PR #78 (branch repo-assist/improve-renderer-tests)",
-    "files_changed": [
-      "crates/motif_core/src/renderer.rs (6 unit tests for DebugRenderer)"
-    ],
-    "approach": "Tests: initial state, frame count increment, quad count recording, accumulation across frames."
-  },
-  "layout_tests_pr_2026_05_14": {
-    "status": "SUBMITTED — PR #79 (branch repo-assist/improve-layout-tests)",
-    "files_changed": [
-      "crates/motif_core/src/layout.rs (5 new tests extending coverage from 7 to 12)"
-    ],
-    "approach": "Tests cover: flex_row_gap, flex_grow, clear+reuse, justify_content SpaceBetween, layout vs layout_bounds."
   }
 }
