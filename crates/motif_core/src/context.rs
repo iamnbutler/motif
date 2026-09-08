@@ -53,9 +53,33 @@ impl<'a> DrawContext<'a> {
         id
     }
 
-    /// Current offset (sum of all pushed offsets).
-    fn current_offset(&self) -> Point {
+    /// Current accumulated offset (sum of all pushed offsets).
+    ///
+    /// Useful when computing absolute positions for elements like tooltips or
+    /// overlays that need to know where they are in window-space.
+    pub fn current_offset(&self) -> Point {
         self.offset_stack.last().copied().unwrap_or_default()
+    }
+
+    /// Current clip region in logical pixels, if any clip is active.
+    ///
+    /// Returns the innermost active clip rect (already transformed by the
+    /// accumulated offset at the time `with_clip` was called). Returns `None`
+    /// when no clip is active.
+    ///
+    /// Useful for culling: an element can skip expensive painting if its bounds
+    /// don't intersect the current clip.
+    pub fn current_clip(&self) -> Option<Rect> {
+        self.clip_stack.last().copied()
+    }
+
+    /// The display scale factor (logical → device pixels).
+    ///
+    /// Useful for making scale-dependent rendering decisions, e.g. choosing
+    /// between a 1× and 2× asset, or snapping geometry to the physical pixel
+    /// grid.
+    pub fn scale_factor(&self) -> ScaleFactor {
+        self.scale_factor
     }
 
     /// Execute closure with additional offset applied.
@@ -406,5 +430,128 @@ mod tests {
         );
 
         assert!(scene.text_run_count() > 0);
+    }
+
+    // --- Accessor method tests ---
+
+    #[test]
+    fn scale_factor_accessor_returns_constructed_value() {
+        let mut scene = Scene::new();
+        let cx = DrawContext::new(&mut scene, ScaleFactor(2.0));
+        assert_eq!(cx.scale_factor(), ScaleFactor(2.0));
+    }
+
+    #[test]
+    fn scale_factor_accessor_retina() {
+        let mut scene = Scene::new();
+        let cx = DrawContext::new(&mut scene, ScaleFactor(3.0));
+        assert_eq!(cx.scale_factor().0, 3.0);
+    }
+
+    #[test]
+    fn current_offset_at_root_is_zero() {
+        let mut scene = Scene::new();
+        let cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+        let offset = cx.current_offset();
+        assert_eq!(offset.x, 0.0);
+        assert_eq!(offset.y, 0.0);
+    }
+
+    #[test]
+    fn current_offset_reflects_active_with_offset() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        cx.with_offset(Point::new(40.0, 80.0), |cx| {
+            let offset = cx.current_offset();
+            assert_eq!(offset.x, 40.0);
+            assert_eq!(offset.y, 80.0);
+        });
+    }
+
+    #[test]
+    fn current_offset_accumulates_nested_offsets() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        cx.with_offset(Point::new(10.0, 20.0), |cx| {
+            cx.with_offset(Point::new(5.0, 3.0), |cx| {
+                let offset = cx.current_offset();
+                assert_eq!(offset.x, 15.0); // 10 + 5
+                assert_eq!(offset.y, 23.0); // 20 + 3
+            });
+        });
+    }
+
+    #[test]
+    fn current_offset_restored_after_with_offset() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        cx.with_offset(Point::new(100.0, 200.0), |_cx| {
+            // inside the block, offset is 100,200
+        });
+
+        // After the block, offset is back to zero
+        let offset = cx.current_offset();
+        assert_eq!(offset.x, 0.0);
+        assert_eq!(offset.y, 0.0);
+    }
+
+    #[test]
+    fn current_clip_none_when_no_clip_active() {
+        let mut scene = Scene::new();
+        let cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+        assert!(cx.current_clip().is_none());
+    }
+
+    #[test]
+    fn current_clip_returns_active_clip() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        let clip_rect = Rect::new(Point::new(10.0, 20.0), Size::new(100.0, 50.0));
+        cx.with_clip(clip_rect, |cx| {
+            let active = cx.current_clip().expect("clip should be active");
+            assert_eq!(active.origin.x, 10.0);
+            assert_eq!(active.origin.y, 20.0);
+            assert_eq!(active.size.width, 100.0);
+            assert_eq!(active.size.height, 50.0);
+        });
+    }
+
+    #[test]
+    fn current_clip_restored_after_with_clip() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        cx.with_clip(
+            Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 200.0)),
+            |_cx| {},
+        );
+
+        // After the block, clip is gone
+        assert!(cx.current_clip().is_none());
+    }
+
+    #[test]
+    fn current_clip_transformed_by_active_offset() {
+        let mut scene = Scene::new();
+        let mut cx = DrawContext::new(&mut scene, ScaleFactor(1.0));
+
+        // Push offset (50, 30), then push clip at (0, 0)
+        cx.with_offset(Point::new(50.0, 30.0), |cx| {
+            cx.with_clip(
+                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 80.0)),
+                |cx| {
+                    let active = cx.current_clip().expect("clip should be active");
+                    // with_clip applies the offset to the clip rect origin
+                    assert_eq!(active.origin.x, 50.0);
+                    assert_eq!(active.origin.y, 30.0);
+                    assert_eq!(active.size.width, 100.0);
+                    assert_eq!(active.size.height, 80.0);
+                },
+            );
+        });
     }
 }
