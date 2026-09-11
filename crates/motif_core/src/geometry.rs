@@ -125,6 +125,22 @@ impl<T: Copy> Corners<T> {
             bottom_right: bottom,
         }
     }
+
+    /// Creates `Corners` with diagonal symmetry: `main_diagonal` applies to
+    /// `top_left` and `bottom_right`; `anti_diagonal` applies to `top_right`
+    /// and `bottom_left`.
+    ///
+    /// Complements [`Corners::top_bottom`] (row symmetry) and
+    /// [`Corners::all`] (uniform). Useful for asymmetric corner radius patterns
+    /// where opposing corners along each diagonal share a value.
+    pub fn diagonal(main_diagonal: T, anti_diagonal: T) -> Self {
+        Self {
+            top_left: main_diagonal,
+            bottom_right: main_diagonal,
+            top_right: anti_diagonal,
+            bottom_left: anti_diagonal,
+        }
+    }
 }
 
 /// Axis in 2D space.
@@ -179,5 +195,35 @@ mod tests {
         };
         assert_eq!(edges.horizontal(), 6.0); // 4 + 2
         assert_eq!(edges.vertical(), 4.0); // 1 + 3
+    }
+
+    #[test]
+    fn corners_diagonal_main_applies_to_top_left_and_bottom_right() {
+        let c = Corners::diagonal(8.0_f32, 2.0_f32);
+        assert_eq!(c.top_left, 8.0);
+        assert_eq!(c.bottom_right, 8.0);
+    }
+
+    #[test]
+    fn corners_diagonal_anti_applies_to_top_right_and_bottom_left() {
+        let c = Corners::diagonal(8.0_f32, 2.0_f32);
+        assert_eq!(c.top_right, 2.0);
+        assert_eq!(c.bottom_left, 2.0);
+    }
+
+    #[test]
+    fn corners_diagonal_uniform_equals_all() {
+        let by_diagonal: Corners<f32> = Corners::diagonal(5.0, 5.0);
+        let by_all: Corners<f32> = Corners::all(5.0);
+        assert_eq!(by_diagonal, by_all);
+    }
+
+    #[test]
+    fn corners_diagonal_with_integer_type() {
+        let c = Corners::diagonal(10_u32, 3_u32);
+        assert_eq!(c.top_left, 10);
+        assert_eq!(c.bottom_right, 10);
+        assert_eq!(c.top_right, 3);
+        assert_eq!(c.bottom_left, 3);
     }
 }
