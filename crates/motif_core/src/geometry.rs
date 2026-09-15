@@ -98,6 +98,46 @@ impl<T: Copy + std::ops::Add<Output = T>> Edges<T> {
     }
 }
 
+impl<T: std::ops::Add<Output = T>> std::ops::Add for Edges<T> {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self {
+            top: self.top + rhs.top,
+            right: self.right + rhs.right,
+            bottom: self.bottom + rhs.bottom,
+            left: self.left + rhs.left,
+        }
+    }
+}
+
+impl<T: std::ops::Sub<Output = T>> std::ops::Sub for Edges<T> {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self {
+            top: self.top - rhs.top,
+            right: self.right - rhs.right,
+            bottom: self.bottom - rhs.bottom,
+            left: self.left - rhs.left,
+        }
+    }
+}
+
+impl<T, S> std::ops::Mul<S> for Edges<T>
+where
+    T: std::ops::Mul<S, Output = T>,
+    S: Copy,
+{
+    type Output = Self;
+    fn mul(self, rhs: S) -> Self {
+        Self {
+            top: self.top * rhs,
+            right: self.right * rhs,
+            bottom: self.bottom * rhs,
+            left: self.left * rhs,
+        }
+    }
+}
+
 /// Corner values for border radii.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Corners<T> {
@@ -123,6 +163,46 @@ impl<T: Copy> Corners<T> {
             top_right: top,
             bottom_left: bottom,
             bottom_right: bottom,
+        }
+    }
+}
+
+impl<T: std::ops::Add<Output = T>> std::ops::Add for Corners<T> {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self {
+            top_left: self.top_left + rhs.top_left,
+            top_right: self.top_right + rhs.top_right,
+            bottom_right: self.bottom_right + rhs.bottom_right,
+            bottom_left: self.bottom_left + rhs.bottom_left,
+        }
+    }
+}
+
+impl<T: std::ops::Sub<Output = T>> std::ops::Sub for Corners<T> {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self {
+            top_left: self.top_left - rhs.top_left,
+            top_right: self.top_right - rhs.top_right,
+            bottom_right: self.bottom_right - rhs.bottom_right,
+            bottom_left: self.bottom_left - rhs.bottom_left,
+        }
+    }
+}
+
+impl<T, S> std::ops::Mul<S> for Corners<T>
+where
+    T: std::ops::Mul<S, Output = T>,
+    S: Copy,
+{
+    type Output = Self;
+    fn mul(self, rhs: S) -> Self {
+        Self {
+            top_left: self.top_left * rhs,
+            top_right: self.top_right * rhs,
+            bottom_right: self.bottom_right * rhs,
+            bottom_left: self.bottom_left * rhs,
         }
     }
 }
@@ -179,5 +259,149 @@ mod tests {
         };
         assert_eq!(edges.horizontal(), 6.0); // 4 + 2
         assert_eq!(edges.vertical(), 4.0); // 1 + 3
+    }
+
+    #[test]
+    fn edges_add() {
+        let a = Edges {
+            top: 1.0_f32,
+            right: 2.0,
+            bottom: 3.0,
+            left: 4.0,
+        };
+        let b = Edges {
+            top: 10.0,
+            right: 20.0,
+            bottom: 30.0,
+            left: 40.0,
+        };
+        let c = a + b;
+        assert_eq!(
+            c,
+            Edges {
+                top: 11.0,
+                right: 22.0,
+                bottom: 33.0,
+                left: 44.0
+            }
+        );
+    }
+
+    #[test]
+    fn edges_sub() {
+        let a = Edges {
+            top: 10.0_f32,
+            right: 20.0,
+            bottom: 30.0,
+            left: 40.0,
+        };
+        let b = Edges {
+            top: 1.0,
+            right: 2.0,
+            bottom: 3.0,
+            left: 4.0,
+        };
+        let c = a - b;
+        assert_eq!(
+            c,
+            Edges {
+                top: 9.0,
+                right: 18.0,
+                bottom: 27.0,
+                left: 36.0
+            }
+        );
+    }
+
+    #[test]
+    fn edges_mul_scalar() {
+        let a = Edges {
+            top: 1.0_f32,
+            right: 2.0,
+            bottom: 3.0,
+            left: 4.0,
+        };
+        let b = a * 2.0_f32;
+        assert_eq!(
+            b,
+            Edges {
+                top: 2.0,
+                right: 4.0,
+                bottom: 6.0,
+                left: 8.0
+            }
+        );
+    }
+
+    #[test]
+    fn corners_add() {
+        let a = Corners {
+            top_left: 1.0_f32,
+            top_right: 2.0,
+            bottom_right: 3.0,
+            bottom_left: 4.0,
+        };
+        let b = Corners {
+            top_left: 10.0,
+            top_right: 20.0,
+            bottom_right: 30.0,
+            bottom_left: 40.0,
+        };
+        let c = a + b;
+        assert_eq!(
+            c,
+            Corners {
+                top_left: 11.0,
+                top_right: 22.0,
+                bottom_right: 33.0,
+                bottom_left: 44.0
+            }
+        );
+    }
+
+    #[test]
+    fn corners_sub() {
+        let a = Corners {
+            top_left: 10.0_f32,
+            top_right: 20.0,
+            bottom_right: 30.0,
+            bottom_left: 40.0,
+        };
+        let b = Corners {
+            top_left: 1.0,
+            top_right: 2.0,
+            bottom_right: 3.0,
+            bottom_left: 4.0,
+        };
+        let c = a - b;
+        assert_eq!(
+            c,
+            Corners {
+                top_left: 9.0,
+                top_right: 18.0,
+                bottom_right: 27.0,
+                bottom_left: 36.0
+            }
+        );
+    }
+
+    #[test]
+    fn corners_mul_scalar() {
+        let a = Corners {
+            top_left: 1.0_f32,
+            top_right: 2.0,
+            bottom_right: 3.0,
+            bottom_left: 4.0,
+        };
+        let b = a * 3.0_f32;
+        assert_eq!(
+            b,
+            Corners {
+                top_left: 3.0,
+                top_right: 6.0,
+                bottom_right: 9.0,
+                bottom_left: 12.0
+            }
+        );
     }
 }
