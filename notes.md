@@ -1,12 +1,12 @@
 # Repo Assist Memory — iamnbutler/motif
 
 ## Last Updated
-2026-09-06
+2026-09-15
 
 ## Repository State
 - Main branch: `57a5ad8` (feat(ci): add release workflow and version bump helper) — unchanged since March 2026
 - No tags/releases exist (version: 0.0.1)
-- 71 open Repo Assist draft PRs (including new PR #118)
+- 82 open Repo Assist draft PRs (including new PR #130)
 - 13 open issues (all have Repo Assist comments)
 - No human-authored PRs or recent human activity
 
@@ -33,6 +33,8 @@ All 13 open issues have at least one Repo Assist comment. Do not re-engage unles
 - PR cursor: all 69 PRs from Repo Assist, no human PRs to nudge
 
 ## Round-Robin Task History
+- 2026-09-15: Tasks 1, 10, 11
+- 2026-09-13: Tasks 4, 5, 11
 - 2026-09-06: Tasks 10, 11
 - 2026-09-03: Tasks 3, 11
 - 2026-08-31: Tasks 5, 10, 11
@@ -141,9 +143,18 @@ All 13 open issues have at least one Repo Assist comment. Do not re-engage unles
 - Then close issues #101, #102, #104, #105, #106, #107
 
 ## Future Improvement Ideas
-- `Corners::diagonal(tl_br, tr_bl)` — split corners along diagonals for visual effect patterns
+- `PointExt`/`SizeExt` extension traits — `snap_to_pixel()`, `area()`, `max_dimension()` for glamour type aliases
+- `Corners::diagonal(tl_br, tr_bl)` done in PR #127
 - `Edges::new()` / `Corners::new()` done in PR #116
 - `Edges::axial()` / `Corners::left_right()` done in PR #118
+- `Edges/Corners::Add/Sub/Mul` done in PR #130
+
+## Edges/Corners Arithmetic Added (2026-09-15)
+- **PR #130**: Added `Add`, `Sub`, `Mul<S>` trait impls to `Edges<T>` and `Corners<T>`:
+  - `Add`/`Sub` require only `T: Add/Sub<Output=T>` (no Copy bound — consume both operands)
+  - `Mul<S>` requires `T: Mul<S,Output=T>` and `S: Copy` — scalar multiplication
+  - Useful for combining padding+inset, scaling radii for hover states, etc.
+  - 6 new unit tests; fmt passes; Linux fontconfig infra failure expected
 
 ## Geometry Axial Constructors Added (2026-09-06)
 - **PR #118**: Added `Edges::axial(horizontal, vertical)` and `Corners::left_right(left, right)`:

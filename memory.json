@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-09-06T00:00:00Z",
-  "last_run_id": "34060521202",
+  "last_run": "2026-09-15T00:00:00Z",
+  "last_run_id": "35029445316",
   "monthly_summary_issue": "sep-2026-aw_sep26",
   "monthly_summary_month": "2026-09",
   "monthly_summary_august_closed": true,
@@ -10,11 +10,11 @@
   "monthly_summary_april_closed": true,
   "monthly_summary_may_closed": true,
   "tasks_run_last": {
-    "task_11_monthly_summary": "2026-09-06",
-    "task_10_forward": "2026-09-06",
-    "task_5_maintain_prs": "2026-08-31",
+    "task_11_monthly_summary": "2026-09-15",
+    "task_10_forward": "2026-09-15",
+    "task_1_triage": "2026-09-15",
+    "task_5_maintain_prs": "2026-09-13",
     "task_3_improvements": "2026-09-03",
-    "task_1_triage": "2026-08-30",
     "task_7_labels": "2026-08-30",
     "task_6_stale_nudges": "2026-08-22",
     "task_9_welcome": "2026-08-22",
@@ -123,7 +123,8 @@
     "color-helpers": "pr-115-open",
     "geometry-constructors": "pr-116-open",
     "geometry-axial-constructors": "pr-118-open",
-    "bench-ci-jsonl": "issue-101-push-failed-6-attempts-workflow-scope-required"
+    "bench-ci-jsonl": "issue-101-push-failed-6-attempts-workflow-scope-required",
+    "edges-corners-arithmetic": "pr-130-open"
   },
   "issues_created": {
     "48": "PR backlog merge order",
@@ -141,10 +142,10 @@
     "103": "monthly summary august 2026 - OPEN"
   },
   "backlog_cursor": null,
-  "notes": "2026-09-06: Tasks 10, 11 run. Task 10: Created PR #118 Edges::axial()/Corners::left_right() constructors - 4 tests - fmt passes, full build needs macOS. Task 11: Updated September monthly summary #117. No human activity detected. Task 4 (deps) next check: 2026-09-07 (TOMORROW - run next). Next priority tasks: 4 (deps - due tomorrow), 5 (maintain PRs), 1 (triage), 7 (labels).",
+  "notes": "2026-09-15: Tasks 1, 10, 11 run. Task 10: Created PR #130 Edges/Corners Add+Sub+Mul arithmetic ops - 6 tests - fmt passes, Linux fontconfig infra failure (expected). Task 1: All 13 issues have RA comments, no new human activity. Task 11: Updated Sep monthly summary #117. Dep audit done 2026-09-13 (PR #128 current). Issue #48 updated 2026-09-14 (81 PRs). Next priority tasks: 7 (labels), 3 (improvements), 5 (maintain PRs).",
   "pr_merge_order_issue": "48",
-  "pr_merge_order_updated": "2026-08-31",
-  "open_repo_assist_prs": [20,21,22,25,27,36,37,38,39,40,41,42,43,44,45,46,47,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,96,97,99,100,108,109,110,111,112,113,114,115,116,118],
+  "pr_merge_order_updated": "2026-09-14",
+  "open_repo_assist_prs": [20,21,22,25,27,36,37,38,39,40,41,42,43,44,45,46,47,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,96,97,99,100,108,109,110,111,112,113,114,115,116,118,119,121,122,123,124,125,126,127,128,129,130],
   "mergeability_verified": {
     "date": "2026-08-25",
     "clean": [36, 41, 58],
