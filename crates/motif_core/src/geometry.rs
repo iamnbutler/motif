@@ -28,6 +28,62 @@ pub type DevicePoint = glamour::Point2<DevicePixels>;
 pub type DeviceSize = glamour::Size2<DevicePixels>;
 pub type DeviceRect = glamour::Rect<DevicePixels>;
 
+/// Extension methods on `Point` and `DevicePoint`.
+pub trait PointExt {
+    /// Round both coordinates to the nearest pixel boundary.
+    fn snap_to_pixel(self) -> Self;
+}
+
+impl PointExt for Point {
+    fn snap_to_pixel(self) -> Self {
+        Point::new(self.x.round(), self.y.round())
+    }
+}
+
+impl PointExt for DevicePoint {
+    fn snap_to_pixel(self) -> Self {
+        DevicePoint::new(self.x.round(), self.y.round())
+    }
+}
+
+/// Extension methods on `Size` and `DeviceSize`.
+pub trait SizeExt {
+    /// Area of the size (width × height).
+    fn area(&self) -> f32;
+    /// The larger of width and height.
+    fn max_dimension(&self) -> f32;
+    /// Round both dimensions to the nearest pixel boundary.
+    fn snap_to_pixel(self) -> Self;
+}
+
+impl SizeExt for Size {
+    fn area(&self) -> f32 {
+        self.width * self.height
+    }
+
+    fn max_dimension(&self) -> f32 {
+        self.width.max(self.height)
+    }
+
+    fn snap_to_pixel(self) -> Self {
+        Size::new(self.width.round(), self.height.round())
+    }
+}
+
+impl SizeExt for DeviceSize {
+    fn area(&self) -> f32 {
+        self.width * self.height
+    }
+
+    fn max_dimension(&self) -> f32 {
+        self.width.max(self.height)
+    }
+
+    fn snap_to_pixel(self) -> Self {
+        DeviceSize::new(self.width.round(), self.height.round())
+    }
+}
+
 /// Scale factor for converting between logical and device pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScaleFactor(pub f32);
@@ -167,6 +223,54 @@ mod tests {
         assert_eq!(original.origin.y, back.origin.y);
         assert_eq!(original.size.width, back.size.width);
         assert_eq!(original.size.height, back.size.height);
+    }
+
+    #[test]
+    fn point_snap_to_pixel_rounds() {
+        let p = Point::new(1.4, 2.7);
+        let snapped = p.snap_to_pixel();
+        assert_eq!(snapped.x, 1.0);
+        assert_eq!(snapped.y, 3.0);
+    }
+
+    #[test]
+    fn device_point_snap_to_pixel() {
+        let p = DevicePoint::new(3.5, 4.3);
+        let snapped = p.snap_to_pixel();
+        assert_eq!(snapped.x, 4.0);
+        assert_eq!(snapped.y, 4.0);
+    }
+
+    #[test]
+    fn size_area() {
+        let s = Size::new(4.0, 5.0);
+        assert_eq!(s.area(), 20.0);
+    }
+
+    #[test]
+    fn size_max_dimension_width_larger() {
+        let s = Size::new(8.0, 3.0);
+        assert_eq!(s.max_dimension(), 8.0);
+    }
+
+    #[test]
+    fn size_max_dimension_height_larger() {
+        let s = Size::new(3.0, 7.0);
+        assert_eq!(s.max_dimension(), 7.0);
+    }
+
+    #[test]
+    fn size_snap_to_pixel_rounds() {
+        let s = Size::new(2.3, 5.9);
+        let snapped = s.snap_to_pixel();
+        assert_eq!(snapped.width, 2.0);
+        assert_eq!(snapped.height, 6.0);
+    }
+
+    #[test]
+    fn device_size_area() {
+        let s = DeviceSize::new(3.0, 4.0);
+        assert_eq!(s.area(), 12.0);
     }
 
     #[test]
