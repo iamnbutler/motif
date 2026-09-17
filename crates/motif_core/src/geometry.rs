@@ -27,6 +27,7 @@ pub type Vector = glamour::Vector2<LogicalPixels>;
 pub type DevicePoint = glamour::Point2<DevicePixels>;
 pub type DeviceSize = glamour::Size2<DevicePixels>;
 pub type DeviceRect = glamour::Rect<DevicePixels>;
+pub type DeviceVector = glamour::Vector2<DevicePixels>;
 
 /// Scale factor for converting between logical and device pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -55,6 +56,26 @@ impl ScaleFactor {
 
     pub fn unscale_rect(&self, r: DeviceRect) -> Rect {
         Rect::new(self.unscale_point(r.origin), self.unscale_size(r.size))
+    }
+
+    /// Scale a logical [`Vector`] to device pixels.
+    pub fn scale_vector(&self, v: Vector) -> DeviceVector {
+        DeviceVector::new(v.x * self.0, v.y * self.0)
+    }
+
+    /// Unscale a device [`DeviceVector`] back to logical pixels.
+    pub fn unscale_vector(&self, v: DeviceVector) -> Vector {
+        Vector::new(v.x / self.0, v.y / self.0)
+    }
+
+    /// Return the inner scale value as `f32`.
+    pub fn as_f32(&self) -> f32 {
+        self.0
+    }
+
+    /// Return `true` if this scale factor is exactly `1.0` (no scaling).
+    pub fn is_identity(&self) -> bool {
+        self.0 == 1.0
     }
 }
 
@@ -155,6 +176,31 @@ mod tests {
         let back = scale.unscale_point(scaled);
         assert_eq!(original.x, back.x);
         assert_eq!(original.y, back.y);
+    }
+
+    #[test]
+    fn scale_factor_vector_roundtrip() {
+        let scale = ScaleFactor(2.0);
+        let v = Vector::new(3.0, 4.0);
+        let scaled = scale.scale_vector(v);
+        assert_eq!(scaled.x, 6.0);
+        assert_eq!(scaled.y, 8.0);
+        let back = scale.unscale_vector(scaled);
+        assert_eq!(back.x, 3.0);
+        assert_eq!(back.y, 4.0);
+    }
+
+    #[test]
+    fn scale_factor_as_f32() {
+        let scale = ScaleFactor(1.5);
+        assert_eq!(scale.as_f32(), 1.5);
+    }
+
+    #[test]
+    fn scale_factor_is_identity() {
+        assert!(ScaleFactor(1.0).is_identity());
+        assert!(!ScaleFactor(2.0).is_identity());
+        assert!(!ScaleFactor(0.5).is_identity());
     }
 
     #[test]
