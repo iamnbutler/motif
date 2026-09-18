@@ -127,6 +127,43 @@ impl<T: Copy> Corners<T> {
     }
 }
 
+/// Linear interpolation between two `f32` values.
+///
+/// Returns `a` when `t = 0.0`, `b` when `t = 1.0`, and a blend in between.
+/// `t` is not clamped — callers may pass values outside `[0.0, 1.0]` to
+/// extrapolate.
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+/// Linearly interpolate between two [`Point`] values component-wise.
+pub fn lerp_point(a: Point, b: Point, t: f32) -> Point {
+    Point::new(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
+}
+
+/// Linearly interpolate between two [`DevicePoint`] values component-wise.
+pub fn lerp_device_point(a: DevicePoint, b: DevicePoint, t: f32) -> DevicePoint {
+    DevicePoint::new(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
+}
+
+/// Linearly interpolate between two [`Size`] values component-wise.
+pub fn lerp_size(a: Size, b: Size, t: f32) -> Size {
+    Size::new(lerp(a.width, b.width, t), lerp(a.height, b.height, t))
+}
+
+/// Linearly interpolate between two [`DeviceSize`] values component-wise.
+pub fn lerp_device_size(a: DeviceSize, b: DeviceSize, t: f32) -> DeviceSize {
+    DeviceSize::new(lerp(a.width, b.width, t), lerp(a.height, b.height, t))
+}
+
+/// Linearly interpolate between two [`Rect`] values (origin and size both lerped).
+pub fn lerp_rect(a: Rect, b: Rect, t: f32) -> Rect {
+    Rect::new(
+        lerp_point(a.origin, b.origin, t),
+        lerp_size(a.size, b.size, t),
+    )
+}
+
 /// Axis in 2D space.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Axis {
@@ -167,6 +204,83 @@ mod tests {
         assert_eq!(original.origin.y, back.origin.y);
         assert_eq!(original.size.width, back.size.width);
         assert_eq!(original.size.height, back.size.height);
+    }
+
+    #[test]
+    fn lerp_midpoint() {
+        assert_eq!(lerp(0.0, 10.0, 0.5), 5.0);
+    }
+
+    #[test]
+    fn lerp_endpoints() {
+        assert_eq!(lerp(3.0, 7.0, 0.0), 3.0);
+        assert_eq!(lerp(3.0, 7.0, 1.0), 7.0);
+    }
+
+    #[test]
+    fn lerp_point_midpoint() {
+        let a = Point::new(0.0, 0.0);
+        let b = Point::new(10.0, 20.0);
+        let mid = lerp_point(a, b, 0.5);
+        assert_eq!(mid.x, 5.0);
+        assert_eq!(mid.y, 10.0);
+    }
+
+    #[test]
+    fn lerp_point_at_endpoints() {
+        let a = Point::new(1.0, 2.0);
+        let b = Point::new(9.0, 8.0);
+        let at_zero = lerp_point(a, b, 0.0);
+        let at_one = lerp_point(a, b, 1.0);
+        assert_eq!(at_zero.x, 1.0);
+        assert_eq!(at_zero.y, 2.0);
+        assert_eq!(at_one.x, 9.0);
+        assert_eq!(at_one.y, 8.0);
+    }
+
+    #[test]
+    fn lerp_device_point_midpoint() {
+        let a = DevicePoint::new(0.0, 0.0);
+        let b = DevicePoint::new(4.0, 8.0);
+        let mid = lerp_device_point(a, b, 0.5);
+        assert_eq!(mid.x, 2.0);
+        assert_eq!(mid.y, 4.0);
+    }
+
+    #[test]
+    fn lerp_size_midpoint() {
+        let a = Size::new(0.0, 0.0);
+        let b = Size::new(100.0, 200.0);
+        let mid = lerp_size(a, b, 0.5);
+        assert_eq!(mid.width, 50.0);
+        assert_eq!(mid.height, 100.0);
+    }
+
+    #[test]
+    fn lerp_device_size_midpoint() {
+        let a = DeviceSize::new(10.0, 20.0);
+        let b = DeviceSize::new(30.0, 60.0);
+        let mid = lerp_device_size(a, b, 0.5);
+        assert_eq!(mid.width, 20.0);
+        assert_eq!(mid.height, 40.0);
+    }
+
+    #[test]
+    fn lerp_rect_midpoint() {
+        let a = Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0));
+        let b = Rect::new(Point::new(100.0, 100.0), Size::new(200.0, 200.0));
+        let mid = lerp_rect(a, b, 0.5);
+        assert_eq!(mid.origin.x, 50.0);
+        assert_eq!(mid.origin.y, 50.0);
+        assert_eq!(mid.size.width, 150.0);
+        assert_eq!(mid.size.height, 150.0);
+    }
+
+    #[test]
+    fn lerp_extrapolation() {
+        // t outside [0, 1] extrapolates beyond the range
+        assert_eq!(lerp(0.0, 10.0, 2.0), 20.0);
+        assert_eq!(lerp(0.0, 10.0, -1.0), -10.0);
     }
 
     #[test]
