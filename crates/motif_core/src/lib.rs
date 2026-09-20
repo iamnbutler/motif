@@ -1,4 +1,5 @@
 pub mod accessibility;
+pub mod animation;
 pub mod arc_str;
 pub mod callbacks;
 pub mod context;
@@ -17,6 +18,7 @@ pub mod text;
 pub mod metal;
 
 pub use accessibility::*;
+pub use animation::*;
 pub use arc_str::*;
 pub use callbacks::*;
 pub use context::*;
