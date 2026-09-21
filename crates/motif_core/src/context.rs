@@ -1,8 +1,8 @@
 //! DrawContext provides a painter's stack for building scenes.
 
 use crate::{
-    AccessId, AccessNode, AccessRole, AccessTree, DevicePoint, DeviceRect, Point, Quad, Rect,
-    ScaleFactor, Scene, Size, TextContext, TextRun,
+    AccessId, AccessNode, AccessRole, AccessTree, Corners, DevicePoint, DeviceRect, Point, Quad,
+    Rect, ScaleFactor, Scene, Size, TextContext, TextRun,
 };
 use palette::Srgba;
 
@@ -116,6 +116,26 @@ impl<'a> DrawContext<'a> {
         let offset = self.current_offset();
         let origin = Point::new(point.x + offset.x, point.y + offset.y);
         self.scale_factor.scale_point(origin)
+    }
+
+    /// Paint a filled circle.
+    ///
+    /// `center` and `radius` are in logical pixels. The circle is implemented as
+    /// a square quad whose `corner_radii` are all set to the device-scaled radius —
+    /// this produces a pixel-perfect circle when `width == height == 2 * radius`.
+    ///
+    /// Offset and clip are applied automatically, and coordinates are scaled to
+    /// device pixels using the current `ScaleFactor`.
+    pub fn paint_circle(&mut self, center: Point, radius: f32, fill: impl Into<Srgba>) {
+        let origin = Point::new(center.x - radius, center.y - radius);
+        let diameter = radius * 2.0;
+        let bounds = Rect::new(origin, Size::new(diameter, diameter));
+        let device_rect = self.to_device_rect(bounds);
+        let device_radius = radius * self.scale_factor.0;
+        let mut quad = Quad::new(device_rect, fill);
+        quad.corner_radii = Corners::all(device_radius);
+        self.apply_clip(&mut quad);
+        self.scene.push_quad(quad);
     }
 
     /// Paint text at the given position.
@@ -387,6 +407,63 @@ mod tests {
         assert_eq!(node.role, AccessRole::Label);
         assert_eq!(node.name, "Hello World");
         assert!(node.bounds.is_some(), "should have bounds");
+    }
+
+    #[test]
+    fn paint_circle_square_bounds() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.paint_circle(Point::new(50.0, 50.0), 20.0, Srgba::new(1.0, 0.0, 0.0, 1.0));
+
+        let quads = scene.quads();
+        assert_eq!(quads.len(), 1);
+        // origin = center - radius = (30, 30); size = diameter = (40, 40)
+        assert_eq!(quads[0].bounds.origin.x, 30.0);
+        assert_eq!(quads[0].bounds.origin.y, 30.0);
+        assert_eq!(quads[0].bounds.size.width, 40.0);
+        assert_eq!(quads[0].bounds.size.height, 40.0);
+        // corner radius equals the radius so all four corners form a circle
+        assert_eq!(quads[0].corner_radii.top_left, 20.0);
+        assert_eq!(quads[0].corner_radii.top_right, 20.0);
+        assert_eq!(quads[0].corner_radii.bottom_left, 20.0);
+        assert_eq!(quads[0].corner_radii.bottom_right, 20.0);
+    }
+
+    #[test]
+    fn paint_circle_scales_with_hidpi() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(2.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.paint_circle(Point::new(50.0, 50.0), 20.0, Srgba::new(1.0, 0.0, 0.0, 1.0));
+
+        let quads = scene.quads();
+        // At 2× DPI: origin (30,30)×2=(60,60); size 40×2=80; radius 20×2=40
+        assert_eq!(quads[0].bounds.origin.x, 60.0);
+        assert_eq!(quads[0].bounds.origin.y, 60.0);
+        assert_eq!(quads[0].bounds.size.width, 80.0);
+        assert_eq!(quads[0].bounds.size.height, 80.0);
+        assert_eq!(quads[0].corner_radii.top_left, 40.0);
+    }
+
+    #[test]
+    fn paint_circle_respects_offset() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_offset(Point::new(100.0, 0.0), |cx| {
+            cx.paint_circle(Point::new(0.0, 50.0), 10.0, Srgba::new(1.0, 0.0, 0.0, 1.0));
+        });
+
+        let quads = scene.quads();
+        // origin = (0-10 + 100, 50-10) = (90, 40)
+        assert_eq!(quads[0].bounds.origin.x, 90.0);
+        assert_eq!(quads[0].bounds.origin.y, 40.0);
+        assert_eq!(quads[0].bounds.size.width, 20.0);
+        assert_eq!(quads[0].bounds.size.height, 20.0);
     }
 
     #[test]
