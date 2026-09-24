@@ -13,6 +13,7 @@ pub struct DrawContext<'a> {
     scale_factor: ScaleFactor,
     offset_stack: Vec<Point>,
     clip_stack: Vec<Rect>,
+    alpha_stack: Vec<f32>,
     next_access_id: u64,
 }
 
@@ -24,6 +25,7 @@ impl<'a> DrawContext<'a> {
             scale_factor,
             offset_stack: vec![Point::new(0.0, 0.0)],
             clip_stack: Vec::new(),
+            alpha_stack: vec![1.0],
             next_access_id: 1,
         }
     }
@@ -42,6 +44,7 @@ impl<'a> DrawContext<'a> {
             scale_factor,
             offset_stack: vec![Point::new(0.0, 0.0)],
             clip_stack: Vec::new(),
+            alpha_stack: vec![1.0],
             next_access_id: 1,
         }
     }
@@ -56,6 +59,32 @@ impl<'a> DrawContext<'a> {
     /// Current offset (sum of all pushed offsets).
     fn current_offset(&self) -> Point {
         self.offset_stack.last().copied().unwrap_or_default()
+    }
+
+    /// Current alpha multiplier (product of all pushed opacities).
+    fn current_alpha(&self) -> f32 {
+        self.alpha_stack.last().copied().unwrap_or(1.0)
+    }
+
+    /// Execute closure with an additional alpha multiplier applied to all primitives painted within.
+    ///
+    /// Opacities nest by multiplication: outer `0.5` × inner `0.5` = effective `0.25`.
+    /// The `alpha` value is clamped to `[0.0, 1.0]` before multiplication.
+    /// After the closure returns, the previous alpha is restored.
+    ///
+    /// # Example
+    /// ```
+    /// // Paint a disabled button at 40% opacity
+    /// cx.with_opacity(0.4, |cx| {
+    ///     cx.paint_quad(bounds, fill_color);
+    /// });
+    /// ```
+    pub fn with_opacity<R>(&mut self, alpha: f32, f: impl FnOnce(&mut Self) -> R) -> R {
+        let current = self.current_alpha();
+        self.alpha_stack.push(current * alpha.clamp(0.0, 1.0));
+        let result = f(self);
+        self.alpha_stack.pop();
+        result
     }
 
     /// Execute closure with additional offset applied.
@@ -84,13 +113,21 @@ impl<'a> DrawContext<'a> {
 
     /// Paint a simple filled quad.
     pub fn paint_quad(&mut self, bounds: Rect, fill: impl Into<Srgba>) {
+        let mut fill = fill.into();
+        fill.alpha *= self.current_alpha();
         let mut quad = Quad::new(self.to_device_rect(bounds), fill);
         self.apply_clip(&mut quad);
         self.scene.push_quad(quad);
     }
 
     /// Paint a quad with full control.
+    ///
+    /// The current opacity stack is applied: `quad.background.alpha` and
+    /// `quad.border_color.alpha` are both multiplied by the effective alpha.
     pub fn paint(&mut self, mut quad: Quad) {
+        let alpha = self.current_alpha();
+        quad.background.alpha *= alpha;
+        quad.border_color.alpha *= alpha;
         self.apply_clip(&mut quad);
         self.scene.push_quad(quad);
     }
@@ -406,5 +443,130 @@ mod tests {
         );
 
         assert!(scene.text_run_count() > 0);
+    }
+
+    #[test]
+    fn with_opacity_applies_alpha_to_paint_quad() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_opacity(0.5, |cx| {
+            cx.paint_quad(
+                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
+        });
+
+        let quads = scene.quads();
+        assert_eq!(quads.len(), 1);
+        // Background alpha should be 1.0 * 0.5 = 0.5
+        assert!((quads[0].background.alpha - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn with_opacity_nested_multiplies() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_opacity(0.5, |cx| {
+            cx.with_opacity(0.5, |cx| {
+                cx.paint_quad(
+                    Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                    Srgba::new(1.0, 0.0, 0.0, 1.0),
+                );
+            });
+        });
+
+        let quads = scene.quads();
+        // Nested: 1.0 * 0.5 * 0.5 = 0.25
+        assert!((quads[0].background.alpha - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn with_opacity_full_opacity_no_change() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_opacity(1.0, |cx| {
+            cx.paint_quad(
+                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                Srgba::new(1.0, 0.0, 0.0, 0.8),
+            );
+        });
+
+        let quads = scene.quads();
+        // opacity 1.0 should not change the source alpha
+        assert!((quads[0].background.alpha - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn with_opacity_zero_makes_transparent() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_opacity(0.0, |cx| {
+            cx.paint_quad(
+                Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0)),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
+        });
+
+        let quads = scene.quads();
+        assert!((quads[0].background.alpha - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn with_opacity_restores_after_closure() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        cx.with_opacity(0.3, |cx| {
+            cx.paint_quad(
+                Rect::new(Point::new(0.0, 0.0), Size::new(10.0, 10.0)),
+                Srgba::new(1.0, 0.0, 0.0, 1.0),
+            );
+        });
+
+        // After closure, opacity should be restored to 1.0
+        cx.paint_quad(
+            Rect::new(Point::new(20.0, 0.0), Size::new(10.0, 10.0)),
+            Srgba::new(0.0, 1.0, 0.0, 1.0),
+        );
+
+        let quads = scene.quads();
+        assert_eq!(quads.len(), 2);
+        // First quad: 0.3
+        assert!((quads[0].background.alpha - 0.3).abs() < 1e-6);
+        // Second quad: full opacity
+        assert!((quads[1].background.alpha - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn with_opacity_applies_to_paint_border_color() {
+        use crate::{DevicePoint, DeviceRect, DeviceSize};
+
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+
+        let bounds_device =
+            DeviceRect::new(DevicePoint::new(0.0, 0.0), DeviceSize::new(100.0, 100.0));
+
+        let mut quad = Quad::new(bounds_device, Srgba::new(1.0, 0.0, 0.0, 1.0));
+        quad.border_color = Srgba::new(0.0, 0.0, 1.0, 1.0);
+
+        cx.with_opacity(0.6, |cx| {
+            cx.paint(quad);
+        });
+
+        let quads = scene.quads();
+        // Both background and border alpha should be scaled
+        assert!((quads[0].background.alpha - 0.6).abs() < 1e-6);
+        assert!((quads[0].border_color.alpha - 0.6).abs() < 1e-6);
     }
 }
