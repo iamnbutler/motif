@@ -118,6 +118,58 @@ impl<'a> DrawContext<'a> {
         self.scale_factor.scale_point(origin)
     }
 
+    /// Paint text centered within the given bounds.
+    ///
+    /// Centers the text both horizontally and vertically within `bounds`.
+    /// The baseline is positioned so the full text body (ascent + descent) is
+    /// centered in the rect. Text that overflows the bounds is not clipped.
+    ///
+    /// This is a convenience wrapper around [`paint_text`](DrawContext::paint_text) that
+    /// computes the centered position from the text metrics.
+    pub fn paint_text_centered(
+        &mut self,
+        text: &str,
+        bounds: Rect,
+        font_size: f32,
+        color: impl Into<Srgba>,
+        text_ctx: &mut TextContext,
+    ) {
+        // Layout at device resolution to get accurate pixel metrics.
+        let scaled_size = font_size * self.scale_factor.0;
+        let layout = text_ctx.layout_text(text, scaled_size);
+
+        let line_metrics = layout.line_metrics();
+        let first_line = line_metrics.first().copied();
+
+        // In parley's LineMetrics, ascent and descent are both positive values:
+        // ascent = distance above baseline, descent = distance below baseline.
+        let ascent = first_line.map(|m| m.ascent).unwrap_or(scaled_size * 0.8);
+        let descent = first_line.map(|m| m.descent).unwrap_or(scaled_size * 0.2);
+        let text_width_dev = layout.width();
+
+        let scale = self.scale_factor.0;
+
+        // Convert device pixel measurements back to logical coordinates.
+        let text_width = text_width_dev / scale;
+        let ascent_logical = ascent / scale;
+        let descent_logical = descent / scale;
+
+        // Horizontal: center-align text within bounds.
+        let x = bounds.origin.x + (bounds.size.width - text_width) / 2.0;
+
+        // Vertical: position baseline so the text body is vertically centered.
+        // Text spans [baseline - ascent, baseline + descent] in screen coords.
+        // Text center = baseline - ascent + (ascent + descent) / 2
+        //             = baseline - (ascent - descent) / 2.
+        // Setting text center equal to rect center:
+        //   rect_center = baseline - (ascent - descent) / 2
+        //   baseline = rect_center + (ascent - descent) / 2
+        let rect_center_y = bounds.origin.y + bounds.size.height / 2.0;
+        let baseline_y = rect_center_y + (ascent_logical - descent_logical) / 2.0;
+
+        self.paint_text(text, Point::new(x, baseline_y), font_size, color, text_ctx);
+    }
+
     /// Paint text at the given position.
     ///
     /// The position is the baseline origin (left side of first glyph baseline).
@@ -406,5 +458,140 @@ mod tests {
         );
 
         assert!(scene.text_run_count() > 0);
+    }
+
+    #[test]
+    fn paint_text_centered_creates_text_runs() {
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.paint_text_centered(
+            "Hello",
+            Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 60.0)),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0, "should create text runs");
+        let run = &scene.text_runs()[0];
+        assert!(!run.glyphs.is_empty(), "should have glyphs");
+    }
+
+    #[test]
+    fn paint_text_centered_x_within_left_half() {
+        // For a 200-wide rect, text should start in the left half (x <= 100).
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.paint_text_centered(
+            "Hi",
+            Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 50.0)),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0);
+        let run = &scene.text_runs()[0];
+        // Text x in device pixels at 1× scale — should be >= 0 (after left edge)
+        // and <= 100 (within the left half, since text occupies some width)
+        assert!(
+            run.origin.x >= 0.0,
+            "text should start at or after left edge"
+        );
+        assert!(
+            run.origin.x <= 100.0,
+            "text start should be in the left half of the 200px-wide rect"
+        );
+    }
+
+    #[test]
+    fn paint_text_centered_y_within_rect() {
+        // Baseline should land within the rect bounds.
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        cx.paint_text_centered(
+            "Hi",
+            Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 100.0)),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0);
+        let run = &scene.text_runs()[0];
+        // The text run origin is the top of the line (above the baseline).
+        // With a 100px-tall rect, the line top should be comfortably within [0, 100].
+        assert!(
+            run.origin.y >= 0.0,
+            "text top should be at or below rect top"
+        );
+        assert!(
+            run.origin.y <= 100.0,
+            "text top should be within rect height"
+        );
+    }
+
+    #[test]
+    fn paint_text_centered_with_rect_offset() {
+        // Centering should respect the rect origin, not just be relative to (0,0).
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(1.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        let rect_x = 50.0_f32;
+        cx.paint_text_centered(
+            "Hi",
+            Rect::new(Point::new(rect_x, 20.0), Size::new(200.0, 60.0)),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0);
+        let run = &scene.text_runs()[0];
+        // Text x should start at or after the rect left edge (50.0)
+        assert!(
+            run.origin.x >= rect_x,
+            "text should start at or after the rect left edge"
+        );
+    }
+
+    #[test]
+    fn paint_text_centered_hidpi_scale() {
+        // At 2× scale, device pixel positions are doubled.
+        let mut scene = Scene::new();
+        let scale = ScaleFactor(2.0);
+        let mut cx = DrawContext::new(&mut scene, scale);
+        let mut text_ctx = TextContext::new();
+
+        // Logical rect: 200×50 at origin.
+        // Device rect: 400×100 at origin.
+        cx.paint_text_centered(
+            "Hi",
+            Rect::new(Point::new(0.0, 0.0), Size::new(200.0, 50.0)),
+            16.0,
+            Srgba::new(0.0, 0.0, 0.0, 1.0),
+            &mut text_ctx,
+        );
+
+        assert!(scene.text_run_count() > 0);
+        let run = &scene.text_runs()[0];
+        // At 2× scale the text run x is in device pixels.
+        // The 200 logical px wide rect = 400 device px; text starts in left 200 device px.
+        assert!(run.origin.x >= 0.0, "text should start at or after origin");
+        assert!(
+            run.origin.x <= 200.0,
+            "text start should be within left half of device-pixel rect"
+        );
     }
 }
